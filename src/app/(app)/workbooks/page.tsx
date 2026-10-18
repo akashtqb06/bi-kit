@@ -384,13 +384,14 @@ function WorkbooksContent() {
                 enableSorting: true,
             },
             ...(currentUser?.role === 'admin'
-                ? ([
+                ? [
                       {
+                          accessorKey: 'owner',
                           id: 'owner',
-                          header: ({ column }) => (
+                          header: ({ column }: { column: any }) => (
                               <DataTableColumnHeader column={column} title="Owner" />
                           ),
-                          cell: ({ row }) => {
+                          cell: ({ row }: { row: any }) => {
                               const wb = row.original;
                               const isMe = wb.ownerId === currentUser?.id;
                               const displayName = isMe ? 'You' : (wb.owner?.name || wb.owner?.email || 'Unknown');
@@ -411,8 +412,8 @@ function WorkbooksContent() {
                               );
                           },
                           enableSorting: false,
-                      },
-                  ] as LegacyColumnDef<WorkbookWithCounts, unknown>[])
+                      } as LegacyColumnDef<WorkbookWithCounts, unknown>,
+                  ]
                 : []),
             {
                 accessorKey: 'queriesCount',
@@ -539,7 +540,7 @@ function WorkbooksContent() {
                 enableHiding: false,
             },
         ];
-    }, [router, handleDuplicate, currentUser?.id, currentUser?.role]);
+    }, [router, handleDuplicate, currentUser]);
 
     return (
         <TooltipProvider>

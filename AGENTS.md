@@ -46,6 +46,7 @@ This repository is an MVP BI tool using Next.js App Router, TypeScript, shadcn/u
 - Read [docs/SPEC.md](docs/SPEC.md) before changing domain behavior; keep implementation aligned with its MVP scope and acceptance criteria.
 - Do not add product features outside the requested scope without explicit direction.
 - Add or update focused tests for validation, resource relationships, and query safety when implementing those behaviors.
+- When cleaning dependencies, preserve packages imported by CSS and build configuration such as `postcss.config.mjs`, `next.config.ts`, and `components.json`; static dependency scanners may not detect those imports.
 - Run the relevant lint, typecheck, test, or build command for the changed code and report any check that could not be run.
 - Do not add feature code when a task asks only for documentation or planning.
 

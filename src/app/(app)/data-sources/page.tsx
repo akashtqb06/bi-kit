@@ -454,13 +454,14 @@ function DataSourcesContent() {
                 enableHiding: false,
             },
             ...(currentUser?.role === 'admin'
-                ? ([
+                ? [
                       {
+                          accessorKey: 'owner',
                           id: 'owner',
-                          header: ({ column }) => (
+                          header: ({ column }: { column: any }) => (
                               <DataTableColumnHeader column={column} title="Owner" />
                           ),
-                          cell: ({ row }) => {
+                          cell: ({ row }: { row: any }) => {
                               const source = row.original;
                               const isMe = source.ownerId === currentUser?.id;
                               const displayName = isMe ? 'You' : (source.owner?.name || source.owner?.email || 'Unknown');
@@ -481,8 +482,8 @@ function DataSourcesContent() {
                               );
                           },
                           enableSorting: false,
-                      },
-                  ] as LegacyColumnDef<DataSourcePublic, unknown>[])
+                      } as LegacyColumnDef<DataSourcePublic, unknown>,
+                  ]
                 : []),
             {
                 accessorKey: 'type',

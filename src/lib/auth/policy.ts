@@ -35,7 +35,6 @@ export function can(user: PolicyUser, action: Action, resource: Resource): boole
 }
 
 import { NotFoundError } from "@src/lib/connectors/types";
-export { NotFoundError };
 
 export class UnauthorizedError extends Error {
   constructor(message = "Unauthorized") {
