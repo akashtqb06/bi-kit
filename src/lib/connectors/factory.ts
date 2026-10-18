@@ -24,7 +24,7 @@ export function createConnector(source: DataSource): Connector {
     throw new ConnectorError(`Unknown data source type: ${String(source.type)}`, 'UNKNOWN_TYPE');
 }
 
-function resolveSourcePath(filePath: string): string {
+export function resolveSourcePath(filePath: string): string {
     const resolvedPath = path.resolve(process.cwd(), filePath);
     if (!fs.existsSync(resolvedPath)) {
         throw new ConnectorError('Data source file was not found.', 'SOURCE_NOT_FOUND');

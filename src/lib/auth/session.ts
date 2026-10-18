@@ -61,7 +61,38 @@ export async function createSession(
     return session;
 }
 
+let testSessionContext: SessionContext | null | undefined = undefined;
+
+export function setTestSessionUser(user: User | null | undefined): void {
+    if (user === undefined) {
+        testSessionContext = undefined;
+    } else if (user === null) {
+        testSessionContext = null;
+    } else {
+        testSessionContext = {
+            user,
+            session: {
+                id: 'test-session-id',
+                userId: user.id,
+                tokenHash: 'test-token-hash',
+                createdAt: new Date(),
+                lastUsedAt: new Date(),
+                expiresAt: new Date(Date.now() + 3600_000),
+                ipAddress: '127.0.0.1',
+                userAgent: 'Vitest',
+            },
+        };
+    }
+}
+
+export function isTestSessionExplicit(): boolean {
+    return testSessionContext !== undefined;
+}
+
 async function readSession(): Promise<SessionContext | null> {
+    if (process.env.NODE_ENV === 'test' && testSessionContext !== undefined) {
+        return testSessionContext;
+    }
     try {
         await connection();
     } catch {}
@@ -71,6 +102,7 @@ async function readSession(): Promise<SessionContext | null> {
     } catch {
         return null;
     }
+
     if (!token) return null;
 
     const tokenHash = hashToken(token);
@@ -101,7 +133,7 @@ async function readSession(): Promise<SessionContext | null> {
     return { session, user };
 }
 
-export const getSession = cache(readSession);
+export const getSession = process.env.NODE_ENV === 'test' ? readSession : cache(readSession);
 
 export async function destroySession(): Promise<void> {
     const cookieStore = await cookies();

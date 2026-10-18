@@ -144,6 +144,7 @@ describe('workbooks backend services and endpoints', () => {
         db.insert(dashboards)
             .values({
                 id: newId(),
+                ownerId: testUser.id,
                 workbookId: original.id,
                 name: 'D',
                 layout: JSON.stringify([{ i: 'tile-1', chartId: cId, x: 0, y: 0, w: 4, h: 4 }]),

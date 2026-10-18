@@ -82,6 +82,7 @@ import type { SortingState, PaginationState } from '@tanstack/react-table';
 import type { DashboardSummary } from '@src/lib/dashboards/service';
 import type { WorkbookWithCounts } from '@src/lib/workbooks/service';
 import type { LayoutItem } from '@src/lib/schemas';
+import { useCurrentUser } from '@src/components/auth/user-provider';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -214,6 +215,9 @@ function DashboardTileCard({
     onOpenDelete: (d: DashboardSummary) => void;
 }) {
     const router = useRouter();
+    const currentUser = useCurrentUser();
+    const isMe = dashboard.ownerId === currentUser?.id;
+    const ownerDisplay = isMe ? 'You' : (dashboard.owner?.name || dashboard.owner?.email || 'Unknown');
 
     return (
         <div
@@ -303,6 +307,9 @@ function DashboardTileCard({
                             </DropdownMenu>
                         </div>
                     </div>
+                    <div className="text-[11px] text-muted-foreground truncate pt-0.5">
+                        by <span className="text-foreground/80 font-medium">{ownerDisplay}</span>
+                    </div>
                 </div>
 
                 <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
@@ -337,6 +344,7 @@ function DashboardTileCard({
 // ---------------------------------------------------------------------------
 
 function DashboardsContent() {
+    const currentUser = useCurrentUser();
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -837,6 +845,38 @@ function DashboardsContent() {
                 },
                 enableSorting: true,
             },
+            ...(currentUser?.role === 'admin'
+                ? [
+                      {
+                          accessorKey: 'owner',
+                          id: 'owner',
+                          header: ({ column }: { column: any }) => (
+                              <DataTableColumnHeader column={column} title="Owner" />
+                          ),
+                          cell: ({ row }: { row: any }) => {
+                              const d = row.original;
+                              const isMe = d.ownerId === currentUser?.id;
+                              const displayName = isMe ? 'You' : (d.owner?.name || d.owner?.email || 'Unknown');
+                              const initials = isMe
+                                  ? 'YOU'
+                                  : (d.owner?.name
+                                        ? d.owner.name.slice(0, 2).toUpperCase()
+                                        : d.owner?.email?.slice(0, 2).toUpperCase() ?? '??');
+                              return (
+                                  <div className="flex items-center gap-2">
+                                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                                          {initials.slice(0, 2)}
+                                      </span>
+                                      <span className="text-sm text-foreground truncate max-w-[120px]" title={d.owner?.name || d.owner?.email}>
+                                          {displayName}
+                                      </span>
+                                  </div>
+                              );
+                          },
+                          enableSorting: false,
+                      } as LegacyColumnDef<DashboardSummary, unknown>,
+                  ]
+                : []),
             {
                 accessorKey: 'workbookTitle',
                 id: 'workbook',
@@ -960,7 +1000,7 @@ function DashboardsContent() {
                 enableHiding: false,
             },
         ];
-    }, [router, handleDuplicate, handleToggleFavorite]);
+    }, [router, handleDuplicate, handleToggleFavorite, currentUser]);
 
     return (
         <TooltipProvider>

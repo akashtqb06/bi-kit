@@ -2,7 +2,7 @@
 
 import React, { use, useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
 import dynamic from 'next/dynamic';
-import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -164,11 +164,10 @@ function DashboardViewerContent({ params }: { params: Promise<{ did: string }> }
             try {
                 const dashRes = await fetch(`/api/dashboards/${dashboardId}`);
                 if (!dashRes.ok) {
-                    throw new Error(
-                        dashRes.status === 404
-                            ? `Dashboard not found`
-                            : 'Failed to load dashboard'
-                    );
+                    if (dashRes.status === 404 || dashRes.status === 403) {
+                        notFound();
+                    }
+                    throw new Error('Failed to load dashboard');
                 }
                 const dashJson = await dashRes.json();
                 const dash: DashboardPublic = dashJson.data;

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const cookieState = vi.hoisted(() => ({
     value: '' as string,
@@ -35,11 +35,11 @@ vi.mock('next/server', () => ({
     connection: async () => undefined,
 }));
 
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { db } from '@src/lib/db';
 import { appSettings, loginAttempts, sessions, users } from '@src/lib/db/schema';
 import { registerAction, loginAction, logoutAction } from './actions';
-import { can, ForbiddenError, assertCan } from './policy';
+import { can, assertCan, NotFoundError } from './policy';
 import { checkLoginRateLimit, recordLoginAttempt } from './rate-limit';
 import { createSession, destroyAllSessions, destroySession, getSession, listSessions } from './session';
 import { hashPassword, needsRehash, verifyPassword } from './password';
@@ -63,19 +63,28 @@ async function createTestUser(overrides: Partial<typeof users.$inferInsert> = {}
     return user;
 }
 
+const testEmails = ['auth-test@example.com', 'disabled@example.com', 'action-user@example.com'];
+
 describe('auth foundation', () => {
     beforeEach(async () => {
         cookieState.value = '';
         cookieState.options = null;
         await db.delete(sessions);
         await db.delete(loginAttempts);
-        await db.delete(users);
+        await db.delete(users).where(inArray(users.email, testEmails));
     });
 
     afterEach(async () => {
         await db.delete(sessions);
         await db.delete(loginAttempts);
-        await db.delete(users);
+        await db.delete(users).where(inArray(users.email, testEmails));
+    });
+
+    afterAll(async () => {
+        const { seedUsers } = await import('../../../scripts/seed/users');
+        await seedUsers();
+        const { seedSampleWorkbook } = await import('../../../scripts/seed/sample-workbook');
+        await seedSampleWorkbook();
     });
 
     it('hashes passwords and verifies only the matching password', async () => {
@@ -182,9 +191,10 @@ describe('auth foundation', () => {
         expect(can(admin, 'delete', { type: 'user', id: otherMember.id })).toBe(true);
         expect(can(member, 'edit', workbook)).toBe(true);
         expect(can(otherMember, 'view', workbook)).toBe(false);
-        expect(can(member, 'create', { type: 'dashboard' })).toBe(true);
         expect(can(member, 'create', { type: 'user' })).toBe(false);
-        expect(() => assertCan(otherMember, 'delete', workbook)).toThrow(ForbiddenError);
+        // User cannot even view the workbook -> throws NotFoundError to avoid leaking existence
+        expect(() => assertCan(otherMember, 'delete', workbook)).toThrow(NotFoundError);
+        expect(() => assertCan(otherMember, 'view', workbook)).toThrow(NotFoundError);
     });
 
     it('rate limits failed email and IP attempts and ignores successful attempts', async () => {

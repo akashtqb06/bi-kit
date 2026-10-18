@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { SqliteConnector } from '@src/lib/connectors/sqlite-connector';
+import { resolveSourcePath } from '@src/lib/connectors/factory';
 import { handleApiError } from '@src/app/api/utils';
+import { requireUserApi } from '@src/lib/auth/dal';
 
 const testSchema = z.object({
     type: z.literal('sqlite'),
@@ -10,10 +12,11 @@ const testSchema = z.object({
 
 export async function POST(req: Request): Promise<NextResponse> {
     try {
+        await requireUserApi();
         const body: unknown = await req.json();
         const { config } = testSchema.parse(body);
 
-        const connector = new SqliteConnector(config.path);
+        const connector = new SqliteConnector(resolveSourcePath(config.path));
         try {
             connector.testConnection();
             const tables = connector.getTables();

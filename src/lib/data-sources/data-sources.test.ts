@@ -185,24 +185,33 @@ describe('Data Sources Service & Table Integration', () => {
     });
 
     it('tests connection via API route handler', async () => {
-        const { source } = createCsvDataSource({
-            name: 'API Test CSV',
-            csvText: 'col1,col2\nv1,v2',
-            originalFileName: 'api_test.csv',
-        });
+        const { setTestSessionUser } = await import('@src/lib/auth/session');
+        const testUser = db.select().from(users).where(eq(users.role, 'admin')).get() ?? db.select().from(users).get()!;
+        setTestSessionUser(testUser);
 
-        const req = new Request(`http://localhost/api/data-sources/${source.id}/test`, {
-            method: 'POST',
-        });
-        const res = await testApi.POST(req, {
-            params: Promise.resolve({ id: source.id }),
-        });
+        try {
+            const { source } = createCsvDataSource({
+                name: 'API Test CSV',
+                csvText: 'col1,col2\nv1,v2',
+                originalFileName: 'api_test.csv',
+                ownerId: testUser.id,
+            });
 
-        expect(res.status).toBe(200);
-        const json = (await res.json()) as { data?: { ok: boolean; tableCount: number } };
-        expect(json.data?.ok).toBe(true);
-        expect(json.data?.tableCount).toBe(1);
+            const req = new Request(`http://localhost/api/data-sources/${source.id}/test`, {
+                method: 'POST',
+            });
+            const res = await testApi.POST(req, {
+                params: Promise.resolve({ id: source.id }),
+            });
 
-        deleteDataSource(source.id);
+            expect(res.status).toBe(200);
+            const json = (await res.json()) as { data?: { ok: boolean; tableCount: number } };
+            expect(json.data?.ok).toBe(true);
+            expect(json.data?.tableCount).toBe(1);
+
+            deleteDataSource(source.id);
+        } finally {
+            setTestSessionUser(null);
+        }
     });
 });

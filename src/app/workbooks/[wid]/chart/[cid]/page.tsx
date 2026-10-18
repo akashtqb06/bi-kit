@@ -69,8 +69,17 @@ function ChartEditorSkeleton() {
   );
 }
 
+import { notFound } from "next/navigation";
+import { eq } from "drizzle-orm";
+import { db } from "@src/lib/db";
+import { charts } from "@src/lib/db/schema";
+
 async function ChartPageContent({ params }: ChartPageProps) {
   const { wid, cid } = await params;
+  const chart = db.select().from(charts).where(eq(charts.id, cid)).get();
+  if (!chart || chart.workbookId !== wid) {
+    notFound();
+  }
 
   return (
     <div className="flex flex-1 min-h-0 min-w-0 w-full overflow-hidden">

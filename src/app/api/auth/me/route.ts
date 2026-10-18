@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@src/lib/auth/dal';
+import { requireUserApi } from '@src/lib/auth/dal';
+import { handleApiError } from '@src/app/api/utils';
 
 export async function GET() {
-    const user = await getCurrentUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    return NextResponse.json(user);
+    try {
+        const user = await requireUserApi();
+        return NextResponse.json(user);
+    } catch (err) {
+        return handleApiError(err);
+    }
 }

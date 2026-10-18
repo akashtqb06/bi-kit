@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
-import { db, getDb, resetConnection } from './client';
+import { getDb } from './client';
 import { APP_DB_PATH, DATA_DIR, refreshPaths } from './paths';
 import { assertTestIsolationGuard } from './guard';
 

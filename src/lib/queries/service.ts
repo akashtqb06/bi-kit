@@ -1,9 +1,10 @@
 import { eq } from "drizzle-orm";
 import { db } from "@src/lib/db";
-import { queries, charts, type Query } from "@src/lib/db/schema";
+import { queries, charts, workbooks, type Query } from "@src/lib/db/schema";
 import { NotFoundError } from "@src/lib/connectors/types";
 import { getWorkbook } from "@src/lib/workbooks/service";
 import { getDataSource } from "@src/lib/data-sources/service";
+import { newId } from "@src/lib/db/id";
 import type { CreateQueryInput } from "@src/lib/schemas";
 
 // ---------------------------------------------------------------------------
@@ -20,6 +21,7 @@ export interface QueryPublic {
   sql: string;
   createdAt: Date | null;
   updatedAt: Date | null;
+  createdBy?: string | null;
 }
 
 function toPublic(row: Query): QueryPublic {
@@ -33,6 +35,7 @@ function toPublic(row: Query): QueryPublic {
     sql: row.sql,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+    createdBy: row.createdBy,
   };
 }
 
@@ -40,10 +43,27 @@ function toPublic(row: Query): QueryPublic {
 // Service functions
 // ---------------------------------------------------------------------------
 
-export function listQueries(workbookId?: string): QueryPublic[] {
-  const rows = workbookId
-    ? db.select().from(queries).where(eq(queries.workbookId, workbookId)).all()
-    : db.select().from(queries).all();
+export function listQueries(workbookId?: string, user?: { id: string; role: string }): QueryPublic[] {
+  if (workbookId) {
+    if (user && user.role !== "admin") {
+      const wb = db.select().from(workbooks).where(eq(workbooks.id, workbookId)).get();
+      if (!wb || wb.ownerId !== user.id) return [];
+    }
+    const rows = db.select().from(queries).where(eq(queries.workbookId, workbookId)).all();
+    return rows.map(toPublic);
+  }
+
+  if (user && user.role !== "admin") {
+    const rows = db
+      .select({ query: queries })
+      .from(queries)
+      .innerJoin(workbooks, eq(queries.workbookId, workbooks.id))
+      .where(eq(workbooks.ownerId, user.id))
+      .all();
+    return rows.map((r) => toPublic(r.query));
+  }
+
+  const rows = db.select().from(queries).all();
   return rows.map(toPublic);
 }
 
@@ -57,26 +77,26 @@ export function getQueryPublic(id: string): QueryPublic {
   return toPublic(getQuery(id));
 }
 
-export function createQuery(input: CreateQueryInput): QueryPublic {
+export function createQuery(input: CreateQueryInput, createdBy?: string): QueryPublic {
   // Verify FK relationships are valid
   getWorkbook(input.workbookId);
   getDataSource(input.dataSourceId);
 
+  const id = newId();
   db.insert(queries)
     .values({
+      id,
       workbookId: input.workbookId,
       name: input.name,
       dataSourceId: input.dataSourceId,
       mode: input.mode ?? "sql",
       definition: input.definition ?? "[]",
       sql: input.sql ?? "",
+      createdBy: createdBy ?? null,
     })
     .run();
 
-  const rows = db.select().from(queries).orderBy(queries.createdAt).all();
-  const row = rows.at(-1);
-  if (!row) throw new Error("Insert succeeded but row not found");
-  return toPublic(row);
+  return getQueryPublic(id);
 }
 
 export function updateQuery(

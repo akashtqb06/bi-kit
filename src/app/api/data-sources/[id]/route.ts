@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
+  getDataSource,
   getDataSourcePublic,
   updateDataSource,
   deleteDataSource,
 } from "@src/lib/data-sources/service";
 import { handleApiError } from "@src/app/api/utils";
+import { requireUserApi, assertCan } from "@src/lib/auth/dal";
 
 const updateSchema = z.object({
   name: z.string().min(1).max(255).optional(),
@@ -19,7 +21,10 @@ export async function GET(
   { params }: RouteParams
 ): Promise<NextResponse> {
   try {
+    const user = await requireUserApi();
     const { id } = await params;
+    const source = getDataSource(id);
+    assertCan(user, "view", { type: "data_source", id, ownerId: source.ownerId });
     const data = getDataSourcePublic(id);
     return NextResponse.json({ data });
   } catch (err) {
@@ -32,7 +37,10 @@ export async function PUT(
   { params }: RouteParams
 ): Promise<NextResponse> {
   try {
+    const user = await requireUserApi();
     const { id } = await params;
+    const source = getDataSource(id);
+    assertCan(user, "edit", { type: "data_source", id, ownerId: source.ownerId });
     const body: unknown = await req.json();
     const input = updateSchema.parse(body);
     const data = updateDataSource(id, input);
@@ -47,7 +55,10 @@ export async function PATCH(
   { params }: RouteParams
 ): Promise<NextResponse> {
   try {
+    const user = await requireUserApi();
     const { id } = await params;
+    const source = getDataSource(id);
+    assertCan(user, "edit", { type: "data_source", id, ownerId: source.ownerId });
     const body: unknown = await req.json();
     const input = updateSchema.parse(body);
     const data = updateDataSource(id, input);
@@ -62,7 +73,10 @@ export async function DELETE(
   { params }: RouteParams
 ): Promise<NextResponse> {
   try {
+    const user = await requireUserApi();
     const { id } = await params;
+    const source = getDataSource(id);
+    assertCan(user, "delete", { type: "data_source", id, ownerId: source.ownerId });
     deleteDataSource(id);
     return NextResponse.json({ data: { ok: true } });
   } catch (err) {

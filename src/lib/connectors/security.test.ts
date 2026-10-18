@@ -19,7 +19,7 @@ describe('connector security', () => {
 
         source = {
             id: 'connector-security-test',
-            ownerId: null,
+            ownerId: 'test-user',
             name: 'Connector security test',
             slug: null,
             type: 'sqlite',

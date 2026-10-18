@@ -57,6 +57,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DataTable, DataTableColumnHeader } from '@src/components/ui/data-table';
 import { AddDataSourceDialog } from '@src/components/datasource/add-data-source-dialog';
 import { SchemaBrowserSheet } from '@src/components/datasource/schema-browser-sheet';
+import { useCurrentUser } from '@src/components/auth/user-provider';
 import type { DataSourcePublic } from '@src/lib/data-sources/service';
 
 // ---------------------------------------------------------------------------
@@ -116,6 +117,7 @@ type ConnectionStatus = 'unknown' | 'testing' | 'connected' | 'error';
 // ---------------------------------------------------------------------------
 
 function DataSourcesContent() {
+    const currentUser = useCurrentUser();
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
@@ -451,6 +453,37 @@ function DataSourcesContent() {
                 enableSorting: true,
                 enableHiding: false,
             },
+            ...(currentUser?.role === 'admin'
+                ? ([
+                      {
+                          id: 'owner',
+                          header: ({ column }) => (
+                              <DataTableColumnHeader column={column} title="Owner" />
+                          ),
+                          cell: ({ row }) => {
+                              const source = row.original;
+                              const isMe = source.ownerId === currentUser?.id;
+                              const displayName = isMe ? 'You' : (source.owner?.name || source.owner?.email || 'Unknown');
+                              const initials = isMe
+                                  ? 'YOU'
+                                  : (source.owner?.name
+                                        ? source.owner.name.slice(0, 2).toUpperCase()
+                                        : source.owner?.email?.slice(0, 2).toUpperCase() ?? '??');
+                              return (
+                                  <div className="flex items-center gap-2">
+                                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                                          {initials.slice(0, 2)}
+                                      </span>
+                                      <span className="text-sm text-foreground truncate max-w-[120px]" title={source.owner?.name || source.owner?.email}>
+                                          {displayName}
+                                      </span>
+                                  </div>
+                              );
+                          },
+                          enableSorting: false,
+                      },
+                  ] as LegacyColumnDef<DataSourcePublic, unknown>[])
+                : []),
             {
                 accessorKey: 'type',
                 header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
@@ -613,7 +646,7 @@ function DataSourcesContent() {
                 enableHiding: false,
             },
         ],
-        [handleSchemaView, testConnection, openRenameDialog, statusMap]
+        [handleSchemaView, testConnection, openRenameDialog, statusMap, currentUser]
     );
 
     // Controlled column filters

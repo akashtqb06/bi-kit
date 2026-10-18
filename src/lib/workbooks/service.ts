@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@src/lib/db";
 import { newId } from "@src/lib/db/id";
 import { workbooks, queries, charts, dashboards, users, type Workbook } from "@src/lib/db/schema";
@@ -19,6 +19,8 @@ export interface WorkbookPublic {
 }
 
 export interface WorkbookWithCounts extends WorkbookPublic {
+  ownerId?: string;
+  owner?: { id: string; name: string | null; email: string; avatarUrl?: string | null };
   queriesCount: number;
   chartsCount: number;
   dashboardsCount: number;
@@ -54,6 +56,7 @@ function toPublicWithCounts(
   const d = counts?.dashboardsCount ?? 0;
   return {
     id: row.id,
+    ownerId: row.ownerId,
     name: row.name,
     description: row.description,
     createdAt: row.createdAt,
@@ -80,11 +83,15 @@ export function listWorkbooks(user?: PolicyUser): WorkbookWithCounts[] {
       description: workbooks.description,
       createdAt: workbooks.createdAt,
       updatedAt: workbooks.updatedAt,
+      ownerName: users.name,
+      ownerEmail: users.email,
+      ownerAvatarUrl: users.avatarUrl,
       queriesCount: sql<number>`count(distinct ${queries.id})`.mapWith(Number),
       chartsCount: sql<number>`count(distinct ${charts.id})`.mapWith(Number),
       dashboardsCount: sql<number>`count(distinct ${dashboards.id})`.mapWith(Number),
     })
     .from(workbooks)
+    .leftJoin(users, eq(workbooks.ownerId, users.id))
     .leftJoin(queries, eq(queries.workbookId, workbooks.id))
     .leftJoin(charts, eq(charts.workbookId, workbooks.id))
     .leftJoin(dashboards, eq(dashboards.workbookId, workbooks.id));
@@ -94,12 +101,21 @@ export function listWorkbooks(user?: PolicyUser): WorkbookWithCounts[] {
   }
 
   const rows = queryBuilder
-    .groupBy(workbooks.id)
+    .groupBy(workbooks.id, users.id)
     .orderBy(workbooks.createdAt)
     .all();
 
   return rows.map((row) => ({
     id: row.id,
+    ownerId: row.ownerId,
+    owner: row.ownerId
+      ? {
+          id: row.ownerId,
+          name: row.ownerName,
+          email: row.ownerEmail ?? "",
+          avatarUrl: row.ownerAvatarUrl,
+        }
+      : undefined,
     name: row.name,
     description: row.description,
     createdAt: row.createdAt,
@@ -133,7 +149,7 @@ export function createWorkbook(
   db.insert(workbooks)
     .values({
       id: insertedId,
-      ownerId: finalOwnerId,
+      ownerId: finalOwnerId!,
       name: input.name,
       slug: input.slug,
       description: input.description ?? "",
@@ -156,7 +172,7 @@ export function updateWorkbook(
   return getWorkbookPublic(id);
 }
 
-export function duplicateWorkbook(id: string, customName?: string): WorkbookWithCounts {
+export function duplicateWorkbook(id: string, customName?: string, ownerId?: string): WorkbookWithCounts {
   const source = getWorkbook(id);
   const sourceQueries = db.select().from(queries).where(eq(queries.workbookId, id)).all();
   const sourceCharts = db.select().from(charts).where(eq(charts.workbookId, id)).all();
@@ -164,12 +180,13 @@ export function duplicateWorkbook(id: string, customName?: string): WorkbookWith
 
   const newWorkbookId = newId();
   const newName = customName?.trim() || `${source.name} (Copy)`;
+  const finalOwnerId = ownerId ?? source.ownerId;
 
   db.transaction((tx) => {
     tx.insert(workbooks)
       .values({
         id: newWorkbookId,
-        ownerId: source.ownerId,
+        ownerId: finalOwnerId,
         name: newName,
         description: source.description,
       })
@@ -188,7 +205,7 @@ export function duplicateWorkbook(id: string, customName?: string): WorkbookWith
           mode: q.mode,
           definition: q.definition,
           sql: q.sql,
-          createdBy: q.createdBy,
+          createdBy: finalOwnerId,
         })
         .run();
     }
@@ -206,7 +223,7 @@ export function duplicateWorkbook(id: string, customName?: string): WorkbookWith
           name: c.name,
           type: c.type,
           config: c.config,
-          createdBy: c.createdBy,
+          createdBy: finalOwnerId,
         })
         .run();
     }
@@ -233,12 +250,12 @@ export function duplicateWorkbook(id: string, customName?: string): WorkbookWith
         .values({
           id: newDashboardId,
           workbookId: newWorkbookId,
-          ownerId: d.ownerId,
+          ownerId: finalOwnerId,
           name: d.name,
           layout: updatedLayout,
           filters: d.filters,
           autoRefresh: d.autoRefresh,
-          createdBy: d.createdBy,
+          createdBy: finalOwnerId,
         })
         .run();
     }
@@ -252,14 +269,19 @@ export function duplicateWorkbook(id: string, customName?: string): WorkbookWith
   });
 }
 
-export function bulkDeleteWorkbooks(ids: string[]): void {
+export function bulkDeleteWorkbooks(ids: string[], user?: PolicyUser): void {
   if (ids.length === 0) return;
 
+  const targetIds = user && user.role !== "admin"
+    ? db.select({ id: workbooks.id }).from(workbooks).where(and(inArray(workbooks.id, ids), eq(workbooks.ownerId, user.id))).all().map(r => r.id)
+    : ids;
+  if (targetIds.length === 0) return;
+
   db.transaction((tx) => {
-    tx.delete(dashboards).where(inArray(dashboards.workbookId, ids)).run();
-    tx.delete(charts).where(inArray(charts.workbookId, ids)).run();
-    tx.delete(queries).where(inArray(queries.workbookId, ids)).run();
-    tx.delete(workbooks).where(inArray(workbooks.id, ids)).run();
+    tx.delete(dashboards).where(inArray(dashboards.workbookId, targetIds)).run();
+    tx.delete(charts).where(inArray(charts.workbookId, targetIds)).run();
+    tx.delete(queries).where(inArray(queries.workbookId, targetIds)).run();
+    tx.delete(workbooks).where(inArray(workbooks.id, targetIds)).run();
   });
 }
 

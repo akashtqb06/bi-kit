@@ -51,12 +51,20 @@ export function WorkbookShellSkeleton() {
         </div>
     );
 }
+import { notFound } from 'next/navigation';
+import { eq } from 'drizzle-orm';
+import { db } from '@src/lib/db';
+import { workbooks } from '@src/lib/db/schema';
 import { UserProvider } from '@src/components/auth/user-provider';
-import { requireUser } from '@src/lib/auth/dal';
+import { requireUser, can } from '@src/lib/auth/dal';
 
 async function WorkbookLayoutContent({ children, params }: WorkbookLayoutProps) {
     const { wid } = await params;
     const user = await requireUser(`/workbooks/${wid}`);
+    const wb = db.select().from(workbooks).where(eq(workbooks.id, wid)).get();
+    if (!wb || !can(user, 'view', { type: 'workbook', id: wid, ownerId: wb.ownerId })) {
+        notFound();
+    }
 
     return (
         <UserProvider user={user}>

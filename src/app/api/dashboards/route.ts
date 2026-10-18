@@ -9,9 +9,9 @@ import {
   createDashboard,
   bulkDeleteDashboards,
 } from "@src/lib/dashboards/service";
+import { getWorkbook } from "@src/lib/workbooks/service";
 import { handleApiError } from "@src/app/api/utils";
-
-import { getCurrentUser } from "@src/lib/auth/dal";
+import { requireUserApi, assertCan } from "@src/lib/auth/dal";
 
 const createDashboardApiSchema = z
   .object({
@@ -25,7 +25,7 @@ const createDashboardApiSchema = z
 
 export async function GET(req: Request): Promise<NextResponse> {
   try {
-    const user = await getCurrentUser();
+    const user = await requireUserApi();
     const { searchParams } = new URL(req.url);
     const q = searchParams.get("q") ?? undefined;
     const workbookId = searchParams.get("workbookId") ?? undefined;
@@ -35,7 +35,7 @@ export async function GET(req: Request): Promise<NextResponse> {
         q,
         workbookId,
         filter,
-        user ? { id: user.id, role: user.role } : undefined
+        { id: user.id, role: user.role }
       ),
     });
   } catch (err) {
@@ -45,17 +45,19 @@ export async function GET(req: Request): Promise<NextResponse> {
 
 export async function POST(req: Request): Promise<NextResponse> {
   try {
+    const user = await requireUserApi();
     const body: unknown = await req.json();
     const parsed = createDashboardApiSchema.parse(body);
     const { workbookId, ...dashboardInput } = parsed;
     const title = (dashboardInput.title ?? dashboardInput.name)!.trim();
-    const user = await getCurrentUser();
+    const wb = getWorkbook(workbookId);
+    assertCan(user, 'edit', { type: 'workbook', id: workbookId, ownerId: wb.ownerId });
     return NextResponse.json(
       {
         data: createDashboard(workbookId, {
           ...dashboardInput,
           name: title,
-          ownerId: user?.id,
+          ownerId: user.id,
         }),
       },
       { status: 201 }
@@ -67,11 +69,13 @@ export async function POST(req: Request): Promise<NextResponse> {
 
 export async function DELETE(req: Request): Promise<NextResponse> {
   try {
+    const user = await requireUserApi();
     const body: unknown = await req.json();
     const { ids } = bulkDeleteDashboardsSchema.parse(body);
-    bulkDeleteDashboards(ids);
+    bulkDeleteDashboards(ids, { id: user.id, role: user.role });
     return NextResponse.json({ data: { ok: true, count: ids.length } });
   } catch (err) {
     return handleApiError(err);
   }
 }
+

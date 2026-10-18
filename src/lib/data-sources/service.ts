@@ -18,6 +18,8 @@ import type { PolicyUser } from '@src/lib/auth/policy';
 
 export interface DataSourcePublic {
     id: string;
+    ownerId?: string;
+    owner?: { id: string; name: string | null; email: string; avatarUrl?: string | null };
     name: string;
     type: DataSourceType;
     slug?: string | null;
@@ -38,6 +40,7 @@ function getDefaultOwnerId(): string | null {
 function toPublic(row: DataSource, queryCount = 0, tableCount: number | null = null): DataSourcePublic {
     return {
         id: row.id,
+        ownerId: row.ownerId,
         name: row.name,
         type: row.type as DataSourceType,
         slug: row.slug,
@@ -63,9 +66,13 @@ export function listDataSources(user?: PolicyUser): DataSourcePublic[] {
             config: dataSources.config,
             createdAt: dataSources.createdAt,
             updatedAt: dataSources.updatedAt,
+            ownerName: users.name,
+            ownerEmail: users.email,
+            ownerAvatarUrl: users.avatarUrl,
             queryCount: count(queries.id),
         })
         .from(dataSources)
+        .leftJoin(users, eq(dataSources.ownerId, users.id))
         .leftJoin(queries, eq(queries.dataSourceId, dataSources.id));
 
     if (user && user.role !== 'admin') {
@@ -73,7 +80,7 @@ export function listDataSources(user?: PolicyUser): DataSourcePublic[] {
     }
 
     const rows = queryBuilder
-        .groupBy(dataSources.id)
+        .groupBy(dataSources.id, users.id)
         .all();
 
     return rows.map((row) => {
@@ -100,6 +107,15 @@ export function listDataSources(user?: PolicyUser): DataSourcePublic[] {
 
         return {
             id: row.id,
+            ownerId: row.ownerId,
+            owner: row.ownerId
+                ? {
+                      id: row.ownerId,
+                      name: row.ownerName,
+                      email: row.ownerEmail ?? '',
+                      avatarUrl: row.ownerAvatarUrl,
+                  }
+                : undefined,
             name: row.name,
             type: row.type as DataSourceType,
             queryCount: Number(row.queryCount ?? 0),
@@ -151,7 +167,7 @@ export function createDataSource(
     db.insert(dataSources)
         .values({
             id: insertedId,
-            ownerId: finalOwnerId,
+            ownerId: finalOwnerId!,
             name: input.name,
             slug: input.slug,
             type: input.type,
@@ -177,7 +193,7 @@ export function createCsvDataSource(
         db.insert(dataSources)
             .values({
                 id,
-                ownerId: finalOwnerId,
+                ownerId: finalOwnerId!,
                 name: input.name,
                 slug: input.slug,
                 type: 'csv',
@@ -275,13 +291,16 @@ export interface BulkDeleteDataSourcesResult {
     blocked: { id: string; name: string; queryCount: number }[];
 }
 
-export function bulkDeleteDataSources(ids: string[]): BulkDeleteDataSourcesResult {
+export function bulkDeleteDataSources(ids: string[], user?: PolicyUser): BulkDeleteDataSourcesResult {
     if (ids.length === 0) {
         return { deleted: [], blocked: [] };
     }
 
     return db.transaction(() => {
-        const sources = db.select().from(dataSources).where(inArray(dataSources.id, ids)).all();
+        let sources = db.select().from(dataSources).where(inArray(dataSources.id, ids)).all();
+        if (user && user.role !== 'admin') {
+            sources = sources.filter((s) => s.ownerId === user.id);
+        }
         const sourceMap = new Map(sources.map((s) => [s.id, s]));
 
         const dependentQueries = db

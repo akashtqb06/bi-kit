@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import { eq, like } from 'drizzle-orm';
 import { db } from '@src/lib/db';
@@ -370,5 +370,12 @@ describe('Settings module & user service', () => {
             const user = await requireRole('admin', { next: '/settings/users' });
             expect(user.role).toBe('admin');
         });
+    });
+
+    afterAll(async () => {
+        const { seedUsers } = await import('../../../scripts/seed/users');
+        await seedUsers();
+        const { seedSampleWorkbook } = await import('../../../scripts/seed/sample-workbook');
+        await seedSampleWorkbook();
     });
 });

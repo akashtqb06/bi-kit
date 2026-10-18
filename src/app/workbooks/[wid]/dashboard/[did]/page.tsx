@@ -42,8 +42,17 @@ function DashboardEditorSkeleton() {
   );
 }
 
+import { notFound } from "next/navigation";
+import { eq } from "drizzle-orm";
+import { db } from "@src/lib/db";
+import { dashboards } from "@src/lib/db/schema";
+
 async function DashboardPageContent({ params }: DashboardPageProps) {
   const { wid, did } = await params;
+  const dashboard = db.select().from(dashboards).where(eq(dashboards.id, did)).get();
+  if (!dashboard || dashboard.workbookId !== wid) {
+    notFound();
+  }
 
   return (
     <div className="flex flex-1 min-h-0 min-w-0 w-full overflow-hidden">

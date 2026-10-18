@@ -6,6 +6,7 @@ import { compile, CompileError } from '@src/lib/query-engine/compiler';
 import { validateReadOnlyShape, ReadOnlyValidationError } from '@src/lib/query-engine/validate-readonly';
 import { handleApiError, apiError } from '@src/app/api/utils';
 import { ConnectorError, type SqlParam } from '@src/lib/connectors/types';
+import { requireUserApi, assertCan } from '@src/lib/auth/dal';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -56,11 +57,16 @@ interface RunQuerySuccess {
 
 export async function POST(req: Request): Promise<NextResponse> {
     try {
+        const user = await requireUserApi();
         const body: unknown = await req.json();
         const input = runQuerySchema.parse(body);
 
         // Load the data source (validates it exists, no config exposed)
         const source = getDataSource(input.dataSourceId);
+
+        // Verify the caller can view this data source
+        assertCan(user, 'view', { type: 'data_source', id: source.id, ownerId: source.ownerId });
+
 
         let finalSql: string;
         let params: unknown[] = [];

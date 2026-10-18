@@ -11,6 +11,11 @@ const { DATA_DIR, CSV_DIR } = await import('@src/lib/db/paths');
 
 const { runMigrations, resetConnection } = await import('@src/lib/db');
 runMigrations();
+const { seedUsers } = await import('../../../scripts/seed/users');
+const { admin } = await seedUsers();
+const { setTestSessionUser } = await import('@src/lib/auth/session');
+setTestSessionUser(admin);
+
 
 const dataSourcesApi = await import('@src/app/api/data-sources/route');
 const deleteDataSourceApi = await import('@src/app/api/data-sources/[id]/route');
@@ -76,6 +81,7 @@ function postJson(url: string, body: unknown): Request {
 }
 
 afterAll(() => {
+    setTestSessionUser(null);
     rmSync(appDatabaseDirectory, { recursive: true, force: true });
     if (previousDatabasePath) {
         process.env.APP_DB_PATH = previousDatabasePath;

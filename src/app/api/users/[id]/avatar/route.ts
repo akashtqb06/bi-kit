@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises';
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@src/lib/auth/dal';
+import { requireUserApi } from '@src/lib/auth/dal';
 import { getAvatarFilePath } from '@src/lib/auth/user-service';
+import { handleApiError } from '@src/app/api/utils';
 
 const MIME_MAP: Record<string, string> = {
     png: 'image/png',
@@ -14,15 +15,13 @@ export async function GET(
     _request: NextRequest,
     context: { params: Promise<{ id: string }> }
 ) {
-    const user = await getCurrentUser();
-    if (!user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    try {
+        await requireUserApi();
 
-    const { id } = await context.params;
-    if (!id) {
-        return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
-    }
+        const { id } = await context.params;
+        if (!id) {
+            return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+        }
 
     const avatar = await getAvatarFilePath(id);
     if (!avatar) {
@@ -42,5 +41,8 @@ export async function GET(
         });
     } catch {
         return NextResponse.json({ error: 'Failed to read avatar' }, { status: 500 });
+    }
+    } catch (err) {
+        return handleApiError(err);
     }
 }

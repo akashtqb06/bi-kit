@@ -50,6 +50,8 @@ export interface DashboardSummary {
   id: string;
   title: string;
   name: string;
+  ownerId?: string;
+  owner?: { id: string; name: string | null; email: string; avatarUrl?: string | null };
   workbookId: string;
   workbookTitle: string;
   workbookName: string;
@@ -147,8 +149,12 @@ export function listAllDashboards(
       createdAt: dashboards.createdAt,
       updatedAt: dashboards.updatedAt,
       workbookName: workbooks.name,
+      ownerName: users.name,
+      ownerEmail: users.email,
+      ownerAvatarUrl: users.avatarUrl,
     })
     .from(dashboards)
+    .leftJoin(users, eq(dashboards.ownerId, users.id))
     .leftJoin(workbooks, eq(dashboards.workbookId, workbooks.id))
     .leftJoin(
       dashboardFavorites,
@@ -205,6 +211,15 @@ export function listAllDashboards(
       id: row.id,
       title: row.name,
       name: row.name,
+      ownerId: row.ownerId,
+      owner: row.ownerId
+        ? {
+            id: row.ownerId,
+            name: row.ownerName,
+            email: row.ownerEmail ?? "",
+            avatarUrl: row.ownerAvatarUrl,
+          }
+        : undefined,
       workbookId: row.workbookId,
       workbookTitle,
       workbookName: workbookTitle,
@@ -263,7 +278,7 @@ export function createDashboard(
     .values({
       id: insertedId,
       workbookId,
-      ownerId,
+      ownerId: ownerId!,
       name,
       slug: input.slug,
       layout: serializeDashboardLayout(input.layout ?? []),
@@ -441,7 +456,13 @@ export function deleteDashboard(id: string): void {
   db.delete(dashboards).where(eq(dashboards.id, id)).run();
 }
 
-export function bulkDeleteDashboards(ids: string[]): void {
+export function bulkDeleteDashboards(ids: string[], user?: { id: string; role: string }): void {
   if (ids.length === 0) return;
+  if (user && user.role !== "admin") {
+    db.delete(dashboards)
+      .where(and(inArray(dashboards.id, ids), eq(dashboards.ownerId, user.id)))
+      .run();
+    return;
+  }
   db.delete(dashboards).where(inArray(dashboards.id, ids)).run();
 }

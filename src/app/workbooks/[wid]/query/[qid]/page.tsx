@@ -67,8 +67,17 @@ function QueryEditorSkeleton() {
   );
 }
 
+import { notFound } from "next/navigation";
+import { eq } from "drizzle-orm";
+import { db } from "@src/lib/db";
+import { queries } from "@src/lib/db/schema";
+
 async function QueryPageContent({ params }: QueryPageProps) {
   const { wid, qid } = await params;
+  const query = db.select().from(queries).where(eq(queries.id, qid)).get();
+  if (!query || query.workbookId !== wid) {
+    notFound();
+  }
 
   return (
     <div className="flex flex-1 min-h-0 min-w-0 w-full overflow-hidden">

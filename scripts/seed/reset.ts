@@ -160,3 +160,4 @@ resetDatabase().catch((error: unknown) => {
     console.error('Database reset failed:', error);
     process.exit(1);
 });
+

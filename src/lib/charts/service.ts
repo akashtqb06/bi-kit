@@ -1,9 +1,10 @@
 import { eq } from "drizzle-orm";
 import { db } from "@src/lib/db";
-import { charts, type Chart } from "@src/lib/db/schema";
+import { charts, workbooks, type Chart } from "@src/lib/db/schema";
 import { NotFoundError } from "@src/lib/connectors/types";
 import { getQuery } from "@src/lib/queries/service";
 import { parseChartConfig, serializeChartConfig } from "@src/lib/db/json-helpers";
+import { newId } from "@src/lib/db/id";
 import type { CreateChartInput } from "@src/lib/schemas";
 
 // ---------------------------------------------------------------------------
@@ -19,6 +20,7 @@ export interface ChartPublic {
   config: Record<string, unknown>;
   createdAt: Date | null;
   updatedAt: Date | null;
+  createdBy?: string | null;
 }
 
 function toPublic(row: Chart): ChartPublic {
@@ -31,6 +33,7 @@ function toPublic(row: Chart): ChartPublic {
     config: parseChartConfig(row.config),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+    createdBy: row.createdBy,
   };
 }
 
@@ -38,10 +41,27 @@ function toPublic(row: Chart): ChartPublic {
 // Service functions
 // ---------------------------------------------------------------------------
 
-export function listCharts(workbookId?: string): ChartPublic[] {
-  const rows = workbookId
-    ? db.select().from(charts).where(eq(charts.workbookId, workbookId)).all()
-    : db.select().from(charts).all();
+export function listCharts(workbookId?: string, user?: { id: string; role: string }): ChartPublic[] {
+  if (workbookId) {
+    if (user && user.role !== "admin") {
+      const wb = db.select().from(workbooks).where(eq(workbooks.id, workbookId)).get();
+      if (!wb || wb.ownerId !== user.id) return [];
+    }
+    const rows = db.select().from(charts).where(eq(charts.workbookId, workbookId)).all();
+    return rows.map(toPublic);
+  }
+
+  if (user && user.role !== "admin") {
+    const rows = db
+      .select({ chart: charts })
+      .from(charts)
+      .innerJoin(workbooks, eq(charts.workbookId, workbooks.id))
+      .where(eq(workbooks.ownerId, user.id))
+      .all();
+    return rows.map((r) => toPublic(r.chart));
+  }
+
+  const rows = db.select().from(charts).all();
   return rows.map(toPublic);
 }
 
@@ -55,24 +75,24 @@ export function getChartPublic(id: string): ChartPublic {
   return toPublic(getChart(id));
 }
 
-export function createChart(input: CreateChartInput): ChartPublic {
+export function createChart(input: CreateChartInput, createdBy?: string): ChartPublic {
   // Derive workbookId from query (enforces same-workbook relationship)
   const query = getQuery(input.queryId);
 
+  const id = newId();
   db.insert(charts)
     .values({
+      id,
       workbookId: query.workbookId,
       queryId: input.queryId,
       name: input.name,
       type: input.type,
       config: serializeChartConfig(input.config ?? {}),
+      createdBy: createdBy ?? null,
     })
     .run();
 
-  const rows = db.select().from(charts).orderBy(charts.createdAt).all();
-  const row = rows.at(-1);
-  if (!row) throw new Error("Insert succeeded but row not found");
-  return toPublic(row);
+  return getChartPublic(id);
 }
 
 export function updateChart(

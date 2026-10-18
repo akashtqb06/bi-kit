@@ -34,6 +34,16 @@ export function can(user: PolicyUser, action: Action, resource: Resource): boole
   return false;
 }
 
+import { NotFoundError } from "@src/lib/connectors/types";
+export { NotFoundError };
+
+export class UnauthorizedError extends Error {
+  constructor(message = "Unauthorized") {
+    super(message);
+    this.name = "UnauthorizedError";
+  }
+}
+
 export class ForbiddenError extends Error {
   constructor(message = "Forbidden") {
     super(message);
@@ -42,7 +52,12 @@ export class ForbiddenError extends Error {
 }
 
 export function assertCan(user: PolicyUser, action: Action, resource: Resource): void {
-  if (!can(user, action, resource)) throw new ForbiddenError();
+  if (!can(user, "view", resource)) {
+    throw new NotFoundError("Not found");
+  }
+  if (!can(user, action, resource)) {
+    throw new ForbiddenError();
+  }
 }
 
 export function forbiddenResponse(error: unknown): Response | null {
