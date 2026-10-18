@@ -1,0 +1,61 @@
+import 'server-only';
+
+import { redirect } from "next/navigation";
+import { getSession } from "./session";
+import type { SafeUser } from "./types";
+
+export type { SafeUser };
+export { can, assertCan, visibleScope } from './policy';
+
+function toSafeUser(user: NonNullable<Awaited<ReturnType<typeof getSession>>>["user"]): SafeUser {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    avatarUrl: user.avatarUrl,
+    createdAt: user.createdAt,
+    lastLoginAt: user.lastLoginAt,
+  };
+}
+
+export async function getCurrentUser(): Promise<SafeUser | null> {
+  const session = await getSession();
+  return session ? toSafeUser(session.user) : null;
+}
+
+export async function requireUser(next = "/"): Promise<SafeUser> {
+  const user = await getCurrentUser();
+  if (!user) redirect(`/login?next=${encodeURIComponent(next)}`);
+  return user;
+}
+
+export async function requireUserApi(): Promise<SafeUser | Response> {
+  const user = await getCurrentUser();
+  return user ?? Response.json({ error: "Unauthorized" }, { status: 401 });
+}
+
+export function isAuthResponse(value: SafeUser | Response): value is Response {
+  return value instanceof Response;
+}
+
+export function requireRole(
+  role: string,
+  options: { api: true },
+): Promise<SafeUser | Response>;
+export function requireRole(role: string, options?: { api?: false; next?: string }): Promise<SafeUser>;
+export async function requireRole(
+  role: string,
+  options: { api?: boolean; next?: string } = {},
+): Promise<SafeUser | Response> {
+  const user = await getCurrentUser();
+  if (!user) {
+    if (options.api) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    redirect(`/login?next=${encodeURIComponent(options.next ?? "/")}`);
+  }
+  if (user.role !== role) {
+    if (options.api) return Response.json({ error: "Forbidden" }, { status: 403 });
+    redirect("/?toast=forbidden");
+  }
+  return user;
+}
