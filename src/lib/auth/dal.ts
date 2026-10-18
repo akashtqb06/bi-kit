@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { redirect } from "next/navigation";
-import { getSession, isTestSessionExplicit } from "./session";
+import { getSession } from "./session";
 import type { SafeUser } from "./types";
 
 export type { SafeUser };
@@ -19,19 +19,9 @@ function toSafeUser(user: NonNullable<Awaited<ReturnType<typeof getSession>>>["u
   };
 }
 
-import { db } from '@src/lib/db';
-import { users } from '@src/lib/db/schema';
-import { eq } from 'drizzle-orm';
-
 export async function getCurrentUser(): Promise<SafeUser | null> {
   const session = await getSession();
   if (session) return toSafeUser(session.user);
-  if (process.env.NODE_ENV === 'test' && !isTestSessionExplicit()) {
-    try {
-      const [adminUser] = await db.select().from(users).where(eq(users.role, 'admin')).limit(1);
-      if (adminUser) return toSafeUser(adminUser);
-    } catch {}
-  }
   return null;
 }
 

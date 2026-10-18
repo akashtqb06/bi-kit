@@ -1,8 +1,97 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import path from 'node:path';
 import fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import Database from 'better-sqlite3';
+
+type UserRow = {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    status: string;
+    avatarUrl: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    lastLoginAt: Date | null;
+    passwordHash: string;
+};
+
+const testSessionState = vi.hoisted(() => ({
+    user: null as UserRow | null,
+}));
+
+function setTestSessionUser(user: UserRow | null | undefined): void {
+    testSessionState.user = user ?? null;
+}
+
+vi.mock('@src/lib/auth/session', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@src/lib/auth/session')>();
+    return {
+        ...actual,
+        isTestSessionExplicit: vi.fn(() => true),
+        getSession: vi.fn(async () => {
+            if (!testSessionState.user) return null;
+            return {
+                user: testSessionState.user,
+                session: {
+                    id: 'mock-session-id',
+                    userId: testSessionState.user.id,
+                    tokenHash: 'mock-hash',
+                    createdAt: new Date(),
+                    lastUsedAt: new Date(),
+                    expiresAt: new Date(Date.now() + 3600_000),
+                    ipAddress: '127.0.0.1',
+                    userAgent: 'Vitest',
+                },
+            };
+        }),
+    };
+});
+
+type UserRow = {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    status: string;
+    avatarUrl: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    lastLoginAt: Date | null;
+    passwordHash: string;
+};
+
+const testSessionState = vi.hoisted(() => ({
+    user: null as UserRow | null,
+}));
+
+function setTestSessionUser(user: UserRow | null | undefined): void {
+    testSessionState.user = user ?? null;
+}
+
+vi.mock('@src/lib/auth/session', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@src/lib/auth/session')>();
+    return {
+        ...actual,
+        getSession: vi.fn(async () => {
+            if (!testSessionState.user) return null;
+            return {
+                user: testSessionState.user,
+                session: {
+                    id: 'mock-session-id',
+                    userId: testSessionState.user.id,
+                    tokenHash: 'mock-hash',
+                    createdAt: new Date(),
+                    lastUsedAt: new Date(),
+                    expiresAt: new Date(Date.now() + 3600_000),
+                    ipAddress: '127.0.0.1',
+                    userAgent: 'Vitest',
+                },
+            };
+        }),
+    };
+});
 
 const previousDatabasePath = process.env.APP_DB_PATH;
 const appDatabaseDirectory = fs.mkdtempSync(path.join(tmpdir(), 'bi-kit-policy-test-'));
@@ -12,7 +101,6 @@ const { db, runMigrations, resetConnection } = await import('@src/lib/db');
 runMigrations();
 const { users, workbooks, dataSources, queries, charts, dashboards } = await import('@src/lib/db/schema');
 const { seedUsers } = await import('../../../scripts/seed/users');
-const { setTestSessionUser } = await import('@src/lib/auth/session');
 const { DATA_DIR } = await import('@src/lib/db/paths');
 
 // Import all API routes
@@ -33,8 +121,6 @@ import * as dashboardsApi from '@src/app/api/dashboards/route';
 import * as dashboardDetailApi from '@src/app/api/dashboards/[id]/route';
 import * as dashboardDuplicateApi from '@src/app/api/dashboards/[id]/duplicate/route';
 import * as dashboardViewApi from '@src/app/api/dashboards/[id]/view/route';
-
-type UserRow = typeof users.$inferSelect;
 
 let adminUser: UserRow;
 let memberA: UserRow;

@@ -1,8 +1,35 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import type { WorkbookWithCounts } from '@src/lib/workbooks/service';
+
+vi.mock('@src/lib/auth/session', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@src/lib/auth/session')>();
+    return {
+        ...actual,
+        getSession: vi.fn(async () => {
+            const { db } = await import('@src/lib/db');
+            const { users } = await import('@src/lib/db/schema');
+            const { eq } = await import('drizzle-orm');
+            const [adminUser] = await db.select().from(users).where(eq(users.role, 'admin')).limit(1);
+            if (!adminUser) return null;
+            return {
+                user: adminUser,
+                session: {
+                    id: 'test-admin-session',
+                    userId: adminUser.id,
+                    tokenHash: 'hash',
+                    createdAt: new Date(),
+                    lastUsedAt: new Date(),
+                    expiresAt: new Date(Date.now() + 3600_000),
+                    ipAddress: '127.0.0.1',
+                    userAgent: 'Vitest',
+                },
+            };
+        }),
+    };
+});
 
 const previousDatabasePath = process.env.APP_DB_PATH;
 const appDatabaseDirectory = mkdtempSync(path.join(tmpdir(), 'bi-kit-wb-test-'));

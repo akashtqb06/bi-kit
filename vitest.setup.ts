@@ -27,7 +27,7 @@ export async function setup() {
     const { seedUsers } = await import('./scripts/seed/users');
     await seedUsers();
     const { seedDemoDatabase } = await import('./scripts/seed/demo-data');
-    seedDemoDatabase();
+    seedDemoDatabase({ orderCount: 150 });
     const { seedSampleWorkbook } = await import('./scripts/seed/sample-workbook');
     await seedSampleWorkbook();
 

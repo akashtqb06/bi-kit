@@ -7,6 +7,8 @@ import { isRegistrationAllowed } from '@src/lib/auth/registration';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
+import { Skeleton } from '@/components/ui/skeleton';
+
 type RegisterPageProps = {
     searchParams: Promise<{ next?: string | string[] }>;
 };
@@ -39,17 +41,39 @@ async function RegisterPageContent({ searchParams }: RegisterPageProps) {
     return <RegisterForm next={next} />;
 }
 
-function RegisterFallback() {
+function RegisterFormSkeleton() {
     return (
         <Card className="w-full max-w-sm">
-            <CardContent className="h-64" />
+            <CardHeader>
+                <CardTitle>Create your account</CardTitle>
+                <CardDescription>Start organizing your data and dashboards.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div className="space-y-2">
+                    <Skeleton className="h-4 w-12" />
+                    <Skeleton className="h-9 w-full" />
+                </div>
+                <div className="space-y-2">
+                    <Skeleton className="h-4 w-12" />
+                    <Skeleton className="h-9 w-full" />
+                </div>
+                <div className="space-y-2">
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-9 w-full" />
+                </div>
+                <div className="space-y-2">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-9 w-full" />
+                </div>
+                <Skeleton className="h-9 w-full" />
+            </CardContent>
         </Card>
     );
 }
 
 export default function RegisterPage(props: RegisterPageProps) {
     return (
-        <Suspense fallback={<RegisterFallback />}>
+        <Suspense fallback={<RegisterFormSkeleton />}>
             <RegisterPageContent {...props} />
         </Suspense>
     );

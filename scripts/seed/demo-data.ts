@@ -6,7 +6,7 @@ import { DATA_DIR, SAMPLE_DB_PATH } from '@src/lib/db/paths';
 import { assertTestIsolationGuard } from '@src/lib/db/guard';
 
 const SEED = 0x5eed1234;
-const ORDER_COUNT = process.env.NODE_ENV === 'test' ? 150 : 12_000;
+const DEFAULT_ORDER_COUNT = 12_000;
 const BATCH_SIZE = 500;
 
 const locations = [
@@ -320,7 +320,7 @@ function createSchema(database: Database.Database): void {
     `);
 }
 
-export function seedDemoDatabase(): void {
+export function seedDemoDatabase(options?: { orderCount?: number }): void {
     assertTestIsolationGuard(SAMPLE_DB_PATH);
     const startedAt = performance.now();
     fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -425,7 +425,8 @@ export function seedDemoDatabase(): void {
         const reviewRows: { reviewId: string; orderId: string; rating: number; createdAt: string }[] = [];
         const statusThresholds = [0.85, 0.9, 0.95, 0.98, 1];
 
-        for (let index = 0; index < ORDER_COUNT; index++) {
+        const targetOrderCount = options?.orderCount ?? DEFAULT_ORDER_COUNT;
+        for (let index = 0; index < targetOrderCount; index++) {
             const orderId = `ORD${String(index + 1).padStart(6, '0')}`;
             const customer = choose(customers, random);
             const purchase = purchaseDate(random);

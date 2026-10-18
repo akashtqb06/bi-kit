@@ -9,7 +9,7 @@ interface WorkbookLayoutProps {
     params: Promise<{ wid: string }>;
 }
 
-export function WorkbookShellSkeleton() {
+function WorkbookShellSkeleton() {
     return (
         <div className="flex h-dvh flex-col overflow-hidden bg-background">
             {/* Header skeleton */}

@@ -1,8 +1,31 @@
+import React, { Suspense } from 'react';
 import { requireRole } from '@src/lib/auth/dal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Settings2Icon } from 'lucide-react';
 
-export default async function AdminGeneralPage() {
+function GeneralPageSkeleton() {
+    return (
+        <div className="space-y-6">
+            <Card>
+                <CardHeader className="space-y-2">
+                    <div className="flex items-center gap-2">
+                        <Skeleton className="size-5 rounded" />
+                        <Skeleton className="h-6 w-36" />
+                    </div>
+                    <Skeleton className="h-4 w-72" />
+                </CardHeader>
+                <CardContent className="flex flex-col items-center justify-center py-12 text-center space-y-3">
+                    <Skeleton className="size-16 rounded-full" />
+                    <Skeleton className="h-5 w-28" />
+                    <Skeleton className="h-4 w-64" />
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
+async function AdminGeneralContent() {
     await requireRole('admin', { next: '/settings/general' });
 
     return (
@@ -28,5 +51,13 @@ export default async function AdminGeneralPage() {
                 </CardContent>
             </Card>
         </div>
+    );
+}
+
+export default function AdminGeneralPage() {
+    return (
+        <Suspense fallback={<GeneralPageSkeleton />}>
+            <AdminGeneralContent />
+        </Suspense>
     );
 }

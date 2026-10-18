@@ -1,4 +1,35 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const testSessionState = vi.hoisted(() => ({
+    user: null as any,
+}));
+
+function setTestSessionUser(user: any): void {
+    testSessionState.user = user ?? null;
+}
+
+vi.mock('@src/lib/auth/session', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@src/lib/auth/session')>();
+    return {
+        ...actual,
+        getSession: vi.fn(async () => {
+            if (!testSessionState.user) return null;
+            return {
+                user: testSessionState.user,
+                session: {
+                    id: 'mock-session-id',
+                    userId: testSessionState.user.id,
+                    tokenHash: 'mock-hash',
+                    createdAt: new Date(),
+                    lastUsedAt: new Date(),
+                    expiresAt: new Date(Date.now() + 3600_000),
+                    ipAddress: '127.0.0.1',
+                    userAgent: 'Vitest',
+                },
+            };
+        }),
+    };
+});
 import { eq } from 'drizzle-orm';
 import { db } from '@src/lib/db';
 import { dataSources, queries, users, workbooks } from '@src/lib/db/schema';
@@ -185,7 +216,6 @@ describe('Data Sources Service & Table Integration', () => {
     });
 
     it('tests connection via API route handler', async () => {
-        const { setTestSessionUser } = await import('@src/lib/auth/session');
         const testUser = db.select().from(users).where(eq(users.role, 'admin')).get() ?? db.select().from(users).get()!;
         setTestSessionUser(testUser);
 

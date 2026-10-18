@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
     createDashboard,
     deleteDashboard,
@@ -7,6 +7,59 @@ import { createWorkbook, deleteWorkbook } from '@src/lib/workbooks/service';
 import { GET as getDashboardsRoute } from '@src/app/api/dashboards/route';
 import { PATCH as patchDashboardRoute } from '@src/app/api/dashboards/[id]/route';
 import { POST as postDashboardViewRoute } from '@src/app/api/dashboards/[id]/view/route';
+
+vi.mock('@src/lib/auth/session', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@src/lib/auth/session')>();
+    return {
+        ...actual,
+        getSession: vi.fn(async () => {
+            const { db } = await import('@src/lib/db');
+            const { users } = await import('@src/lib/db/schema');
+            const { eq } = await import('drizzle-orm');
+            const [adminUser] = await db.select().from(users).where(eq(users.role, 'admin')).limit(1);
+            if (!adminUser) return null;
+            return {
+                user: adminUser,
+                session: {
+                    id: 'test-admin-session',
+                    userId: adminUser.id,
+                    tokenHash: 'hash',
+                    createdAt: new Date(),
+                    lastUsedAt: new Date(),
+                    expiresAt: new Date(Date.now() + 3600_000),
+                    ipAddress: '127.0.0.1',
+                    userAgent: 'Vitest',
+                },
+            };
+        }),
+    };
+});
+
+vi.mock('@src/lib/auth/session', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@src/lib/auth/session')>();
+    return {
+        ...actual,
+        getSession: vi.fn(async () => {
+            const { db } = await import('@src/lib/db');
+            const { users } = await import('@src/lib/db/schema');
+            const [adminUser] = await db.select().from(users).limit(1);
+            if (!adminUser) return null;
+            return {
+                user: adminUser,
+                session: {
+                    id: 'test-admin-session',
+                    userId: adminUser.id,
+                    tokenHash: 'hash',
+                    createdAt: new Date(),
+                    lastUsedAt: new Date(),
+                    expiresAt: new Date(Date.now() + 3600_000),
+                    ipAddress: '127.0.0.1',
+                    userAgent: 'Vitest',
+                },
+            };
+        }),
+    };
+});
 
 describe('Dashboards Tile View & API Integration', () => {
     it('returns chartCount, viewCount, isFavorite, lastViewedAt, layout in GET /api/dashboards', async () => {

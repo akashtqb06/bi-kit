@@ -72,7 +72,3 @@ export const db = new Proxy({} as ReturnType<typeof drizzle<typeof schema>>, {
         return value;
     },
 });
-
-if (process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
-    getDb();
-}

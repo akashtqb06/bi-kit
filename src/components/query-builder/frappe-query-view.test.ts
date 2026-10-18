@@ -1,10 +1,36 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { compile } from '@src/lib/query-engine/compiler';
 import * as runQueryApi from '@src/app/api/queries/run/route';
 import { db } from '@src/lib/db/client';
 import { dataSources } from '@src/lib/db/schema';
 import { createConnector } from '@src/lib/connectors/factory';
 import { getDataSource } from '@src/lib/data-sources/service';
+
+vi.mock('@src/lib/auth/session', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@src/lib/auth/session')>();
+    return {
+        ...actual,
+        getSession: vi.fn(async () => {
+            const { db } = await import('@src/lib/db');
+            const { users } = await import('@src/lib/db/schema');
+            const [adminUser] = await db.select().from(users).limit(1);
+            if (!adminUser) return null;
+            return {
+                user: adminUser,
+                session: {
+                    id: 'test-admin-session',
+                    userId: adminUser.id,
+                    tokenHash: 'hash',
+                    createdAt: new Date(),
+                    lastUsedAt: new Date(),
+                    expiresAt: new Date(Date.now() + 3600_000),
+                    ipAddress: '127.0.0.1',
+                    userAgent: 'Vitest',
+                },
+            };
+        }),
+    };
+});
 
 function postJson(url: string, body: unknown): Request {
     return new Request(url, {

@@ -65,8 +65,17 @@ function DropdownMenuContent({
   )
 }
 
+// Note: Base UI's Menu.GroupLabel requires MenuGroupContext (provided by Menu.Group or Menu.RadioGroup).
+// DropdownMenuGroupContext tracks whether DropdownMenuLabel is rendered within a group.
+// When rendered outside a group, DropdownMenuLabel renders a plain styled <div> so loose labels cannot crash.
+const DropdownMenuGroupContext = React.createContext(false);
+
 function DropdownMenuGroup({ ...props }: MenuPrimitive.Group.Props) {
-  return <MenuPrimitive.Group data-slot="dropdown-menu-group" {...props} />
+  return (
+    <DropdownMenuGroupContext.Provider value={true}>
+      <MenuPrimitive.Group data-slot="dropdown-menu-group" {...props} />
+    </DropdownMenuGroupContext.Provider>
+  )
 }
 
 function DropdownMenuLabel({
@@ -76,6 +85,47 @@ function DropdownMenuLabel({
 }: MenuPrimitive.GroupLabel.Props & {
   inset?: boolean
 }) {
+  const isInGroup = React.useContext(DropdownMenuGroupContext);
+
+  if (!isInGroup) {
+    const { render: renderProp, ...divProps } = props;
+    if (typeof renderProp === "function") {
+      return (renderProp as unknown as (props: Record<string, unknown>, state?: Record<string, unknown>) => React.ReactElement)({
+        "data-slot": "dropdown-menu-label",
+        "data-inset": inset,
+        className: cn(
+          "px-1.5 py-1 text-xs font-medium text-muted-foreground data-inset:pl-7",
+          className
+        ),
+        ...divProps,
+      });
+    }
+    if (React.isValidElement(renderProp)) {
+      return React.cloneElement(renderProp, {
+        "data-slot": "dropdown-menu-label",
+        "data-inset": inset,
+        className: cn(
+          "px-1.5 py-1 text-xs font-medium text-muted-foreground data-inset:pl-7",
+          (renderProp.props as { className?: string }).className,
+          className
+        ),
+        ...divProps,
+      } as React.HTMLAttributes<HTMLElement>);
+    }
+
+    return (
+      <div
+        data-slot="dropdown-menu-label"
+        data-inset={inset}
+        className={cn(
+          "px-1.5 py-1 text-xs font-medium text-muted-foreground data-inset:pl-7",
+          className
+        )}
+        {...(divProps as React.ComponentProps<"div">)}
+      />
+    );
+  }
+
   return (
     <MenuPrimitive.GroupLabel
       data-slot="dropdown-menu-label"
@@ -86,7 +136,7 @@ function DropdownMenuLabel({
       )}
       {...props}
     />
-  )
+  );
 }
 
 function DropdownMenuItem({
@@ -197,10 +247,12 @@ function DropdownMenuCheckboxItem({
 
 function DropdownMenuRadioGroup({ ...props }: MenuPrimitive.RadioGroup.Props) {
   return (
-    <MenuPrimitive.RadioGroup
-      data-slot="dropdown-menu-radio-group"
-      {...props}
-    />
+    <DropdownMenuGroupContext.Provider value={true}>
+      <MenuPrimitive.RadioGroup
+        data-slot="dropdown-menu-radio-group"
+        {...props}
+      />
+    </DropdownMenuGroupContext.Provider>
   )
 }
 

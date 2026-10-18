@@ -7,13 +7,20 @@ import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
 const Select = SelectPrimitive.Root;
 
+// Note: Base UI's Select.GroupLabel requires SelectGroupContext (provided by Select.Group).
+// SelectGroupCustomContext tracks whether SelectLabel is rendered within a SelectGroup.
+// When rendered outside a group, SelectLabel renders a plain styled <div> so loose labels cannot crash.
+const SelectGroupCustomContext = React.createContext(false);
+
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return (
-    <SelectPrimitive.Group
-      data-slot="select-group"
-      className={cn("scroll-my-1 p-1", className)}
-      {...props}
-    />
+    <SelectGroupCustomContext.Provider value={true}>
+      <SelectPrimitive.Group
+        data-slot="select-group"
+        className={cn("scroll-my-1 p-1", className)}
+        {...props}
+      />
+    </SelectGroupCustomContext.Provider>
   )
 }
 
@@ -107,6 +114,37 @@ function SelectLabel({
   className,
   ...props
 }: SelectPrimitive.GroupLabel.Props) {
+  const isInGroup = React.useContext(SelectGroupCustomContext);
+
+  if (!isInGroup) {
+    const { render: renderProp, ...divProps } = props;
+    if (typeof renderProp === "function") {
+      return (renderProp as unknown as (props: Record<string, unknown>, state?: Record<string, unknown>) => React.ReactElement)({
+        "data-slot": "select-label",
+        className: cn("px-1.5 py-1 text-xs text-muted-foreground", className),
+        ...divProps,
+      });
+    }
+    if (React.isValidElement(renderProp)) {
+      return React.cloneElement(renderProp, {
+        "data-slot": "select-label",
+        className: cn(
+          "px-1.5 py-1 text-xs text-muted-foreground",
+          (renderProp.props as { className?: string }).className,
+          className
+        ),
+        ...divProps,
+      } as React.HTMLAttributes<HTMLElement>);
+    }
+    return (
+      <div
+        data-slot="select-label"
+        className={cn("px-1.5 py-1 text-xs text-muted-foreground", className)}
+        {...(divProps as React.ComponentProps<"div">)}
+      />
+    );
+  }
+
   return (
     <SelectPrimitive.GroupLabel
       data-slot="select-label"

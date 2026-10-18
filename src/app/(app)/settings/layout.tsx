@@ -1,15 +1,17 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { requireUser } from '@src/lib/auth/dal';
 import { SettingsNav } from '@src/components/settings/settings-nav';
 
-export default async function SettingsLayout({
+async function SettingsNavWrapper() {
+    const user = await requireUser('/settings');
+    return <SettingsNav isAdmin={user.role === 'admin'} />;
+}
+
+export default function SettingsLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const user = await requireUser('/settings');
-    const isAdmin = user.role === 'admin';
-
     return (
         <div className="flex flex-1 flex-col min-h-0 h-full overflow-hidden">
             {/* Fixed header */}
@@ -23,7 +25,9 @@ export default async function SettingsLayout({
             {/* Single scroll area */}
             <div className="flex-1 min-h-0 overflow-y-auto p-6">
                 <div className="flex flex-col md:flex-row gap-8 max-w-5xl">
-                    <SettingsNav isAdmin={isAdmin} />
+                    <Suspense fallback={<SettingsNav isAdmin={false} />}>
+                        <SettingsNavWrapper />
+                    </Suspense>
                     <main className="flex-1 min-w-0 max-w-3xl pb-12">
                         {children}
                     </main>
