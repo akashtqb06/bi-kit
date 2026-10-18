@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { UsersIcon } from 'lucide-react';
 
-export function AdminPageSkeleton() {
+function AdminPageSkeleton() {
     return (
         <div className="space-y-6">
             <Card>

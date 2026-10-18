@@ -4,50 +4,6 @@ import fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import Database from 'better-sqlite3';
 
-type UserRow = {
-    id: string;
-    email: string;
-    name: string;
-    role: string;
-    status: string;
-    avatarUrl: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-    lastLoginAt: Date | null;
-    passwordHash: string;
-};
-
-const testSessionState = vi.hoisted(() => ({
-    user: null as UserRow | null,
-}));
-
-function setTestSessionUser(user: UserRow | null | undefined): void {
-    testSessionState.user = user ?? null;
-}
-
-vi.mock('@src/lib/auth/session', async (importOriginal) => {
-    const actual = await importOriginal<typeof import('@src/lib/auth/session')>();
-    return {
-        ...actual,
-        isTestSessionExplicit: vi.fn(() => true),
-        getSession: vi.fn(async () => {
-            if (!testSessionState.user) return null;
-            return {
-                user: testSessionState.user,
-                session: {
-                    id: 'mock-session-id',
-                    userId: testSessionState.user.id,
-                    tokenHash: 'mock-hash',
-                    createdAt: new Date(),
-                    lastUsedAt: new Date(),
-                    expiresAt: new Date(Date.now() + 3600_000),
-                    ipAddress: '127.0.0.1',
-                    userAgent: 'Vitest',
-                },
-            };
-        }),
-    };
-});
 
 type UserRow = {
     id: string;

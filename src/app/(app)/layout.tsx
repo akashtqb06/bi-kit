@@ -6,7 +6,7 @@ import { UserProvider } from '@src/components/auth/user-provider';
 import { requireUser } from '@src/lib/auth/dal';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export function AppShellSkeleton() {
+function AppShellSkeleton() {
     return (
         <div className="flex h-dvh min-h-dvh w-full overflow-hidden bg-background">
             {/* Sidebar skeleton matching AppSidebar dimensions */}

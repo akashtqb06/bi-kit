@@ -5,7 +5,7 @@ import { ProfileForm } from '@src/components/settings/profile-form';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export function ProfileSkeleton() {
+function ProfileSkeleton() {
     return (
         <div className="space-y-6">
             <Card>

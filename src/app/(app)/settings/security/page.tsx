@@ -5,7 +5,7 @@ import { SecurityForm } from '@src/components/settings/security-form';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export function SecuritySkeleton() {
+function SecuritySkeleton() {
     return (
         <div className="space-y-6">
             <Card>

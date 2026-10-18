@@ -5,7 +5,7 @@ import { SessionsView } from '@src/components/settings/sessions-view';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export function SessionsSkeleton() {
+function SessionsSkeleton() {
     return (
         <Card>
             <CardHeader className="space-y-2">
