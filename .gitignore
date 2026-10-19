@@ -29,6 +29,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+.pnpm-store/
 
 # env files
 .env*
@@ -49,6 +50,7 @@ data/*.db-wal
 data/*.db-shm
 data/uploads
 data/csv
+data/csv-sources
 data/avatars
 /data/*
 !/data/.gitkeep
