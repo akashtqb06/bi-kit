@@ -1,3 +1,4 @@
+import 'server-only';
 import { rmSync } from 'node:fs';
 import path from 'node:path';
 import { count, eq, inArray } from 'drizzle-orm';
@@ -269,7 +270,7 @@ export function getDependentQueries(id: string): { id: string; name: string }[] 
 export function deleteDataSource(id: string): void {
     const source = getDataSource(id);
 
-    const dependentQueries = db.select({ name: queries.name }).from(queries).where(eq(queries.dataSourceId, id)).all();
+    const dependentQueries = getDependentQueries(id);
     if (dependentQueries.length > 0) {
         const queryNames = dependentQueries.map(({ name }) => `"${name}"`).join(', ');
         const count = dependentQueries.length;

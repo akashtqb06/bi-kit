@@ -1,3 +1,4 @@
+import 'server-only';
 import { eq } from "drizzle-orm";
 import { db } from "@src/lib/db";
 import { charts, workbooks, type Chart } from "@src/lib/db/schema";

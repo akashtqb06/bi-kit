@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { revokeOtherSessionsAction, revokeSessionAction } from '@src/lib/auth/settings-actions';
 import type { ListedSession } from '@src/lib/auth/types';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDate as formatUtilsDate, formatRelativeTime } from '@src/lib/utils';
 
 export function parseUserAgent(ua: string | null | undefined): string {
     if (!ua) return 'Unknown device';
@@ -64,21 +64,11 @@ function getDeviceIcon(ua: string | null | undefined) {
 }
 
 function formatDate(date: Date | string | null): string {
-    if (!date) return '—';
-    try {
-        return format(new Date(date), 'MMM d, yyyy');
-    } catch {
-        return '—';
-    }
+    return formatUtilsDate(date, 'MMM d, yyyy');
 }
 
 function formatRelative(date: Date | string | null): string {
-    if (!date) return 'Just now';
-    try {
-        return formatDistanceToNow(new Date(date), { addSuffix: true });
-    } catch {
-        return 'Recently';
-    }
+    return formatRelativeTime(date, 'Just now');
 }
 
 interface SessionsViewProps {

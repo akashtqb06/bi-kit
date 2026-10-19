@@ -21,7 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { updateProfileAction, uploadAvatarAction } from '@src/lib/auth/settings-actions';
 import type { SafeUser } from '@src/lib/auth/types';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDate as formatUtilsDate, formatRelativeTime } from '@src/lib/utils';
 import { cn } from 'cn';
 
 export function getAvatarColor(id: string): string {
@@ -57,21 +57,11 @@ function getInitials(name: string): string {
 }
 
 function formatDate(date: Date | string | null): string {
-    if (!date) return '—';
-    try {
-        return format(new Date(date), 'MMMM d, yyyy');
-    } catch {
-        return '—';
-    }
+    return formatUtilsDate(date, 'MMMM d, yyyy');
 }
 
 function formatRelative(date: Date | string | null): string {
-    if (!date) return 'Never';
-    try {
-        return formatDistanceToNow(new Date(date), { addSuffix: true });
-    } catch {
-        return 'Recently';
-    }
+    return formatRelativeTime(date, 'Never');
 }
 
 interface ProfileFormProps {

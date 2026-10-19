@@ -405,7 +405,41 @@ function DataSourcesContent() {
     // ---------------------------------------------------------------------------
 
     const columns = useMemo<LegacyColumnDef<DataSourcePublic, unknown>[]>(
-        () => [
+        () => {
+            const adminColumns: LegacyColumnDef<DataSourcePublic, unknown>[] = currentUser?.role === 'admin'
+                ? [
+                      {
+                          accessorKey: 'owner',
+                          id: 'owner',
+                          header: ({ column }) => (
+                              <DataTableColumnHeader column={column} title="Owner" />
+                          ),
+                          cell: ({ row }) => {
+                              const source = row.original;
+                              const isMe = source.ownerId === currentUser?.id;
+                              const displayName = isMe ? 'You' : (source.owner?.name || source.owner?.email || 'Unknown');
+                              const initials = isMe
+                                  ? 'YOU'
+                                  : (source.owner?.name
+                                        ? source.owner.name.slice(0, 2).toUpperCase()
+                                        : source.owner?.email?.slice(0, 2).toUpperCase() ?? '??');
+                              return (
+                                  <div className="flex items-center gap-2">
+                                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                                          {initials.slice(0, 2)}
+                                      </span>
+                                      <span className="text-sm text-foreground truncate max-w-[120px]" title={source.owner?.name || source.owner?.email}>
+                                          {displayName}
+                                      </span>
+                                  </div>
+                              );
+                          },
+                          enableSorting: false,
+                      },
+                  ]
+                : [];
+
+            return [
             {
                 id: 'select',
                 header: ({ table }) => (
@@ -453,38 +487,7 @@ function DataSourcesContent() {
                 enableSorting: true,
                 enableHiding: false,
             },
-            ...(currentUser?.role === 'admin'
-                ? [
-                      {
-                          accessorKey: 'owner',
-                          id: 'owner',
-                          header: ({ column }: { column: any }) => (
-                              <DataTableColumnHeader column={column} title="Owner" />
-                          ),
-                          cell: ({ row }: { row: any }) => {
-                              const source = row.original;
-                              const isMe = source.ownerId === currentUser?.id;
-                              const displayName = isMe ? 'You' : (source.owner?.name || source.owner?.email || 'Unknown');
-                              const initials = isMe
-                                  ? 'YOU'
-                                  : (source.owner?.name
-                                        ? source.owner.name.slice(0, 2).toUpperCase()
-                                        : source.owner?.email?.slice(0, 2).toUpperCase() ?? '??');
-                              return (
-                                  <div className="flex items-center gap-2">
-                                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
-                                          {initials.slice(0, 2)}
-                                      </span>
-                                      <span className="text-sm text-foreground truncate max-w-[120px]" title={source.owner?.name || source.owner?.email}>
-                                          {displayName}
-                                      </span>
-                                  </div>
-                              );
-                          },
-                          enableSorting: false,
-                      } as LegacyColumnDef<DataSourcePublic, unknown>,
-                  ]
-                : []),
+            ...adminColumns,
             {
                 accessorKey: 'type',
                 header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
@@ -646,9 +649,8 @@ function DataSourcesContent() {
                 enableSorting: false,
                 enableHiding: false,
             },
-        ],
-        [handleSchemaView, testConnection, openRenameDialog, statusMap, currentUser]
-    );
+        ];
+    }, [handleSchemaView, testConnection, openRenameDialog, statusMap, currentUser]);
 
     // Controlled column filters
     const columnFilters = useMemo<ColumnFiltersState>(() => {

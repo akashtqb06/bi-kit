@@ -1,0 +1,31 @@
+{
+  "$schema": "https://unpkg.com/knip@5/overview.json",
+  "entry": [
+    "src/app/**/{page,layout,route,loading,error,not-found,template,default}.{ts,tsx,js,jsx}",
+    "drizzle.config.ts",
+    "vitest.config.ts",
+    "vitest.setup.ts",
+    "vitest.empty.js",
+    "scripts/**/*.{ts,js,mjs}",
+    "src/lib/db/migrate.ts"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx,js,jsx}",
+    "scripts/**/*.{ts,js,mjs}",
+    "components/**/*.{ts,tsx}",
+    "hooks/**/*.{ts,tsx}",
+    "lib/**/*.{ts,tsx}",
+    "*.{ts,js,mjs}"
+  ],
+  "ignore": [
+    "src/components/ui/**",
+    "components/ui/**"
+  ],
+  "ignoreDependencies": [
+    "tailwindcss",
+    "tw-animate-css",
+    "shadcn",
+    "react-day-picker"
+  ]
+}
+

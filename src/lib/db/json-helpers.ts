@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   sqliteSourceConfigSchema,
   csvSourceConfigSchema,
+  chartConfigSchema,
   layoutItemSchema,
   dashboardFilterSchema,
   type DataSourceType,
@@ -37,38 +38,25 @@ export function serializeDataSourceConfig(
 }
 
 // ---------------------------------------------------------------------------
-// Query builder definition
-// Placeholder: refined schema lives here once the builder is implemented.
-// ---------------------------------------------------------------------------
+import { queryDefinitionSchema, type QueryDefinition } from "@src/lib/query-engine/definition";
 
-const builderStepSchema = z.object({
-  op: z.string(),
-  args: z.record(z.string(), z.unknown()).default({}),
-});
-
-const builderDefinitionSchema = z.array(builderStepSchema);
-
-export type BuilderStep = z.infer<typeof builderStepSchema>;
-
-export function parseQueryDefinition(raw: string): BuilderStep[] {
+export function parseQueryDefinition(raw: string): QueryDefinition {
   let json: unknown;
   try {
     json = JSON.parse(raw);
   } catch {
     throw new Error(`Query definition is not valid JSON`);
   }
-  return builderDefinitionSchema.parse(json);
+  return queryDefinitionSchema.parse(json);
 }
 
-export function serializeQueryDefinition(steps: BuilderStep[]): string {
-  return JSON.stringify(steps);
+export function serializeQueryDefinition(def: QueryDefinition): string {
+  return JSON.stringify(def);
 }
 
 // ---------------------------------------------------------------------------
-// Chart config — keyed by chart type; refined per-type as chart types are built
+// Chart config — validated against chartConfigSchema
 // ---------------------------------------------------------------------------
-
-const chartConfigSchema = z.record(z.string(), z.unknown());
 
 export type ChartConfig = z.infer<typeof chartConfigSchema>;
 
@@ -79,7 +67,7 @@ export function parseChartConfig(raw: string): ChartConfig {
   } catch {
     throw new Error(`Chart config is not valid JSON`);
   }
-  return chartConfigSchema.parse(json);
+  return chartConfigSchema.passthrough().parse(json);
 }
 
 export function serializeChartConfig(config: ChartConfig): string {

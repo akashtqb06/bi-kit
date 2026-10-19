@@ -72,7 +72,7 @@ export type DuplicateWorkbookInput = z.infer<typeof duplicateWorkbookSchema>;
 // Query
 // ---------------------------------------------------------------------------
 
-export const queryModeSchema = z.enum(['builder', 'sql']);
+const queryModeSchema = z.enum(['builder', 'sql']);
 
 export const createQuerySchema = z.object({
     workbookId: z.string().min(1),
@@ -94,10 +94,10 @@ export type CreateQueryInput = z.infer<typeof createQuerySchema>;
 
 export const chartTypeSchema = z.enum(['bar', 'line', 'row', 'donut', 'pie', 'area', 'number', 'table']);
 
-export const dateGrainSchema = z.enum(['day', 'week', 'month', 'quarter', 'year']);
+const dateGrainSchema = z.enum(['day', 'week', 'month', 'quarter', 'year']);
 export type DateGrain = z.infer<typeof dateGrainSchema>;
 
-export const chartSeriesConfigSchema = z.object({
+const chartSeriesConfigSchema = z.object({
     column: z.string(),
     aggregation: z.enum(['sum', 'avg', 'count', 'min', 'max']).default('sum'),
     label: z.string().optional(),
@@ -106,7 +106,7 @@ export const chartSeriesConfigSchema = z.object({
 });
 export type ChartSeriesConfig = z.infer<typeof chartSeriesConfigSchema>;
 
-export const referenceLineSchema = z.object({
+const referenceLineSchema = z.object({
     label: z.string().default(''),
     value: z.number().default(0),
     color: z.string().default('#e11d48'),
@@ -202,7 +202,7 @@ export const layoutItemSchema = z.object({
     h: z.number().int().positive(),
 });
 
-export const dashboardFilterTypeSchema = z.enum(['date_range', 'select']);
+const dashboardFilterTypeSchema = z.enum(['date_range', 'select']);
 
 export const dashboardFilterSchema = z.object({
     id: z.string(),

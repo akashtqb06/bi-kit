@@ -7,17 +7,19 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx src/lib/db/migrate.ts",
-    "db:seed:users": "tsx scripts/seed/users.ts",
-    "db:seed:demo": "tsx scripts/seed/demo-data.ts",
-    "db:seed:workbook": "tsx scripts/seed/sample-workbook.ts",
-    "db:seed": "npm run db:seed:users && npm run db:seed:demo && npm run db:seed:workbook",
-    "db:reset": "tsx scripts/seed/reset.ts",
+    "db:migrate": "tsx --conditions=react-server src/lib/db/migrate.ts",
+    "db:seed:users": "tsx --conditions=react-server scripts/seed/users.ts",
+    "db:seed:demo": "tsx --conditions=react-server scripts/seed/demo-data.ts",
+    "db:seed:workbook": "tsx --conditions=react-server scripts/seed/sample-workbook.ts",
+    "db:seed": "pnpm run db:seed:users && pnpm run db:seed:demo && pnpm run db:seed:workbook",
+    "db:reset": "tsx --conditions=react-server scripts/seed/reset.ts",
     "db:studio": "drizzle-kit studio",
-    "db:clean-tests": "tsx scripts/seed/clean-tests.ts",
-    "setup": "npm install && npm run db:migrate && npm run db:seed"
+    "db:clean-tests": "tsx --conditions=react-server scripts/seed/clean-tests.ts",
+    "user:reset-password": "tsx --conditions=react-server scripts/reset-password.ts",
+    "setup": "pnpm install && pnpm run db:migrate && pnpm run db:seed"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
@@ -60,15 +62,17 @@
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/react-grid-layout": "^2.1.0",
-    "@vitejs/plugin-react": "^6.1.2",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.4.1",
+    "knip": "^6.41.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.0.5"
+  },
+  "engines": {
+    "node": ">=20.9.0"
   },
   "packageManager": "pnpm@11.20.0"
 }

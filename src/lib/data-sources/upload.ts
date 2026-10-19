@@ -1,3 +1,4 @@
+import 'server-only';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
@@ -60,7 +61,7 @@ export async function saveCsvUpload(file: File): Promise<{ path: string; text: s
     return { path: filePath, text: bytes.toString('utf8') };
 }
 
-export function sanitizeDisplayFileName(fileName: string): string {
+function sanitizeDisplayFileName(fileName: string): string {
     const basename = fileName.replace(/\\/g, '/').split('/').pop() ?? '';
     const sanitized = basename
         .replace(/[\u0000-\u001f\u007f]/g, '')

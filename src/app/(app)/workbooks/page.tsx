@@ -51,17 +51,8 @@ import type { LegacyColumnDef } from '@tanstack/react-table/legacy';
 import type { SortingState, PaginationState } from '@tanstack/react-table';
 import type { WorkbookWithCounts } from '@src/lib/workbooks/service';
 import { useCurrentUser } from '@src/components/auth/user-provider';
-import { formatDistanceToNow } from 'date-fns';
+import { formatRelativeTime } from '@src/lib/utils';
 import { toast } from 'sonner';
-
-function formatRelativeTime(date: Date | string | null): string {
-    if (!date) return '—';
-    try {
-        return formatDistanceToNow(new Date(date), { addSuffix: true });
-    } catch {
-        return '—';
-    }
-}
 
 function formatFullDateTime(date: Date | string | null): string {
     if (!date) return '';
@@ -330,6 +321,39 @@ function WorkbooksContent() {
 
     // Table Columns definition
     const columns = useMemo<LegacyColumnDef<WorkbookWithCounts, unknown>[]>(() => {
+        const adminColumns: LegacyColumnDef<WorkbookWithCounts, unknown>[] = currentUser?.role === 'admin'
+            ? [
+                  {
+                      accessorKey: 'owner',
+                      id: 'owner',
+                      header: ({ column }) => (
+                          <DataTableColumnHeader column={column} title="Owner" />
+                      ),
+                      cell: ({ row }) => {
+                          const wb = row.original;
+                          const isMe = wb.ownerId === currentUser?.id;
+                          const displayName = isMe ? 'You' : (wb.owner?.name || wb.owner?.email || 'Unknown');
+                          const initials = isMe
+                              ? 'YOU'
+                              : (wb.owner?.name
+                                    ? wb.owner.name.slice(0, 2).toUpperCase()
+                                    : wb.owner?.email?.slice(0, 2).toUpperCase() ?? '??');
+                          return (
+                              <div className="flex items-center gap-2">
+                                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                                      {initials.slice(0, 2)}
+                                  </span>
+                                  <span className="text-sm text-foreground truncate max-w-[120px]" title={wb.owner?.name || wb.owner?.email}>
+                                      {displayName}
+                                  </span>
+                              </div>
+                          );
+                      },
+                      enableSorting: false,
+                  },
+              ]
+            : [];
+
         return [
             {
                 id: 'select',
@@ -383,38 +407,7 @@ function WorkbooksContent() {
                 },
                 enableSorting: true,
             },
-            ...(currentUser?.role === 'admin'
-                ? [
-                      {
-                          accessorKey: 'owner',
-                          id: 'owner',
-                          header: ({ column }: { column: any }) => (
-                              <DataTableColumnHeader column={column} title="Owner" />
-                          ),
-                          cell: ({ row }: { row: any }) => {
-                              const wb = row.original;
-                              const isMe = wb.ownerId === currentUser?.id;
-                              const displayName = isMe ? 'You' : (wb.owner?.name || wb.owner?.email || 'Unknown');
-                              const initials = isMe
-                                  ? 'YOU'
-                                  : (wb.owner?.name
-                                        ? wb.owner.name.slice(0, 2).toUpperCase()
-                                        : wb.owner?.email?.slice(0, 2).toUpperCase() ?? '??');
-                              return (
-                                  <div className="flex items-center gap-2">
-                                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
-                                          {initials.slice(0, 2)}
-                                      </span>
-                                      <span className="text-sm text-foreground truncate max-w-[120px]" title={wb.owner?.name || wb.owner?.email}>
-                                          {displayName}
-                                      </span>
-                                  </div>
-                              );
-                          },
-                          enableSorting: false,
-                      } as LegacyColumnDef<WorkbookWithCounts, unknown>,
-                  ]
-                : []),
+            ...adminColumns,
             {
                 accessorKey: 'queriesCount',
                 id: 'queries',

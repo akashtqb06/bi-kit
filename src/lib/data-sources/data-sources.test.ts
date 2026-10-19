@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { User } from '@src/lib/db/schema';
 
 const testSessionState = vi.hoisted(() => ({
-    user: null as any,
+    user: null as User | null,
 }));
 
-function setTestSessionUser(user: any): void {
+function setTestSessionUser(user: User | null): void {
     testSessionState.user = user ?? null;
 }
 
@@ -45,6 +46,8 @@ import { ensureSampleDataSource } from './sample';
 import { createConnector } from '@src/lib/connectors/factory';
 import { ConflictError } from '@src/lib/connectors/types';
 import * as testApi from '@src/app/api/data-sources/[id]/test/route';
+import * as detailApi from '@src/app/api/data-sources/[id]/route';
+import * as dataSourcesApi from '@src/app/api/data-sources/route';
 
 describe('Data Sources Service & Table Integration', () => {
     beforeEach(() => {
@@ -239,6 +242,59 @@ describe('Data Sources Service & Table Integration', () => {
             expect(json.data?.ok).toBe(true);
             expect(json.data?.tableCount).toBe(1);
 
+            deleteDataSource(source.id);
+        } finally {
+            setTestSessionUser(null);
+        }
+    });
+
+    it('returns 409 with dependent query details when deleting data source via API', async () => {
+        const testUser = db.select().from(users).where(eq(users.role, 'admin')).get() ?? db.select().from(users).get()!;
+        setTestSessionUser(testUser);
+
+        try {
+            const { source } = createCsvDataSource({
+                name: 'API 409 Test Source',
+                csvText: 'id,metric\n1,100',
+                originalFileName: 'api_409.csv',
+                ownerId: testUser.id,
+            });
+
+            const wbId = 'wb-api-409-' + Date.now();
+            db.insert(workbooks).values({ id: wbId, name: 'WB 409', ownerId: testUser.id }).run();
+
+            const qId = 'q-api-409-' + Date.now();
+            db.insert(queries).values({
+                id: qId,
+                name: 'Financial Audit Query',
+                workbookId: wbId,
+                dataSourceId: source.id,
+                sql: 'SELECT 1',
+            }).run();
+
+            // 1. Single delete via API returns 409 Conflict
+            const req = new Request(`http://localhost/api/data-sources/${source.id}`, { method: 'DELETE' });
+            const res = await detailApi.DELETE(req, { params: Promise.resolve({ id: source.id }) });
+            expect(res.status).toBe(409);
+            const body = (await res.json()) as { error?: string };
+            expect(body.error).toContain('Financial Audit Query');
+
+            // 2. Bulk delete via API reports it as blocked
+            const bulkReq = new Request('http://localhost/api/data-sources', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: [source.id] }),
+            });
+            const bulkRes = await dataSourcesApi.DELETE(bulkReq);
+            expect(bulkRes.status).toBe(200);
+            const bulkJson = (await bulkRes.json()) as { data?: { blocked: { id: string; name: string; queryCount: number }[] } };
+            expect(bulkJson.data?.blocked).toEqual([
+                expect.objectContaining({ id: source.id, name: 'API 409 Test Source', queryCount: 1 }),
+            ]);
+
+            // Clean up
+            db.delete(queries).where(eq(queries.id, qId)).run();
+            db.delete(workbooks).where(eq(workbooks.id, wbId)).run();
             deleteDataSource(source.id);
         } finally {
             setTestSessionUser(null);

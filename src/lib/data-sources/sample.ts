@@ -1,3 +1,4 @@
+import 'server-only';
 import { existsSync } from 'node:fs';
 import { listDataSources, type DataSourcePublic } from './service';
 import { SAMPLE_DB_PATH } from '@src/lib/db/paths';

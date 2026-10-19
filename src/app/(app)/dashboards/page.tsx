@@ -83,18 +83,9 @@ import type { DashboardSummary } from '@src/lib/dashboards/service';
 import type { WorkbookWithCounts } from '@src/lib/workbooks/service';
 import type { LayoutItem } from '@src/lib/schemas';
 import { useCurrentUser } from '@src/components/auth/user-provider';
-import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-
-function formatRelativeTime(date: Date | string | null): string {
-    if (!date) return '—';
-    try {
-        return formatDistanceToNow(new Date(date), { addSuffix: true });
-    } catch {
-        return '—';
-    }
-}
+import { formatRelativeTime } from '@src/lib/utils';
 
 function formatFullDateTime(date: Date | string | null): string {
     if (!date) return '';
@@ -770,6 +761,39 @@ function DashboardsContent() {
 
     // Table Columns definition (Title, Workbook, Charts, Views, Modified, Favorite, Actions)
     const columns = useMemo<LegacyColumnDef<DashboardSummary, unknown>[]>(() => {
+        const adminColumns: LegacyColumnDef<DashboardSummary, unknown>[] = currentUser?.role === 'admin'
+            ? [
+                  {
+                      accessorKey: 'owner',
+                      id: 'owner',
+                      header: ({ column }) => (
+                          <DataTableColumnHeader column={column} title="Owner" />
+                      ),
+                      cell: ({ row }) => {
+                          const d = row.original;
+                          const isMe = d.ownerId === currentUser?.id;
+                          const displayName = isMe ? 'You' : (d.owner?.name || d.owner?.email || 'Unknown');
+                          const initials = isMe
+                              ? 'YOU'
+                              : (d.owner?.name
+                                    ? d.owner.name.slice(0, 2).toUpperCase()
+                                    : d.owner?.email?.slice(0, 2).toUpperCase() ?? '??');
+                          return (
+                              <div className="flex items-center gap-2">
+                                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                                      {initials.slice(0, 2)}
+                                  </span>
+                                  <span className="text-sm text-foreground truncate max-w-[120px]" title={d.owner?.name || d.owner?.email}>
+                                      {displayName}
+                                  </span>
+                              </div>
+                          );
+                      },
+                      enableSorting: false,
+                  },
+              ]
+            : [];
+
         return [
             {
                 id: 'select',
@@ -845,38 +869,7 @@ function DashboardsContent() {
                 },
                 enableSorting: true,
             },
-            ...(currentUser?.role === 'admin'
-                ? [
-                      {
-                          accessorKey: 'owner',
-                          id: 'owner',
-                          header: ({ column }: { column: any }) => (
-                              <DataTableColumnHeader column={column} title="Owner" />
-                          ),
-                          cell: ({ row }: { row: any }) => {
-                              const d = row.original;
-                              const isMe = d.ownerId === currentUser?.id;
-                              const displayName = isMe ? 'You' : (d.owner?.name || d.owner?.email || 'Unknown');
-                              const initials = isMe
-                                  ? 'YOU'
-                                  : (d.owner?.name
-                                        ? d.owner.name.slice(0, 2).toUpperCase()
-                                        : d.owner?.email?.slice(0, 2).toUpperCase() ?? '??');
-                              return (
-                                  <div className="flex items-center gap-2">
-                                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
-                                          {initials.slice(0, 2)}
-                                      </span>
-                                      <span className="text-sm text-foreground truncate max-w-[120px]" title={d.owner?.name || d.owner?.email}>
-                                          {displayName}
-                                      </span>
-                                  </div>
-                              );
-                          },
-                          enableSorting: false,
-                      } as LegacyColumnDef<DashboardSummary, unknown>,
-                  ]
-                : []),
+            ...adminColumns,
             {
                 accessorKey: 'workbookTitle',
                 id: 'workbook',

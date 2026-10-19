@@ -239,9 +239,6 @@ describe('Policy Integration & Access Control', () => {
                         const res = await mod[method](req, {
                             params: Promise.resolve({ id: 'any-id' }),
                         });
-                        if (res.status !== 401) {
-                            console.log('UNEXPECTED STATUS for', file, method, res.status, await res.json());
-                        }
                         expect(
                             res.status,
                             `Expected 401 for unauthenticated ${method} on ${path.relative(process.cwd(), file)}`
@@ -260,7 +257,7 @@ describe('Policy Integration & Access Control', () => {
             const listRes = await workbooksApi.GET();
             expect(listRes.status).toBe(200);
             const listJson = await listRes.json();
-            expect(listJson.data.some((w: any) => w.id === memberBWorkbookId)).toBe(false);
+            expect(listJson.data.some((w: { id: string }) => w.id === memberBWorkbookId)).toBe(false);
 
             // Member A tries to get Member B's workbook -> 404
             const getRes = await workbookDetailApi.GET(makeJsonReq('http://localhost/api/workbooks', 'GET'), {
@@ -274,6 +271,13 @@ describe('Policy Integration & Access Control', () => {
                 { params: Promise.resolve({ id: memberBWorkbookId }) }
             );
             expect(putRes.status).toBe(404);
+
+            // Member A tries to duplicate Member B's workbook -> 404
+            const dupRes = await workbookDuplicateApi.POST(
+                makeJsonReq('http://localhost/api/workbooks/duplicate', 'POST'),
+                { params: Promise.resolve({ id: memberBWorkbookId }) }
+            );
+            expect(dupRes.status).toBe(404);
 
             // Member A tries to delete Member B's workbook -> 404
             const delRes = await workbookDetailApi.DELETE(makeJsonReq('http://localhost/api/workbooks', 'DELETE'), {
@@ -289,7 +293,7 @@ describe('Policy Integration & Access Control', () => {
             const listRes = await dataSourcesApi.GET();
             expect(listRes.status).toBe(200);
             const listJson = await listRes.json();
-            expect(listJson.data.some((ds: any) => ds.id === memberBDataSourceId)).toBe(false);
+            expect(listJson.data.some((ds: { id: string }) => ds.id === memberBDataSourceId)).toBe(false);
 
             // Get data source detail -> 404
             const getRes = await dataSourceDetailApi.GET(makeJsonReq('http://localhost/api/data-sources', 'GET'), {
@@ -330,7 +334,7 @@ describe('Policy Integration & Access Control', () => {
             const listRes = await queriesApi.GET(new Request('http://localhost/api/queries'));
             expect(listRes.status).toBe(200);
             const listJson = await listRes.json();
-            expect(listJson.data.some((q: any) => q.id === memberBQueryId)).toBe(false);
+            expect(listJson.data.some((q: { id: string }) => q.id === memberBQueryId)).toBe(false);
 
             // Get query -> 404
             const getRes = await queryDetailApi.GET(makeJsonReq('http://localhost/api/queries', 'GET'), {
@@ -362,8 +366,14 @@ describe('Policy Integration & Access Control', () => {
             expect(runRes.status).toBe(404);
         });
 
-        it('isolates charts (get, edit, delete)', async () => {
+        it('isolates charts (list, get, edit, delete)', async () => {
             setTestSessionUser(memberA);
+
+            // List charts: Member B's chart must not be returned
+            const listRes = await chartsApi.GET(new Request('http://localhost/api/charts'));
+            expect(listRes.status).toBe(200);
+            const listJson = await listRes.json();
+            expect(listJson.data.some((c: { id: string }) => c.id === memberBChartId)).toBe(false);
 
             // Get chart -> 404
             const getRes = await chartDetailApi.GET(makeJsonReq('http://localhost/api/charts', 'GET'), {
@@ -392,7 +402,7 @@ describe('Policy Integration & Access Control', () => {
             const listRes = await dashboardsApi.GET(new Request('http://localhost/api/dashboards'));
             expect(listRes.status).toBe(200);
             const listJson = await listRes.json();
-            expect(listJson.data.some((d: any) => d.id === memberBDashboardId)).toBe(false);
+            expect(listJson.data.some((d: { id: string }) => d.id === memberBDashboardId)).toBe(false);
 
             // Get dashboard -> 404
             const getRes = await dashboardDetailApi.GET(makeJsonReq('http://localhost/api/dashboards', 'GET'), {
@@ -436,7 +446,7 @@ describe('Policy Integration & Access Control', () => {
             const listWbRes = await workbooksApi.GET();
             expect(listWbRes.status).toBe(200);
             const listWbJson = await listWbRes.json();
-            expect(listWbJson.data.some((w: any) => w.id === memberBWorkbookId)).toBe(true);
+            expect(listWbJson.data.some((w: { id: string }) => w.id === memberBWorkbookId)).toBe(true);
 
             // Admin reads Member B's workbook
             const getWbRes = await workbookDetailApi.GET(makeJsonReq('http://localhost/api/workbooks', 'GET'), {

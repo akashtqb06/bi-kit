@@ -5,6 +5,7 @@ import { getSession } from "./session";
 import type { SafeUser } from "./types";
 
 export type { SafeUser };
+// keep: used by RBAC phase
 export { can, assertCan, visibleScope } from './policy';
 
 function toSafeUser(user: NonNullable<Awaited<ReturnType<typeof getSession>>>["user"]): SafeUser {
@@ -37,10 +38,6 @@ export async function requireUserApi(): Promise<SafeUser> {
   const user = await getCurrentUser();
   if (!user) throw new UnauthorizedError();
   return user;
-}
-
-export function isAuthResponse(value: SafeUser | Response): value is Response {
-  return value instanceof Response;
 }
 
 export function requireRole(

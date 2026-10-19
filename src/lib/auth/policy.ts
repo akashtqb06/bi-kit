@@ -6,6 +6,7 @@ import { eq, type SQL } from "drizzle-orm";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 
 export type Action = "view" | "edit" | "delete" | "share" | "create";
+// keep: used by RBAC phase
 export type ResourceType = "workbook" | "dashboard" | "chart" | "query" | "data_source" | "user";
 export type Resource = {
   type: ResourceType;
@@ -60,10 +61,12 @@ export function assertCan(user: PolicyUser, action: Action, resource: Resource):
   }
 }
 
+// keep: used by RBAC phase
 export function forbiddenResponse(error: unknown): Response | null {
   return error instanceof ForbiddenError ? Response.json({ error: "Forbidden" }, { status: 403 }) : null;
 }
 
+// keep: used by RBAC phase
 export function visibleScope(
   user: PolicyUser,
   type: ResourceType,

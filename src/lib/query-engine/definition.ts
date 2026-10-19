@@ -26,7 +26,7 @@ const joinStepSchema = z.object({
 // Filter step
 // ---------------------------------------------------------------------------
 
-export const filterOpSchema = z.enum([
+const filterOpSchema = z.enum([
   "=",
   "!=",
   ">",
@@ -75,14 +75,14 @@ const mutateStepSchema = z.object({
 // Summarize step
 // ---------------------------------------------------------------------------
 
-export const dateGrainSchema = z.enum(["year", "month", "week", "day", "hour"]);
+const dateGrainSchema = z.enum(["year", "month", "week", "day", "hour"]);
 
 const groupByItemSchema = z.object({
   column: identifierSchema,
   dateGrain: dateGrainSchema.optional(),
 });
 
-export const aggFnSchema = z.enum([
+const aggFnSchema = z.enum([
   "count",
   "sum",
   "avg",
@@ -139,7 +139,7 @@ const limitStepSchema = z.object({
 // Union discriminated step
 // ---------------------------------------------------------------------------
 
-export const queryStepSchema = z.discriminatedUnion("type", [
+const queryStepSchema = z.discriminatedUnion("type", [
   joinStepSchema,
   filterStepSchema,
   mutateStepSchema,
@@ -153,7 +153,7 @@ export const queryStepSchema = z.discriminatedUnion("type", [
 // Top-level query definition
 // ---------------------------------------------------------------------------
 
-export const querySourceSchema = z.object({
+const querySourceSchema = z.object({
   table: identifierSchema,
 });
 
@@ -168,7 +168,6 @@ export const queryDefinitionSchema = z.object({
 
 export type FilterOp = z.infer<typeof filterOpSchema>;
 export type FilterItem = z.infer<typeof filterItemSchema>;
-export type FilterConditions = z.infer<typeof filterConditionsSchema>;
 export type DateGrain = z.infer<typeof dateGrainSchema>;
 export type GroupByItem = z.infer<typeof groupByItemSchema>;
 export type AggFn = z.infer<typeof aggFnSchema>;
@@ -182,5 +181,4 @@ export type SelectStep = z.infer<typeof selectStepSchema>;
 export type OrderStep = z.infer<typeof orderStepSchema>;
 export type LimitStep = z.infer<typeof limitStepSchema>;
 export type QueryStep = z.infer<typeof queryStepSchema>;
-export type QuerySource = z.infer<typeof querySourceSchema>;
 export type QueryDefinition = z.infer<typeof queryDefinitionSchema>;

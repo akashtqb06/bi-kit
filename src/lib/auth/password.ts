@@ -1,3 +1,4 @@
+import 'server-only';
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 
 const COST = 2 ** 15;

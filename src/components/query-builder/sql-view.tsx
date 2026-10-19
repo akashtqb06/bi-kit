@@ -109,5 +109,3 @@ export function SqlEditor() {
     </div>
   );
 }
-
-export { SqlEditor as SqlView };

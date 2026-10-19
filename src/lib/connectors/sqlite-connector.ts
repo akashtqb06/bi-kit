@@ -1,3 +1,4 @@
+import 'server-only';
 import Database from 'better-sqlite3';
 import { Worker } from 'node:worker_threads';
 import {

@@ -14,32 +14,8 @@ export interface ChartCsvTarget {
     queryId?: string;
 }
 
-/**
- * Escapes a single CSV value according to RFC 4180.
- * If the value contains commas, double quotes, or newlines, it must be enclosed
- * in double quotes, and any internal double quotes must be doubled ("").
- */
-export function escapeCsvField(val: unknown): string {
-    if (val === null || val === undefined) return '';
-    const str = String(val);
-    if (/[",\r\n]/.test(str)) {
-        return `"${str.replace(/"/g, '""')}"`;
-    }
-    return str;
-}
-
-/**
- * Generates a clean URL-friendly and filename-safe slug from a chart/dashboard title.
- */
-export function slugifyTitle(title?: string): string {
-    if (!title) return 'chart-data';
-    const slug = title
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '');
-    return slug || 'chart-data';
-}
+import { escapeCsvField, slugifyTitle, buildCsvContent, downloadCsv } from '@src/lib/utils';
+export { escapeCsvField, slugifyTitle };
 
 // ---------------------------------------------------------------------------
 // Chart Refetch Registry for refreshChart(chartId)
@@ -192,21 +168,9 @@ export async function downloadChartCsv(
         return;
     }
 
-    const headerLine = effectiveCols.map(escapeCsvField).join(',');
-    const rowLines = effectiveRows.map((row) => row.map(escapeCsvField).join(','));
-    const csvContent = (headerLine ? [headerLine, ...rowLines] : rowLines).join('\r\n');
-
-    // Prepend UTF-8 BOM (\uFEFF) for Microsoft Excel compatibility
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
+    const csvContent = buildCsvContent(effectiveCols, effectiveRows);
     const filename = `${slugifyTitle(chart.title || chart.name)}.csv`;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    downloadCsv(filename, csvContent);
     toast.success('CSV downloaded');
 }
 

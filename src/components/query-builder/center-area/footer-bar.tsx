@@ -8,6 +8,7 @@ import {
   DownloadIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { buildCsvContent, downloadCsv } from "@src/lib/utils";
 import { useQueryEditorStore } from "../store";
 
 export function FooterBar() {
@@ -34,26 +35,8 @@ export function FooterBar() {
       return;
     }
 
-    const headers = results.columns.map((c) => `"${c.name.replace(/"/g, '""')}"`).join(",");
-    const rows = results.rows.map((row) =>
-      row
-        .map((val) => {
-          if (val === null || val === undefined) return "";
-          return `"${String(val).replace(/"/g, '""')}"`;
-        })
-        .join(",")
-    );
-
-    const csvContent = [headers, ...rows].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `${queryName || "query-results"}-page-${page}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const csvContent = buildCsvContent(results.columns, results.rows);
+    downloadCsv(`${queryName || "query-results"}-page-${page}.csv`, csvContent);
     toast.success("CSV downloaded");
   };
 

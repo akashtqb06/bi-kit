@@ -41,6 +41,7 @@ import {
   SlidersHorizontalIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { buildCsvContent, downloadCsv } from "@src/lib/utils";
 import { defaultChartConfig } from "@src/lib/schemas";
 import { useQueryEditorStore } from "../store";
 
@@ -111,27 +112,8 @@ export function StatusBar() {
       return;
     }
 
-    const headers = results.columns.map((c) => `"${c.name.replace(/"/g, '""')}"`).join(",");
-    const rows = results.rows.map((row) =>
-      row
-        .map((val) => {
-          if (val === null || val === undefined) return "";
-          const str = String(val);
-          return `"${str.replace(/"/g, '""')}"`;
-        })
-        .join(",")
-    );
-
-    const csvContent = [headers, ...rows].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `${queryName || "query-results"}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const csvContent = buildCsvContent(results.columns, results.rows);
+    downloadCsv(`${queryName || "query-results"}.csv`, csvContent);
     toast.success("CSV exported successfully");
   };
 

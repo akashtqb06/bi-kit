@@ -2,19 +2,13 @@ import { describe, it, expect } from 'vitest';
 import * as React from 'react';
 import { renderToString } from 'react-dom/server';
 import {
-    DropdownMenu,
-    DropdownMenuContent,
     DropdownMenuGroup,
     DropdownMenuLabel,
     DropdownMenuRadioGroup,
-    DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu';
 import {
-    Select,
-    SelectContent,
     SelectGroup,
     SelectLabel,
-    SelectItem,
 } from '@/components/ui/select';
 
 describe('Base UI Safe Labels Verification', () => {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { updateDataSourceSchema } from "@src/lib/schemas";
 import {
   getDataSource,
   getDataSourcePublic,
@@ -8,11 +8,6 @@ import {
 } from "@src/lib/data-sources/service";
 import { handleApiError } from "@src/app/api/utils";
 import { requireUserApi, assertCan } from "@src/lib/auth/dal";
-
-const updateSchema = z.object({
-  name: z.string().min(1).max(255).optional(),
-  config: z.object({ path: z.string().min(1) }).optional(),
-});
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -42,7 +37,7 @@ export async function PUT(
     const source = getDataSource(id);
     assertCan(user, "edit", { type: "data_source", id, ownerId: source.ownerId });
     const body: unknown = await req.json();
-    const input = updateSchema.parse(body);
+    const input = updateDataSourceSchema.parse(body);
     const data = updateDataSource(id, input);
     return NextResponse.json({ data });
   } catch (err) {
@@ -60,7 +55,7 @@ export async function PATCH(
     const source = getDataSource(id);
     assertCan(user, "edit", { type: "data_source", id, ownerId: source.ownerId });
     const body: unknown = await req.json();
-    const input = updateSchema.parse(body);
+    const input = updateDataSourceSchema.parse(body);
     const data = updateDataSource(id, input);
     return NextResponse.json({ data });
   } catch (err) {

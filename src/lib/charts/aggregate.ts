@@ -5,7 +5,7 @@ import type { ChartConfigData, ChartSeriesConfig, DateGrain } from '@src/lib/sch
 // Types
 // ---------------------------------------------------------------------------
 
-export interface AggregatedSeriesItem {
+interface AggregatedSeriesItem {
     key: string;
     label: string;
     column: string;
@@ -100,7 +100,7 @@ export function parseDateSafe(val: unknown): Date | null {
     return null;
 }
 
-export function formatDateWithGrain(
+function formatDateWithGrain(
     d: Date,
     grain?: DateGrain,
     customFormat?: string
@@ -166,23 +166,6 @@ export function formatDateWithGrain(
             };
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// Number formatting helper
-// ---------------------------------------------------------------------------
-
-export function formatNumericValue(val: unknown, decimals?: number | null): string {
-    if (val === null || val === undefined) return '—';
-    const num = typeof val === 'number' ? val : Number(val);
-    if (isNaN(num)) return String(val);
-    if (typeof decimals === 'number') {
-        return num.toLocaleString(undefined, {
-            minimumFractionDigits: decimals,
-            maximumFractionDigits: decimals,
-        });
-    }
-    return num.toLocaleString();
 }
 
 // ---------------------------------------------------------------------------

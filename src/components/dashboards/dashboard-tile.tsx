@@ -23,7 +23,7 @@ import {
     PencilIcon,
     CopyIcon,
 } from 'lucide-react';
-import { ChartRenderer } from '@src/components/charts';
+import { ChartRenderer } from '@src/components/charts/chart-renderer';
 import { cn } from '@/lib/utils';
 import { downloadChartCsv, refreshChart, openInWorkbook } from '@src/lib/chart-actions';
 import type { ChartPublic } from '@src/lib/charts/service';
@@ -660,7 +660,3 @@ export function DashboardWidget({
         </div>
     );
 }
-
-// Backward compatibility aliases
-export const DashboardTile = DashboardWidget;
-export type DashboardTileProps = DashboardWidgetProps;

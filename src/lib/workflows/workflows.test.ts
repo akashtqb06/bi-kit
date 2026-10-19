@@ -3,12 +3,13 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import Database from 'better-sqlite3';
 import { afterAll, describe, expect, it, vi } from 'vitest';
+import type { User } from '@src/lib/db/schema';
 
 const testSessionState = vi.hoisted(() => ({
-    user: null as any,
+    user: null as User | null,
 }));
 
-function setTestSessionUser(user: any): void {
+function setTestSessionUser(user: User | null): void {
     testSessionState.user = user ?? null;
 }
 

@@ -10,7 +10,6 @@ import { hashPassword, verifyPassword } from './password';
 import { checkLoginRateLimit, recordLoginAttempt } from './rate-limit';
 import { credentialsSchema, registerSchema } from './schemas';
 import type { AuthActionResult, AuthField } from './types';
-export type { AuthActionResult, AuthField } from './types';
 
 const invalidCredentialsMessage = 'Invalid email or password';
 const dummyPasswordHash = hashPassword('bi-kit-invalid-account-password');

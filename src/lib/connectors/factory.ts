@@ -1,3 +1,4 @@
+import 'server-only';
 import * as fs from 'fs';
 import * as path from 'path';
 import { parseDataSourceConfig } from '@src/lib/db/json-helpers';

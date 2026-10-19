@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { assertTestIsolationGuard } from './guard';
 
+// keep: single source of truth for paths
 export function getDataDir(): string {
     return path.resolve(process.cwd(), process.env.DATA_DIR ?? 'data');
 }

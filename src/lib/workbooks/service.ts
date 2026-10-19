@@ -1,3 +1,4 @@
+import 'server-only';
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@src/lib/db";
 import { newId } from "@src/lib/db/id";

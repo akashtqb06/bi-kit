@@ -12,13 +12,6 @@ export type SettingsActionResult = {
     formError?: string;
 };
 
-export type ActionResult<T = unknown> = {
-    ok: boolean;
-    data?: T;
-    fieldErrors?: Record<string, string>;
-    formError?: string;
-};
-
 export type SafeUser = {
     id: string;
     email: string;
