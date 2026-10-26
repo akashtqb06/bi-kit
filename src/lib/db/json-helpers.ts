@@ -70,7 +70,7 @@ export function parseChartConfig(raw: string): ChartConfig {
   return chartConfigSchema.passthrough().parse(json);
 }
 
-export function serializeChartConfig(config: ChartConfig): string {
+export function serializeChartConfig(config: ChartConfig | Record<string, unknown>): string {
   return JSON.stringify(config);
 }
 

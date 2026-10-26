@@ -1,3 +1,11 @@
+/**
+ * Rule: `nativeButton` must match the element that is actually rendered.
+ * - The rendered element is a real <button> (including a shadcn <Button> or <button>):
+ *   leave nativeButton at its default (true); remove the nativeButton={false} prop.
+ * - The rendered element is NOT a button (a, Link, div, span, li):
+ *   nativeButton={false} is required.
+ */
+
 "use client"
 
 import * as React from "react"
@@ -7,6 +15,7 @@ import { type VariantProps } from "class-variance-authority"
 import { cn } from "cn"
 
 import { toggleVariants } from "@/components/ui/toggle"
+import { resolveNativeButton } from "@/components/ui/button"
 
 const ToggleGroupContext = React.createContext<
   VariantProps<typeof toggleVariants> & {
@@ -61,6 +70,8 @@ function ToggleGroupItem({
   children,
   variant = "default",
   size = "default",
+  nativeButton,
+  render,
   ...props
 }: TogglePrimitive.Props & VariantProps<typeof toggleVariants>) {
   const context = React.useContext(ToggleGroupContext)
@@ -79,6 +90,8 @@ function ToggleGroupItem({
         }),
         className
       )}
+      nativeButton={resolveNativeButton(nativeButton, render)}
+      render={render}
       {...props}
     >
       {children}

@@ -28,7 +28,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertCircleIcon, BarChart2Icon, TrendingUpIcon, TrendingDownIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { ChartConfigData, ChartType } from '@src/lib/schemas';
+import type { ChartConfigData, ChartType, NormalizedChartTextStyle } from '@src/lib/schemas';
+import { normalizeTextStyle } from '@src/lib/schemas';
+import { getFontFamily } from '@src/lib/fonts';
+import { ChartTitle } from './chart-title';
 import type { QueryResultData } from '@src/components/query-builder/store';
 import { aggregateChartData, parseDateSafe } from '@src/lib/charts/aggregate';
 import { format } from 'date-fns';
@@ -333,6 +336,9 @@ export function ChartRenderer({
     className,
     showTitle = true,
 }: ChartRendererProps) {
+    // Normalize text style before rendering
+    const textStyle = useMemo(() => normalizeTextStyle(config), [config]);
+
     // Normalize data
     const { columnNames, rows } = useMemo(() => normalizeData(data), [data]);
 
@@ -396,7 +402,7 @@ export function ChartRenderer({
                 <BarChart2Icon className="size-8 mb-2 opacity-30" />
                 <p className="text-sm font-medium">No data available</p>
                 <p className="text-xs text-muted-foreground/80 mt-1 max-w-xs">
-                    Run the linked query or configure columns to display visualization.
+                    Select a query or configure columns to display visualization.
                 </p>
             </div>
         );
@@ -433,13 +439,26 @@ export function ChartRenderer({
         return (
             <div className={cn('flex flex-col justify-between p-3.5 w-full h-full min-h-0', className)}>
                 {showTitle && cardTitle && (
-                    <div className="text-sm font-medium text-muted-foreground truncate mb-1">
-                        {cardTitle}
-                    </div>
+                    <ChartTitle title={cardTitle} textStyle={textStyle} className="mb-1" />
                 )}
                 <div className="flex items-end justify-between gap-3 mt-auto">
                     <div className="min-w-0">
-                        <div className="text-3xl font-semibold tracking-tight text-foreground font-mono tabular-nums truncate">
+                        <div
+                            className="tracking-tight text-foreground font-mono tabular-nums truncate"
+                            style={{
+                                fontSize: `${textStyle.numberValue.fontSize}px`,
+                                fontWeight:
+                                    textStyle.numberValue.fontWeight === 'bold'
+                                        ? 700
+                                        : textStyle.numberValue.fontWeight === 'medium'
+                                        ? 500
+                                        : textStyle.numberValue.fontWeight === 'normal'
+                                        ? 400
+                                        : 600,
+                                fontFamily: getFontFamily(textStyle.title.fontFamily),
+                                color: textStyle.title.color || undefined,
+                            }}
+                        >
                             {formatted}
                         </div>
                         {timeDelta ? (
@@ -476,7 +495,7 @@ export function ChartRenderer({
                     </div>
                     {sparklineData && sparklineData.length >= 2 && (
                         <div className="w-24 sm:w-28 h-10 shrink-0">
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" debounce={50}>
                                 <AreaChart data={sparklineData} margin={{ top: 2, right: 0, bottom: 2, left: 0 }}>
                                     <defs>
                                         <linearGradient id="sparkline-gradient" x1="0" y1="0" x2="0" y2="1">
@@ -514,7 +533,16 @@ export function ChartRenderer({
     // Render: TABLE
     // -------------------------------------------------------------------------
     if (type === 'table') {
-        return <TableView columnNames={columnNames} rows={rows} config={config} className={className} />;
+        return (
+            <TableView
+                columnNames={columnNames}
+                rows={rows}
+                config={config}
+                textStyle={textStyle}
+                showTitle={showTitle}
+                className={className}
+            />
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -556,20 +584,23 @@ export function ChartRenderer({
 
         return (
             <div className={cn('flex h-full min-h-0 w-full flex-col overflow-hidden', className)}>
-                {showTitle && config.title && (
-                    <div className="text-center mb-1">
-                        <h4 className="text-sm font-semibold text-foreground">{config.title}</h4>
-                        {config.description && <p className="text-xs text-muted-foreground">{config.description}</p>}
-                    </div>
+                {showTitle && (config.title || textStyle.subtitle.text) && (
+                    <ChartTitle
+                        title={config.title}
+                        description={config.description}
+                        textStyle={textStyle}
+                        className="mb-1 px-1"
+                    />
                 )}
                 <PieChartWithLegend
                     data={pieData}
                     palette={palette}
                     chartConfig={pieConfig}
-                    showLegend={config.showLegend !== false}
+                    showLegend={config.showLegend !== false && textStyle.legend.show !== false}
                     isDonut={isDonut}
                     total={total}
                     measureLabel={measureCol || 'Total'}
+                    textStyle={textStyle}
                 />
             </div>
         );
@@ -579,13 +610,16 @@ export function ChartRenderer({
     // Render: ROW (Horizontal Bar Chart)
     // -------------------------------------------------------------------------
     if (type === 'row') {
+        const yAxisWidth = Math.max(80, Math.round(textStyle.axisLabels.fontSize * 6.5));
         return (
             <div className={cn('w-full h-full min-h-0 min-w-0 flex flex-col overflow-hidden', className)}>
-                {showTitle && config.title && (
-                    <div className="mb-2 px-2">
-                        <h4 className="text-sm font-semibold text-foreground">{config.title}</h4>
-                        {config.description && <p className="text-xs text-muted-foreground">{config.description}</p>}
-                    </div>
+                {showTitle && (config.title || textStyle.subtitle.text) && (
+                    <ChartTitle
+                        title={config.title}
+                        description={config.description}
+                        textStyle={textStyle}
+                        className="mb-2 px-2"
+                    />
                 )}
                 <ChartContainer config={chartConfig} className="h-full w-full aspect-auto min-h-0 flex-1">
                     <BarChart
@@ -603,7 +637,12 @@ export function ChartRenderer({
                             domain={[config.yMin ?? 'auto', config.yMax ?? 'auto']}
                             tickLine={false}
                             axisLine={false}
-                            tickMargin={4}
+                            tickMargin={Math.max(4, Math.round(textStyle.axisLabels.fontSize * 0.4))}
+                            tick={{
+                                fontSize: textStyle.axisLabels.fontSize,
+                                fontFamily: getFontFamily(textStyle.axisLabels.fontFamily),
+                                fill: textStyle.axisLabels.color || 'var(--muted-foreground)',
+                            }}
                             tickFormatter={(val) =>
                                 config.normalize
                                     ? `${val}%`
@@ -615,12 +654,17 @@ export function ChartRenderer({
                         <YAxis
                             type="category"
                             dataKey={xAxisKey}
-                            width={80}
+                            width={yAxisWidth}
                             interval={0}
                             hide={!config.showAxisLabel}
                             tickLine={false}
                             axisLine={false}
-                            tickMargin={4}
+                            tickMargin={6}
+                            tick={{
+                                fontSize: textStyle.axisLabels.fontSize,
+                                fontFamily: getFontFamily(textStyle.axisLabels.fontFamily),
+                                fill: textStyle.axisLabels.color || 'var(--muted-foreground)',
+                            }}
                             tickFormatter={(val) => (val === null || val === undefined ? '' : String(val))}
                         />
                         <ChartTooltip content={<ChartTooltipContent />} />
@@ -645,7 +689,20 @@ export function ChartRenderer({
                                     stackId={config.stacked ? 'stack' : undefined}
                                     label={
                                         config.showDataLabels
-                                            ? { position: 'right', fill: 'currentColor', fontSize: 10 }
+                                            ? {
+                                                  position: 'right',
+                                                  fill: textStyle.dataLabels.color || 'currentColor',
+                                                  fontSize: textStyle.dataLabels.fontSize,
+                                                  fontFamily: getFontFamily(textStyle.dataLabels.fontFamily),
+                                                  fontWeight:
+                                                      textStyle.dataLabels.fontWeight === 'bold'
+                                                          ? 700
+                                                          : textStyle.dataLabels.fontWeight === 'medium'
+                                                          ? 500
+                                                          : textStyle.dataLabels.fontWeight === 'semibold'
+                                                          ? 600
+                                                          : 400,
+                                              }
                                             : false
                                     }
                                 />
@@ -653,7 +710,9 @@ export function ChartRenderer({
                         })}
                     </BarChart>
                 </ChartContainer>
-                {config.showLegend && <CompactSeriesLegend series={seriesList} palette={palette} />}
+                {config.showLegend && textStyle.legend.show !== false && (
+                    <CompactSeriesLegend series={seriesList} palette={palette} textStyle={textStyle} />
+                )}
             </div>
         );
     }
@@ -663,19 +722,30 @@ export function ChartRenderer({
     // -------------------------------------------------------------------------
     const angle = config.xRotateValues ? -Number(config.xRotateValues) : 0;
     const textAnchor = config.xRotateValues ? 'end' : 'middle';
+    const xAxisHeight = config.xRotateValues
+        ? Math.max(60, Math.round(textStyle.axisLabels.fontSize * 3.8))
+        : Math.max(30, Math.round(textStyle.axisLabels.fontSize * 2.2));
+    const yAxisWidth = Math.max(55, Math.round(textStyle.axisLabels.fontSize * 4.8));
 
     return (
         <div className={cn('w-full h-full min-h-0 min-w-0 flex flex-col overflow-hidden', className)}>
-            {showTitle && config.title && (
-                <div className="mb-2 px-2">
-                    <h4 className="text-sm font-semibold text-foreground">{config.title}</h4>
-                    {config.description && <p className="text-xs text-muted-foreground">{config.description}</p>}
-                </div>
+            {showTitle && (config.title || textStyle.subtitle.text) && (
+                <ChartTitle
+                    title={config.title}
+                    description={config.description}
+                    textStyle={textStyle}
+                    className="mb-2 px-2"
+                />
             )}
             <ChartContainer config={chartConfig} className="h-full w-full aspect-auto min-h-0 flex-1">
                 <ComposedChart
                     data={chartData}
-                    margin={{ top: 8, right: 16, bottom: config.xRotateValues ? 16 : 4, left: 4 }}
+                    margin={{
+                        top: 8,
+                        right: 16,
+                        bottom: config.xRotateValues ? Math.max(16, Math.round(textStyle.axisLabels.fontSize * 1.2)) : 4,
+                        left: 4,
+                    }}
                     barGap={config.overlap ? -20 : 4}
                 >
                     {config.showGrid && <CartesianGrid vertical={false} stroke="var(--border)" strokeOpacity={0.55} />}
@@ -687,18 +757,28 @@ export function ChartRenderer({
                         angle={angle}
                         textAnchor={textAnchor}
                         interval="preserveStartEnd"
-                        height={config.xRotateValues ? 60 : 30}
-                        tickMargin={config.xRotateValues ? 8 : 4}
+                        height={xAxisHeight}
+                        tickMargin={config.xRotateValues ? Math.max(8, Math.round(textStyle.axisLabels.fontSize * 0.6)) : 4}
                         minTickGap={8}
+                        tick={{
+                            fontSize: textStyle.axisLabels.fontSize,
+                            fontFamily: getFontFamily(textStyle.axisLabels.fontFamily),
+                            fill: textStyle.axisLabels.color || 'var(--muted-foreground)',
+                        }}
                         tickFormatter={(val) => (val === null || val === undefined ? '' : String(val))}
                     />
                     <YAxis
                         hide={!config.showAxisLabel}
-                        width={55}
+                        width={yAxisWidth}
                         domain={[config.yMin ?? 'auto', config.yMax ?? 'auto']}
                         tickLine={false}
                         axisLine={false}
-                        tickMargin={4}
+                        tickMargin={6}
+                        tick={{
+                            fontSize: textStyle.axisLabels.fontSize,
+                            fontFamily: getFontFamily(textStyle.axisLabels.fontFamily),
+                            fill: textStyle.axisLabels.color || 'var(--muted-foreground)',
+                        }}
                         tickFormatter={(val) =>
                             config.normalize ? `${val}%` : typeof val === 'number' ? val.toLocaleString() : String(val)
                         }
@@ -732,7 +812,20 @@ export function ChartRenderer({
                                     dot={false}
                                     label={
                                         config.showDataLabels
-                                            ? { position: 'top', fill: 'currentColor', fontSize: 10 }
+                                            ? {
+                                                  position: 'top',
+                                                  fill: textStyle.dataLabels.color || 'currentColor',
+                                                  fontSize: textStyle.dataLabels.fontSize,
+                                                  fontFamily: getFontFamily(textStyle.dataLabels.fontFamily),
+                                                  fontWeight:
+                                                      textStyle.dataLabels.fontWeight === 'bold'
+                                                          ? 700
+                                                          : textStyle.dataLabels.fontWeight === 'medium'
+                                                          ? 500
+                                                          : textStyle.dataLabels.fontWeight === 'semibold'
+                                                          ? 600
+                                                          : 400,
+                                              }
                                             : false
                                     }
                                 />
@@ -762,7 +855,20 @@ export function ChartRenderer({
                                 stackId={config.stacked ? 'stack' : undefined}
                                 label={
                                     config.showDataLabels
-                                        ? { position: 'top', fill: 'currentColor', fontSize: 10 }
+                                        ? {
+                                              position: 'top',
+                                              fill: textStyle.dataLabels.color || 'currentColor',
+                                              fontSize: textStyle.dataLabels.fontSize,
+                                              fontFamily: getFontFamily(textStyle.dataLabels.fontFamily),
+                                              fontWeight:
+                                                  textStyle.dataLabels.fontWeight === 'bold'
+                                                      ? 700
+                                                      : textStyle.dataLabels.fontWeight === 'medium'
+                                                      ? 500
+                                                      : textStyle.dataLabels.fontWeight === 'semibold'
+                                                      ? 600
+                                                      : 400,
+                                          }
                                         : false
                                 }
                             />
@@ -770,7 +876,9 @@ export function ChartRenderer({
                     })}
                 </ComposedChart>
             </ChartContainer>
-            {config.showLegend && <CompactSeriesLegend series={seriesList} palette={palette} />}
+            {config.showLegend && textStyle.legend.show !== false && (
+                <CompactSeriesLegend series={seriesList} palette={palette} textStyle={textStyle} />
+            )}
         </div>
     );
 }
@@ -778,14 +886,26 @@ export function ChartRenderer({
 function CompactSeriesLegend({
     series,
     palette,
+    textStyle,
 }: {
     series: ReturnType<typeof aggregateChartData>['series'];
     palette: string[];
+    textStyle?: NormalizedChartTextStyle;
 }) {
     return (
-        <div className="flex max-h-10 shrink-0 flex-wrap items-center justify-center gap-x-3 gap-y-1 overflow-y-auto px-1 py-1 text-[10px]">
+        <div
+            className="flex max-h-10 shrink-0 flex-wrap items-center justify-center gap-x-3 gap-y-1 overflow-y-auto px-1 py-1"
+            style={{
+                fontFamily: textStyle ? getFontFamily(textStyle.legend.fontFamily) : undefined,
+                fontSize: textStyle ? `${textStyle.legend.fontSize}px` : '10px',
+            }}
+        >
             {series.map((item, index) => (
-                <span key={item.key} className="flex min-w-0 max-w-full items-center gap-1 text-muted-foreground">
+                <span
+                    key={item.key}
+                    className="flex min-w-0 max-w-full items-center gap-1 text-muted-foreground"
+                    style={{ color: textStyle?.legend.color || undefined }}
+                >
                     <span
                         className="size-2 shrink-0 rounded-full"
                         style={{ backgroundColor: item.color || palette[index % palette.length] }}
@@ -807,6 +927,7 @@ function PieChartWithLegend({
     isDonut,
     total,
     measureLabel,
+    textStyle,
 }: {
     data: { name: string; value: number }[];
     palette: string[];
@@ -815,6 +936,7 @@ function PieChartWithLegend({
     isDonut: boolean;
     total: number;
     measureLabel: string;
+    textStyle?: NormalizedChartTextStyle;
 }) {
     const containerRef = useRef<HTMLDivElement>(null);
     const [isWide, setIsWide] = useState(false);
@@ -827,6 +949,10 @@ function PieChartWithLegend({
         observer.observe(container);
         return () => observer.disconnect();
     }, []);
+
+    const legendFontFamily = textStyle ? getFontFamily(textStyle.legend.fontFamily) : undefined;
+    const legendFontSize = textStyle ? `${textStyle.legend.fontSize}px` : '10px';
+    const legendColor = textStyle?.legend.color || undefined;
 
     return (
         <div
@@ -879,12 +1005,26 @@ function PieChartWithLegend({
                 </ChartContainer>
                 {isDonut && (
                     <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-                        <span className="max-w-[65%] truncate text-sm font-semibold tabular-nums text-foreground">
+                        <span
+                            className="max-w-[65%] truncate font-semibold tabular-nums text-foreground"
+                            style={{
+                                fontFamily: textStyle ? getFontFamily(textStyle.title.fontFamily) : undefined,
+                                fontSize: textStyle ? `${Math.max(14, textStyle.title.fontSize + 2)}px` : '14px',
+                                color: textStyle?.title.color || undefined,
+                            }}
+                        >
                             {new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(
                                 total
                             )}
                         </span>
-                        <span className="max-w-[70%] truncate text-[9px] text-muted-foreground">
+                        <span
+                            className="max-w-[70%] truncate text-muted-foreground"
+                            style={{
+                                fontFamily: textStyle ? getFontFamily(textStyle.legend.fontFamily) : undefined,
+                                fontSize: textStyle ? `${Math.max(9, textStyle.legend.fontSize - 2)}px` : '9px',
+                                color: textStyle?.legend.color || undefined,
+                            }}
+                        >
                             {measureLabel || 'Total'}
                         </span>
                     </div>
@@ -900,7 +1040,11 @@ function PieChartWithLegend({
                             return (
                                 <Tooltip key={item.name}>
                                     <TooltipTrigger
-                                        className="flex min-h-6 w-full min-w-0 items-center gap-1.5 rounded-sm px-1 text-left text-[10px] hover:bg-muted/60"
+                                        className="flex min-h-6 w-full min-w-0 items-center gap-1.5 rounded-sm px-1 text-left hover:bg-muted/60"
+                                        style={{
+                                            fontFamily: legendFontFamily,
+                                            fontSize: legendFontSize,
+                                        }}
                                         onMouseEnter={() => setHoveredName(item.name)}
                                         onMouseLeave={() => setHoveredName(null)}
                                         onFocus={() => setHoveredName(item.name)}
@@ -910,7 +1054,12 @@ function PieChartWithLegend({
                                             className="size-2 shrink-0 rounded-full"
                                             style={{ backgroundColor: palette[index % palette.length] }}
                                         />
-                                        <span className="min-w-0 flex-1 truncate text-foreground">{item.name}</span>
+                                        <span
+                                            className="min-w-0 flex-1 truncate text-foreground"
+                                            style={{ color: legendColor }}
+                                        >
+                                            {item.name}
+                                        </span>
                                         <span
                                             className="min-w-0 max-w-[58%] shrink truncate text-right tabular-nums text-muted-foreground"
                                             title={`${item.value.toLocaleString()} (${percent.toFixed(1)}%)`}
@@ -937,11 +1086,15 @@ function TableView({
     columnNames,
     rows,
     config,
+    textStyle,
+    showTitle = true,
     className,
 }: {
     columnNames: string[];
     rows: Record<string, unknown>[];
     config: ChartConfigData;
+    textStyle?: NormalizedChartTextStyle;
+    showTitle?: boolean;
     className?: string;
 }) {
     type RowType = Record<string, unknown>;
@@ -965,7 +1118,17 @@ function TableView({
     const columns = useMemo<LegacyColumnDef<RowType>[]>(() => {
         return displayCols.map((colName) => ({
             id: colName,
-            header: () => <span className="font-semibold text-xs whitespace-nowrap">{colName}</span>,
+            header: () => (
+                <span
+                    className="font-semibold whitespace-nowrap"
+                    style={{
+                        fontFamily: textStyle ? getFontFamily(textStyle.axisLabels.fontFamily) : undefined,
+                        fontSize: textStyle ? `${textStyle.axisLabels.fontSize}px` : undefined,
+                    }}
+                >
+                    {colName}
+                </span>
+            ),
             accessorFn: (row: RowType) => row[colName],
             cell: ({ getValue }: { getValue: () => unknown }) => {
                 const val = getValue();
@@ -990,7 +1153,7 @@ function TableView({
                 return <span className="truncate">{String(val)}</span>;
             },
         }));
-    }, [displayCols]);
+    }, [displayCols, textStyle]);
 
     const table = useLegacyTable({
         data: rows,
@@ -998,13 +1161,24 @@ function TableView({
         getCoreRowModel: getCoreRowModel(),
     });
 
+    const tableFontFamily = textStyle ? getFontFamily(textStyle.axisLabels.fontFamily) : undefined;
+    const tableFontSize = textStyle ? `${textStyle.axisLabels.fontSize}px` : undefined;
+
     return (
-        <div className={cn('flex flex-col h-full overflow-hidden border rounded-md', className)}>
-            {config.title && (
-                <div className="p-3 border-b bg-muted/20">
-                    <h4 className="text-sm font-semibold text-foreground">{config.title}</h4>
-                    {config.description && <p className="text-xs text-muted-foreground">{config.description}</p>}
-                </div>
+        <div
+            className={cn('flex flex-col h-full overflow-hidden border rounded-md', className)}
+            style={{
+                fontFamily: tableFontFamily,
+                fontSize: tableFontSize,
+            }}
+        >
+            {showTitle && (config.title || textStyle?.subtitle.text) && (
+                <ChartTitle
+                    title={config.title}
+                    description={config.description}
+                    textStyle={textStyle}
+                    className="p-3 border-b bg-muted/20"
+                />
             )}
             <ScrollArea className="flex-1 w-full overflow-auto">
                 <Table>
@@ -1025,7 +1199,11 @@ function TableView({
                                 {row.getVisibleCells().map((cell) => (
                                     <TableCell
                                         key={cell.id}
-                                        className="py-1.5 px-3 text-xs font-mono text-muted-foreground"
+                                        className="py-1.5 px-3 font-mono text-muted-foreground"
+                                        style={{
+                                            fontFamily: tableFontFamily,
+                                            fontSize: tableFontSize,
+                                        }}
                                     >
                                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                     </TableCell>

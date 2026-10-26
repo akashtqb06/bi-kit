@@ -45,7 +45,7 @@ function AppShellSkeleton() {
                         <Skeleton className="size-7 rounded" />
                     </div>
                 </header>
-                <main className="flex flex-1 flex-col min-h-0 overflow-hidden" />
+                <main className="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden" />
             </div>
         </div>
     );
@@ -58,9 +58,9 @@ async function AuthenticatedShell({ children }: { children: React.ReactNode }) {
         <UserProvider user={user}>
             <SidebarProvider>
                 <AppSidebar />
-                <SidebarInset className="flex flex-col min-h-0 h-dvh overflow-hidden">
+                <SidebarInset className="flex flex-col min-h-0 min-w-0 h-dvh overflow-hidden">
                     <AppHeader />
-                    <main className="flex flex-1 flex-col min-h-0 overflow-hidden">{children}</main>
+                    <main className="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden">{children}</main>
                 </SidebarInset>
             </SidebarProvider>
         </UserProvider>

@@ -67,6 +67,7 @@ export function ResultsTable() {
     page,
     pageSize,
     definition,
+    dataSourceId,
     updateStep,
     addStep,
   } = useQueryEditorStore();
@@ -205,11 +206,19 @@ export function ResultsTable() {
         {!isRunning && !runError && !results && (
           <div className="flex flex-col items-center justify-center h-full p-8 text-center select-none">
             <div className="size-11 rounded-full bg-muted flex items-center justify-center text-muted-foreground mb-3">
-              <PlayIcon className="size-5 ml-0.5" />
+              {!dataSourceId ? (
+                <DatabaseIcon className="size-5" />
+              ) : (
+                <PlayIcon className="size-5 ml-0.5" />
+              )}
             </div>
-            <p className="text-sm font-semibold text-foreground">No data to display</p>
+            <p className="text-sm font-semibold text-foreground">
+              {!dataSourceId ? "Select a data source to start" : "No data to display"}
+            </p>
             <p className="text-xs text-muted-foreground max-w-sm mt-1">
-              Select a source table or click &quot;Execute&quot; to run your query and view results.
+              {!dataSourceId
+                ? "Choose a data source from the panel to begin building your query."
+                : "Select a source table or click \"Execute\" to run your query and view results."}
             </p>
           </div>
         )}

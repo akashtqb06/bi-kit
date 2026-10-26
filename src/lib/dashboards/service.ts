@@ -21,6 +21,7 @@ import {
   type LayoutItem,
   type DashboardFilter,
 } from "@src/lib/db/json-helpers";
+import { validateFolderAssignment } from "@src/lib/folders/service";
 import type { CreateDashboardInput } from "@src/lib/schemas";
 import type { PolicyUser } from "@src/lib/auth/policy";
 
@@ -43,6 +44,8 @@ export interface DashboardPublic {
   isFavorite: boolean;
   viewCount: number;
   lastViewedAt: Date | null;
+  folderId?: string | null;
+  position?: number;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
@@ -64,6 +67,8 @@ export interface DashboardSummary {
   isFavorite: boolean;
   viewCount: number;
   lastViewedAt: Date | null;
+  folderId?: string | null;
+  position?: number;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
@@ -111,6 +116,8 @@ function toPublic(row: Dashboard, workbookName?: string, userId?: string): Dashb
     isFavorite: Boolean(fav),
     viewCount: view?.viewCount ?? 0,
     lastViewedAt: view?.lastViewedAt ?? null,
+    folderId: row.folderId ?? null,
+    position: row.position ?? 0,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -147,6 +154,8 @@ export function listAllDashboards(
       favoriteId: dashboardFavorites.dashboardId,
       viewCount: dashboardViews.viewCount,
       lastViewedAt: dashboardViews.lastViewedAt,
+      folderId: dashboards.folderId,
+      position: dashboards.position,
       createdAt: dashboards.createdAt,
       updatedAt: dashboards.updatedAt,
       workbookName: workbooks.name,
@@ -232,6 +241,8 @@ export function listAllDashboards(
       isFavorite: Boolean(row.favoriteId),
       viewCount: row.viewCount ?? 0,
       lastViewedAt: row.lastViewedAt ?? null,
+      folderId: row.folderId ?? null,
+      position: row.position ?? 0,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };
@@ -270,6 +281,9 @@ export function createDashboard(
   input: CreateDashboardInput & { ownerId?: string | null; slug?: string }
 ): DashboardSummary {
   getWorkbook(workbookId); // validates FK
+  if (input.folderId) {
+    validateFolderAssignment(input.folderId, workbookId, 'dashboard');
+  }
 
   const insertedId = newId();
   const name = (input.name ?? input.title ?? "Untitled Dashboard").trim();
@@ -285,6 +299,8 @@ export function createDashboard(
       layout: serializeDashboardLayout(input.layout ?? []),
       filters: serializeDashboardFilters(input.filters ?? []),
       autoRefresh: input.autoRefresh ?? "off",
+      folderId: input.folderId ?? null,
+      position: input.position ?? 0,
     })
     .run();
 
@@ -319,6 +335,8 @@ export function createDashboard(
     isFavorite: Boolean(input.isFavorite),
     viewCount: 0,
     lastViewedAt: null,
+    folderId: row.folderId ?? null,
+    position: row.position ?? 0,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -329,7 +347,7 @@ export function updateDashboard(
   input: Partial<CreateDashboardInput>,
   userId?: string
 ): DashboardPublic {
-  getDashboard(id); // throws if missing
+  const current = getDashboard(id); // throws if missing
   const targetUserId = userId ?? getDefaultUserId();
   const updates: Partial<Dashboard> = { updatedAt: new Date() };
   const targetName = input.title ?? input.name;
@@ -340,6 +358,13 @@ export function updateDashboard(
     updates.filters = serializeDashboardFilters(input.filters);
   if (input.autoRefresh !== undefined)
     updates.autoRefresh = input.autoRefresh;
+  if (input.folderId !== undefined) {
+    if (input.folderId !== null) {
+      validateFolderAssignment(input.folderId, current.workbookId, 'dashboard');
+    }
+    updates.folderId = input.folderId ?? null;
+  }
+  if (input.position !== undefined) updates.position = input.position;
 
   db.update(dashboards).set(updates).where(eq(dashboards.id, id)).run();
 

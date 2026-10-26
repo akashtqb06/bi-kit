@@ -5,6 +5,7 @@ import { queries, charts, workbooks, type Query } from "@src/lib/db/schema";
 import { NotFoundError } from "@src/lib/connectors/types";
 import { getWorkbook } from "@src/lib/workbooks/service";
 import { getDataSource } from "@src/lib/data-sources/service";
+import { validateFolderAssignment } from "@src/lib/folders/service";
 import { newId } from "@src/lib/db/id";
 import type { CreateQueryInput } from "@src/lib/schemas";
 
@@ -20,6 +21,8 @@ export interface QueryPublic {
   mode: "builder" | "sql";
   definition: string; // raw JSON string of builder steps
   sql: string;
+  folderId?: string | null;
+  position?: number;
   createdAt: Date | null;
   updatedAt: Date | null;
   createdBy?: string | null;
@@ -34,6 +37,8 @@ function toPublic(row: Query): QueryPublic {
     mode: row.mode as "builder" | "sql",
     definition: row.definition,
     sql: row.sql,
+    folderId: row.folderId,
+    position: row.position,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,
@@ -82,6 +87,16 @@ export function createQuery(input: CreateQueryInput, createdBy?: string): QueryP
   // Verify FK relationships are valid
   getWorkbook(input.workbookId);
   getDataSource(input.dataSourceId);
+  if (input.folderId) {
+    validateFolderAssignment(input.folderId, input.workbookId, 'query');
+  }
+
+  const definitionStr =
+    typeof input.definition === 'string'
+      ? input.definition
+      : input.definition !== undefined
+      ? JSON.stringify(input.definition)
+      : "[]";
 
   const id = newId();
   db.insert(queries)
@@ -90,9 +105,11 @@ export function createQuery(input: CreateQueryInput, createdBy?: string): QueryP
       workbookId: input.workbookId,
       name: input.name,
       dataSourceId: input.dataSourceId,
-      mode: input.mode ?? "sql",
-      definition: input.definition ?? "[]",
+      mode: input.mode ?? "builder",
+      definition: definitionStr,
       sql: input.sql ?? "",
+      folderId: input.folderId ?? null,
+      position: input.position ?? 0,
       createdBy: createdBy ?? null,
     })
     .run();
@@ -104,12 +121,24 @@ export function updateQuery(
   id: string,
   input: Partial<CreateQueryInput>
 ): QueryPublic {
-  getQuery(id); // throws if missing
+  const current = getQuery(id); // throws if missing
   const updates: Partial<Query> = { updatedAt: new Date() };
   if (input.name !== undefined) updates.name = input.name;
   if (input.mode !== undefined) updates.mode = input.mode;
-  if (input.definition !== undefined) updates.definition = input.definition;
+  if (input.definition !== undefined) {
+    updates.definition =
+      typeof input.definition === 'string'
+        ? input.definition
+        : JSON.stringify(input.definition);
+  }
   if (input.sql !== undefined) updates.sql = input.sql;
+  if (input.folderId !== undefined) {
+    if (input.folderId !== null) {
+      validateFolderAssignment(input.folderId, current.workbookId, 'query');
+    }
+    updates.folderId = input.folderId ?? null;
+  }
+  if (input.position !== undefined) updates.position = input.position;
   if (input.dataSourceId !== undefined) {
     getDataSource(input.dataSourceId);
     updates.dataSourceId = input.dataSourceId;

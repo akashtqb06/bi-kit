@@ -15,7 +15,7 @@ import {
     SelectLabel,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Card, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -69,13 +69,18 @@ import { downloadChartCsv, exportChartPng, registerChartRefetcher } from '@src/l
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ChartRenderer } from './chart-renderer';
+import { ChartTitle } from './chart-title';
+import { ChartTextStyleControls } from './chart-text-style-controls';
 import { UnderlyingDataTable } from './underlying-data-table';
+import { ExportChartDialog } from './export-chart-dialog';
 import {
     chartConfigSchema,
     defaultChartConfig,
+    normalizeTextStyle,
     type ChartConfigData,
     type ChartType,
     type ChartSeriesConfig,
+    type ChartTextStyle,
     type DateGrain,
     type ReferenceLine,
 } from '@src/lib/schemas';
@@ -193,6 +198,7 @@ export function ChartEditor({ chartId, workbookId }: ChartEditorProps) {
     const [numberOpen, setNumberOpen] = useState(true);
     const [donutOpen, setDonutOpen] = useState(true);
     const [tableOpen, setTableOpen] = useState(true);
+    const [textFontsOpen, setTextFontsOpen] = useState(false);
 
     const [xColComboboxOpen, setXColComboboxOpen] = useState(false);
 
@@ -207,6 +213,7 @@ export function ChartEditor({ chartId, workbookId }: ChartEditorProps) {
     const lastExecutedQueryRef = useRef<{ id: string; hash: string } | null>(null);
     const chartAbortControllerRef = useRef<AbortController | null>(null);
     const chartCardRef = useRef<HTMLDivElement>(null);
+    const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -394,7 +401,7 @@ export function ChartEditor({ chartId, workbookId }: ChartEditorProps) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         name: nameToSave.trim() || 'Untitled Chart',
-                        queryId: queryIdToSave,
+                        queryId: queryIdToSave || null,
                         type: typeToSave,
                         config: configToSave,
                     }),
@@ -431,6 +438,18 @@ export function ChartEditor({ chartId, workbookId }: ChartEditorProps) {
             triggerSave(name, queryId, type, next);
         },
         [config, name, queryId, type, triggerSave]
+    );
+
+    const updateTextStyle = useCallback(
+        (patch: Partial<ChartTextStyle>) => {
+            const current = config.textStyle || {};
+            const next: ChartTextStyle = {
+                ...current,
+                ...patch,
+            };
+            updateConfig({ textStyle: next });
+        },
+        [config.textStyle, updateConfig]
     );
 
     const handleTypeChange = useCallback(
@@ -614,7 +633,7 @@ export function ChartEditor({ chartId, workbookId }: ChartEditorProps) {
     // Export helpers
     const handleDownloadPng = async () => {
         if (!chartCardRef.current) return;
-        await exportChartPng(chartCardRef.current, config.title || name || 'chart');
+        await exportChartPng(chartCardRef.current, config.title || name || 'chart', config);
     };
 
     const handleDownloadCsv = () => {
@@ -781,15 +800,43 @@ export function ChartEditor({ chartId, workbookId }: ChartEditorProps) {
                                 <MoreHorizontalIcon className="size-4" />
                                 <span className="sr-only">More options</span>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuContent align="end" className="w-48">
                                 <DropdownMenuItem onClick={handleRefresh}>
                                     <RefreshCwIcon className="size-3.5 mr-2" />
                                     <span>Refresh</span>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={handleDownloadPng}>
-                                    <DownloadIcon className="size-3.5 mr-2" />
-                                    <span>Download PNG</span>
-                                </DropdownMenuItem>
+                                {isRunningQuery || Boolean(queryError) || !queryResults?.rows?.length ? (
+                                    <Tooltip>
+                                        <TooltipTrigger render={<span className="block w-full cursor-not-allowed" />}>
+                                            <DropdownMenuItem disabled className="opacity-50 pointer-events-none">
+                                                <DownloadIcon className="size-3.5 mr-2" />
+                                                <span>Download PNG</span>
+                                            </DropdownMenuItem>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="right">Chart has no data yet</TooltipContent>
+                                    </Tooltip>
+                                ) : (
+                                    <DropdownMenuItem onClick={handleDownloadPng}>
+                                        <DownloadIcon className="size-3.5 mr-2" />
+                                        <span>Download PNG</span>
+                                    </DropdownMenuItem>
+                                )}
+                                {isRunningQuery || Boolean(queryError) || !queryResults?.rows?.length ? (
+                                    <Tooltip>
+                                        <TooltipTrigger render={<span className="block w-full cursor-not-allowed" />}>
+                                            <DropdownMenuItem disabled className="opacity-50 pointer-events-none">
+                                                <DownloadIcon className="size-3.5 mr-2" />
+                                                <span>Download PNG...</span>
+                                            </DropdownMenuItem>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="right">Chart has no data yet</TooltipContent>
+                                    </Tooltip>
+                                ) : (
+                                    <DropdownMenuItem onClick={() => setIsExportDialogOpen(true)}>
+                                        <DownloadIcon className="size-3.5 mr-2" />
+                                        <span>Download PNG...</span>
+                                    </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem onClick={handleDownloadCsv}>
                                     <DownloadIcon className="size-3.5 mr-2" />
                                     <span>Download CSV</span>
@@ -815,17 +862,21 @@ export function ChartEditor({ chartId, workbookId }: ChartEditorProps) {
                 <div className="flex-1 min-h-0 min-w-0 overflow-y-auto p-4 space-y-4">
                     {/* Top Card: Chart Title & Live Chart */}
                     <Card ref={chartCardRef} className="flex flex-col p-3 bg-card shadow-xs h-[380px] min-h-[280px] shrink-0">
-                        <div className="flex items-center justify-between pb-2 border-b shrink-0">
-                            <CardTitle className="text-sm font-semibold text-foreground tracking-tight">
-                                {config.title || name || 'Untitled Chart'}
-                            </CardTitle>
-                            {isSaving ? (
-                                <Badge variant="secondary" className="text-[10px] font-mono text-muted-foreground">
-                                    Saving...
-                                </Badge>
-                            ) : isDirty ? (
-                                <span className="text-[10px] text-amber-500 font-medium">Unsaved changes</span>
-                            ) : null}
+                        <div data-chart-header className="flex items-start justify-between pb-2 border-b shrink-0 chart-card-header gap-2">
+                            <ChartTitle
+                                title={config.title !== undefined ? config.title : (name || 'Untitled Chart')}
+                                textStyle={normalizeTextStyle(config)}
+                                className="flex-1 min-w-0"
+                            />
+                            <div className="no-export shrink-0 pt-0.5">
+                                {isSaving ? (
+                                    <Badge variant="secondary" className="text-[10px] font-mono text-muted-foreground">
+                                        Saving...
+                                    </Badge>
+                                ) : isDirty ? (
+                                    <span className="text-[10px] text-amber-500 font-medium">Unsaved changes</span>
+                                ) : null}
+                            </div>
                         </div>
 
                         <div
@@ -1891,6 +1942,26 @@ export function ChartEditor({ chartId, workbookId }: ChartEditorProps) {
                                 </CollapsibleContent>
                             </Collapsible>
                         )}
+
+                        {/* Collapsible section "Text & Fonts" */}
+                        <Collapsible open={textFontsOpen} onOpenChange={setTextFontsOpen}>
+                            <CollapsibleTrigger className="flex items-center justify-between w-full font-semibold text-xs text-foreground py-1 cursor-pointer select-none">
+                                <span>Text & Fonts</span>
+                                <ChevronDownIcon
+                                    className={cn(
+                                        'size-3.5 transition-transform text-muted-foreground',
+                                        !textFontsOpen && '-rotate-90'
+                                    )}
+                                />
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="pt-2">
+                                <ChartTextStyleControls
+                                    chartType={type}
+                                    config={config}
+                                    onUpdateTextStyle={updateTextStyle}
+                                />
+                            </CollapsibleContent>
+                        </Collapsible>
                     </div>
                 </ScrollArea>
             </div>
@@ -1915,6 +1986,14 @@ export function ChartEditor({ chartId, workbookId }: ChartEditorProps) {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            <ExportChartDialog
+                open={isExportDialogOpen}
+                onOpenChange={setIsExportDialogOpen}
+                cardRef={chartCardRef}
+                chartTitle={config.title || name || 'chart'}
+                chartConfig={config}
+            />
         </div>
     );
 }

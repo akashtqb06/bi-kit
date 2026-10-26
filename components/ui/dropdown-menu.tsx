@@ -1,9 +1,18 @@
+/**
+ * Rule: `nativeButton` must match the element that is actually rendered.
+ * - The rendered element is a real <button> (including a shadcn <Button> or <button>):
+ *   leave nativeButton at its default (true); remove the nativeButton={false} prop.
+ * - The rendered element is NOT a button (a, Link, div, span, li):
+ *   nativeButton={false} is required.
+ */
+
 "use client"
 
 import * as React from "react"
 import { Menu as MenuPrimitive } from "@base-ui/react/menu"
 import { cn } from "cn"
 import { ChevronRightIcon, CheckIcon } from "lucide-react"
+import { resolveNativeButton } from "./button"
 
 function DropdownMenu({ ...props }: MenuPrimitive.Root.Props) {
   return <MenuPrimitive.Root data-slot="dropdown-menu" {...props} />
@@ -18,16 +27,10 @@ function DropdownMenuTrigger({
   render,
   ...props
 }: MenuPrimitive.Trigger.Props) {
-  const isNonButton =
-    nativeButton === undefined &&
-    React.isValidElement(render) &&
-    typeof render.type === "string" &&
-    render.type !== "button";
-
   return (
     <MenuPrimitive.Trigger
       data-slot="dropdown-menu-trigger"
-      nativeButton={nativeButton ?? (isNonButton ? false : undefined)}
+      nativeButton={resolveNativeButton(nativeButton, render)}
       render={render}
       {...props}
     />
@@ -143,6 +146,8 @@ function DropdownMenuItem({
   className,
   inset,
   variant = "default",
+  nativeButton,
+  render,
   ...props
 }: MenuPrimitive.Item.Props & {
   inset?: boolean
@@ -157,6 +162,8 @@ function DropdownMenuItem({
         "group/dropdown-menu-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive",
         className
       )}
+      nativeButton={resolveNativeButton(nativeButton, render)}
+      render={render}
       {...props}
     />
   )

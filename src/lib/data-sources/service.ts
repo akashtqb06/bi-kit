@@ -315,7 +315,9 @@ export function bulkDeleteDataSources(ids: string[], user?: PolicyUser): BulkDel
 
         const queryCountBySourceId = new Map<string, number>();
         for (const q of dependentQueries) {
-            queryCountBySourceId.set(q.dataSourceId, (queryCountBySourceId.get(q.dataSourceId) ?? 0) + 1);
+            if (q.dataSourceId) {
+                queryCountBySourceId.set(q.dataSourceId, (queryCountBySourceId.get(q.dataSourceId) ?? 0) + 1);
+            }
         }
 
         const deleted: string[] = [];

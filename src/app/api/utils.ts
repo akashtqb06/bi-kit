@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ZodError } from 'zod';
-import { ConflictError, ConnectorError, NotFoundError } from '@src/lib/connectors/types';
+import { BadRequestError, ConflictError, ConnectorError, NotFoundError } from '@src/lib/connectors/types';
 import { UnauthorizedError, ForbiddenError } from '@src/lib/auth/policy';
 
 export function apiError(message: string, status: number): NextResponse {
@@ -17,6 +17,9 @@ export function handleApiError(err: unknown): NextResponse {
     if (err instanceof ZodError) {
         const message = err.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ');
         return apiError(`Validation error: ${message}`, 400);
+    }
+    if (err instanceof BadRequestError) {
+        return apiError(err.message, 400);
     }
     if (err instanceof NotFoundError) {
         return apiError(err.message, 404);

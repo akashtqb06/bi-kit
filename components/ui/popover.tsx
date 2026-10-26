@@ -1,8 +1,17 @@
+/**
+ * Rule: `nativeButton` must match the element that is actually rendered.
+ * - The rendered element is a real <button> (including a shadcn <Button> or <button>):
+ *   leave nativeButton at its default (true); remove the nativeButton={false} prop.
+ * - The rendered element is NOT a button (a, Link, div, span, li):
+ *   nativeButton={false} is required.
+ */
+
 "use client"
 
 import * as React from "react"
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover"
 import { cn } from "cn"
+import { resolveNativeButton } from "./button"
 
 function Popover({ ...props }: PopoverPrimitive.Root.Props) {
   return <PopoverPrimitive.Root data-slot="popover" {...props} />
@@ -13,16 +22,10 @@ function PopoverTrigger({
   render,
   ...props
 }: PopoverPrimitive.Trigger.Props) {
-  const isNonButton =
-    nativeButton === undefined &&
-    React.isValidElement(render) &&
-    typeof render.type === "string" &&
-    render.type !== "button";
-
   return (
     <PopoverPrimitive.Trigger
       data-slot="popover-trigger"
-      nativeButton={nativeButton ?? (isNonButton ? false : undefined)}
+      nativeButton={resolveNativeButton(nativeButton, render)}
       render={render}
       {...props}
     />

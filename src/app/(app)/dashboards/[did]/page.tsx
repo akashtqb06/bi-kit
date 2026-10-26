@@ -312,7 +312,8 @@ function DashboardViewerContent({ params }: { params: Promise<{ did: string }> }
         if (!gridContainerRef.current) return;
         await exportDashboardPng(
             gridContainerRef.current,
-            dashboard?.name || dashboard?.title || 'dashboard'
+            dashboard?.name || dashboard?.title || 'dashboard',
+            charts
         );
     };
 
@@ -390,7 +391,7 @@ function DashboardViewerContent({ params }: { params: Promise<{ did: string }> }
     ).length;
 
     return (
-        <div className="flex flex-1 flex-col min-h-0 w-full overflow-hidden bg-background">
+        <div className="flex flex-1 flex-col min-h-0 min-w-0 w-full overflow-hidden bg-background">
             {/* ------------------------------------------------------------------- */}
             {/* Standalone Viewer Header: ONE slim row (h-12, border-b, px-4) */}
             {/* Left: breadcrumb / title as plain text */}
@@ -543,7 +544,7 @@ function DashboardViewerContent({ params }: { params: Promise<{ did: string }> }
             {/* ------------------------------------------------------------------- */}
             <div
                 ref={gridContainerRef}
-                className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable] px-4 pt-4 pb-8 bg-background"
+                className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto [scrollbar-gutter:stable] px-4 pt-4 pb-8 bg-background"
             >
                 <DynamicDashboardGrid
                     items={dashboard.layout || []}
@@ -571,7 +572,7 @@ function DashboardViewerContent({ params }: { params: Promise<{ did: string }> }
 
 function DashboardViewerSkeleton() {
     return (
-        <div className="flex flex-1 flex-col min-h-0 w-full overflow-hidden bg-background">
+        <div className="flex flex-1 flex-col min-h-0 min-w-0 w-full overflow-hidden bg-background">
             <div className="flex items-center justify-between border-b px-4 h-12">
                 <div className="flex items-center gap-3">
                     <Skeleton className="h-5 w-44" />

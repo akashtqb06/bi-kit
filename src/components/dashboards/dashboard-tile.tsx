@@ -24,10 +24,11 @@ import {
     CopyIcon,
 } from 'lucide-react';
 import { ChartRenderer } from '@src/components/charts/chart-renderer';
+import { ChartTitle } from '@src/components/charts/chart-title';
 import { cn } from '@/lib/utils';
-import { downloadChartCsv, refreshChart, openInWorkbook } from '@src/lib/chart-actions';
+import { downloadChartCsv, refreshChart, openInWorkbook, exportChartPng } from '@src/lib/chart-actions';
 import type { ChartPublic } from '@src/lib/charts/service';
-import type { ChartConfigData, ChartType, DashboardFilter } from '@src/lib/schemas';
+import { type ChartConfigData, type ChartType, type DashboardFilter, normalizeTextStyle } from '@src/lib/schemas';
 import type { QueryResultData } from '@src/components/query-builder/store';
 
 // ---------------------------------------------------------------------------
@@ -132,6 +133,10 @@ export interface DashboardWidgetProps {
     error?: string | null;
     isEditMode: boolean;
     isSelected?: boolean;
+    isInteracting?: boolean;
+    w?: number;
+    h?: number;
+    gridWidth?: number;
     onSelect?: (itemId: string) => void;
     onEdit?: (itemId: string) => void;
     onOpenChart?: (chartId: string) => void;
@@ -161,6 +166,10 @@ export function DashboardWidget({
     error = null,
     isEditMode,
     isSelected = false,
+    isInteracting = false,
+    w,
+    h,
+    gridWidth,
     onSelect,
     onEdit,
     onOpenChart,
@@ -174,6 +183,7 @@ export function DashboardWidget({
     const [prevText, setPrevText] = useState(text);
     const [isRefetching, setIsRefetching] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const tileRootRef = useRef<HTMLDivElement>(null);
 
     // Synchronize text state if prop changes
     if (text !== prevText) {
@@ -188,6 +198,11 @@ export function DashboardWidget({
             textareaRef.current.select();
         }
     }, [isEditingText]);
+
+    const handleDownloadPng = async () => {
+        if (!tileRootRef.current || !chart) return;
+        await exportChartPng(tileRootRef.current, chart.name || displayTitle || 'chart', chartConfig);
+    };
 
     const handleDownloadCsv = () => {
         if (!chart) return;
@@ -388,9 +403,14 @@ export function DashboardWidget({
             );
         }
 
+        const chartKey = chart
+            ? `${chart.id}-${w ?? 0}x${h ?? 0}-${gridWidth ? Math.round((gridWidth / 12) * (w || 1)) : 0}`
+            : undefined;
+
         return (
             <div className="relative h-full w-full flex flex-col">
                 <ChartRenderer
+                    key={chartKey}
                     type={chartType}
                     config={chartConfig}
                     data={queryResult}
@@ -410,6 +430,7 @@ export function DashboardWidget({
 
     return (
         <div
+            ref={tileRootRef}
             id={`widget-${itemId}`}
             data-widget-id={itemId}
             onClick={handleWidgetClick}
@@ -551,6 +572,24 @@ export function DashboardWidget({
                                     <ExternalLinkIcon className="mr-2 size-3.5" />
                                     Open in workbook
                                 </DropdownMenuItem>
+                                {!isEditMode && (
+                                    isLoading || isRefetching || Boolean(error) || !queryResult?.rows?.length ? (
+                                        <Tooltip>
+                                            <TooltipTrigger render={<span className="block w-full cursor-not-allowed" />}>
+                                                <DropdownMenuItem disabled className="cursor-not-allowed opacity-50 pointer-events-none text-xs">
+                                                    <DownloadIcon className="mr-2 size-3.5" />
+                                                    Download PNG
+                                                </DropdownMenuItem>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="right">Chart has no data yet</TooltipContent>
+                                        </Tooltip>
+                                    ) : (
+                                        <DropdownMenuItem className="cursor-pointer text-xs" onClick={handleDownloadPng}>
+                                            <DownloadIcon className="mr-2 size-3.5" />
+                                            Download PNG
+                                        </DropdownMenuItem>
+                                    )
+                                )}
                                 <DropdownMenuItem className="cursor-pointer text-xs" onClick={handleDownloadCsv}>
                                     <DownloadIcon className="mr-2 size-3.5" />
                                     Download CSV
@@ -632,29 +671,37 @@ export function DashboardWidget({
             {/* Inner Wrapper: h-full overflow-hidden rounded-lg */}
             {/* ----------------------------------------------------------------- */}
             <div className="h-full w-full overflow-hidden rounded-lg flex flex-col">
-                {/* Title at top-left: text-sm font-medium, px-3 pt-2.5 */}
+                {/* Title at top-left: rendered via shared ChartTitle for charts, compact padding */}
                 {displayTitle ? (
-                    <div className="px-3 pt-2.5 min-w-0 pr-8 shrink-0">
-                        <span
-                            className={cn(
-                                'text-sm font-medium truncate block select-none',
-                                chartType === 'number' ? 'text-muted-foreground' : 'text-foreground'
-                            )}
-                            title={displayTitle}
-                        >
-                            {displayTitle}
-                        </span>
+                    <div data-chart-header className="px-3 pt-2.5 min-w-0 pr-8 shrink-0 chart-card-header">
+                        {widgetType === 'chart' && chart ? (
+                            <ChartTitle
+                                title={displayTitle}
+                                textStyle={chartConfig.textStyle ? normalizeTextStyle(chartConfig) : undefined}
+                                compact
+                            />
+                        ) : (
+                            <span
+                                className="text-sm font-medium truncate block select-none text-foreground"
+                                title={displayTitle}
+                            >
+                                {displayTitle}
+                            </span>
+                        )}
                     </div>
                 ) : null}
 
-                {/* Chart fills the rest with p-2 */}
-                <div
-                    className={cn(
-                        'flex-1 min-h-0 p-2 overflow-hidden flex flex-col',
-                        isEditMode && widgetType !== 'text' && widgetType !== 'filter' && 'pointer-events-none'
-                    )}
-                >
-                    {renderBody()}
+                {/* Widget body: relative min-h-0 min-w-0 flex-1 with absolutely positioned chart wrapper */}
+                <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+                    <div
+                        className={cn(
+                            'absolute inset-0 p-2 overflow-hidden flex flex-col',
+                            (isInteracting || (isEditMode && widgetType !== 'text' && widgetType !== 'filter')) &&
+                                'pointer-events-none'
+                        )}
+                    >
+                        {renderBody()}
+                    </div>
                 </div>
             </div>
         </div>

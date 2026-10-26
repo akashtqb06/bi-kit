@@ -1,7 +1,47 @@
+/**
+ * Rule: `nativeButton` must match the element that is actually rendered.
+ * - The rendered element is a real <button> (including a shadcn <Button> or <button>):
+ *   leave nativeButton at its default (true); remove the nativeButton={false} prop.
+ * - The rendered element is NOT a button (a, Link, div, span, li):
+ *   nativeButton={false} is required.
+ */
+
 import * as React from "react"
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "cn"
+
+/**
+ * Resolves the appropriate `nativeButton` value based on the rendered element.
+ * Automatically infers `nativeButton` from the `render` prop so call sites don't need manual props.
+ */
+export function resolveNativeButton(
+  nativeButton: boolean | undefined,
+  render?: unknown
+): boolean | undefined {
+  if (React.isValidElement(render)) {
+    const type = render.type
+    if (typeof type === "string") {
+      return type === "button"
+    }
+    const compName =
+      typeof type === "function"
+        ? (type as React.ComponentType).displayName || type.name
+        : (type as { displayName?: string; name?: string })?.displayName ||
+          (type as { displayName?: string; name?: string })?.name
+
+    if (type === Button || compName === "Button") {
+      return true
+    }
+    if (
+      compName === "Link" ||
+      (render.props && typeof render.props === "object" && "href" in render.props)
+    ) {
+      return false
+    }
+  }
+  return nativeButton
+}
 
 const buttonVariants = cva(
   "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
@@ -48,21 +88,16 @@ function Button({
   render,
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
-  const isNonButton =
-    nativeButton === undefined &&
-    React.isValidElement(render) &&
-    typeof render.type === "string" &&
-    render.type !== "button";
-
   return (
     <ButtonPrimitive
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
-      nativeButton={nativeButton ?? (isNonButton ? false : undefined)}
+      nativeButton={resolveNativeButton(nativeButton, render)}
       render={render}
       {...props}
     />
   )
 }
+Button.displayName = "Button"
 
 export { Button, buttonVariants }

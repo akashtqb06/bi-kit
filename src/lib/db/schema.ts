@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { newId } from './id';
 
 export const users = sqliteTable('users', {
@@ -109,6 +109,32 @@ export const workbooks = sqliteTable(
     (table) => [index('workbooks_owner_id_idx').on(table.ownerId)]
 );
 
+export const folders = sqliteTable(
+    'folders',
+    {
+        id: text('id')
+            .primaryKey()
+            .$defaultFn(() => newId()),
+        workbookId: text('workbook_id')
+            .notNull()
+            .references(() => workbooks.id, { onDelete: 'cascade' }),
+        kind: text('kind', { enum: ['query', 'chart', 'dashboard'] }).notNull(),
+        name: text('name').notNull(),
+        parentId: text('parent_id'),
+        position: integer('position').notNull().default(0),
+        createdAt: integer('created_at', { mode: 'timestamp' })
+            .notNull()
+            .default(sql`(unixepoch())`),
+        updatedAt: integer('updated_at', { mode: 'timestamp' })
+            .notNull()
+            .default(sql`(unixepoch())`),
+    },
+    (table) => [
+        index('folders_workbook_id_kind_idx').on(table.workbookId, table.kind),
+        uniqueIndex('folders_workbook_id_kind_name_idx').on(table.workbookId, table.kind, table.name),
+    ]
+);
+
 export const queries = sqliteTable(
     'queries',
     {
@@ -127,6 +153,8 @@ export const queries = sqliteTable(
             .default('sql'),
         definition: text('definition').notNull().default('[]'), // JSON builder steps
         sql: text('sql').notNull().default(''),
+        folderId: text('folder_id').references(() => folders.id, { onDelete: 'set null' }),
+        position: integer('position').notNull().default(0),
         createdBy: text('created_by'),
         createdAt: integer('created_at', { mode: 'timestamp' })
             .notNull()
@@ -138,6 +166,7 @@ export const queries = sqliteTable(
     (table) => [
         index('queries_workbook_id_idx').on(table.workbookId),
         index('queries_data_source_id_idx').on(table.dataSourceId),
+        index('queries_folder_id_idx').on(table.folderId),
     ]
 );
 
@@ -158,6 +187,8 @@ export const charts = sqliteTable(
             enum: ['bar', 'line', 'row', 'donut', 'pie', 'area', 'number', 'table'],
         }).notNull(),
         config: text('config').notNull().default('{}'), // JSON — validated via json-helpers
+        folderId: text('folder_id').references(() => folders.id, { onDelete: 'set null' }),
+        position: integer('position').notNull().default(0),
         createdBy: text('created_by'),
         createdAt: integer('created_at', { mode: 'timestamp' })
             .notNull()
@@ -169,6 +200,7 @@ export const charts = sqliteTable(
     (table) => [
         index('charts_workbook_id_idx').on(table.workbookId),
         index('charts_query_id_idx').on(table.queryId),
+        index('charts_folder_id_idx').on(table.folderId),
     ]
 );
 
@@ -189,6 +221,8 @@ export const dashboards = sqliteTable(
         layout: text('layout').notNull().default('[]'), // JSON react-grid-layout items
         filters: text('filters').notNull().default('[]'), // JSON dashboard filters
         autoRefresh: text('auto_refresh').notNull().default('off'),
+        folderId: text('folder_id').references(() => folders.id, { onDelete: 'set null' }),
+        position: integer('position').notNull().default(0),
         createdBy: text('created_by')
             .references(() => users.id, { onDelete: 'set null' }),
         createdAt: integer('created_at', { mode: 'timestamp' })
@@ -201,6 +235,7 @@ export const dashboards = sqliteTable(
     (table) => [
         index('dashboards_owner_id_idx').on(table.ownerId),
         index('dashboards_workbook_id_idx').on(table.workbookId),
+        index('dashboards_folder_id_idx').on(table.folderId),
     ]
 );
 
@@ -250,6 +285,8 @@ export type DataSource = typeof dataSources.$inferSelect;
 export type InsertDataSource = typeof dataSources.$inferInsert;
 export type Workbook = typeof workbooks.$inferSelect;
 export type InsertWorkbook = typeof workbooks.$inferInsert;
+export type Folder = typeof folders.$inferSelect;
+export type InsertFolder = typeof folders.$inferInsert;
 export type Query = typeof queries.$inferSelect;
 export type InsertQuery = typeof queries.$inferInsert;
 export type Chart = typeof charts.$inferSelect;

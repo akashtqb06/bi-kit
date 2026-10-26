@@ -34,7 +34,7 @@ function WorkbookShellSkeleton() {
                 <WorkbookSidebarSkeleton />
 
                 {/* Center Panel */}
-                <main className="flex flex-1 min-h-0 overflow-hidden bg-background" />
+                <main className="flex flex-1 min-h-0 min-w-0 overflow-hidden bg-background" />
 
                 {/* Right Panel */}
                 <aside className="w-72 border-l bg-background shrink-0 flex flex-col h-full overflow-hidden">
@@ -77,7 +77,7 @@ async function WorkbookLayoutContent({ children, params }: WorkbookLayoutProps) 
                         <Suspense fallback={<WorkbookSidebarSkeleton />}>
                             <WorkbookSidebar />
                         </Suspense>
-                        <main className="flex flex-1 min-h-0 overflow-hidden">{children}</main>
+                        <main className="flex flex-1 min-h-0 min-w-0 overflow-hidden">{children}</main>
                     </div>
                 </div>
             </WorkbookProvider>

@@ -26,7 +26,7 @@ const STALE_TIME_MS = 60_000;
 
 interface QueryDefinition {
   id: string;
-  dataSourceId: string;
+  dataSourceId: string | null;
   mode: "builder" | "sql";
   definition: string;
   sql: string;
@@ -219,6 +219,19 @@ export function useDashboardQueryRunner(
             data: null,
             loading: false,
             error: "Query not found in workbook",
+            lastFetchedAt: Date.now(),
+          },
+        }));
+        return null;
+      }
+
+      if (!q.dataSourceId) {
+        setCache((prev) => ({
+          ...prev,
+          [queryId]: {
+            data: null,
+            loading: false,
+            error: "Query has no data source assigned",
             lastFetchedAt: Date.now(),
           },
         }));

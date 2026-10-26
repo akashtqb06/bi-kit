@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { ReactGridLayout } from 'react-grid-layout/legacy';
-import { useContainerWidth } from 'react-grid-layout';
 
 import { DashboardWidget } from './dashboard-tile';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,6 +11,77 @@ import { cn } from '@/lib/utils';
 import type { ChartPublic } from '@src/lib/charts/service';
 import type { LayoutItem, DashboardFilter } from '@src/lib/schemas';
 import type { QueryCacheItem } from './use-query-cache';
+
+// ---------------------------------------------------------------------------
+// Hook: useElementWidth
+// ResizeObserver with Math.floor down to integer and rAF coalescing
+// ---------------------------------------------------------------------------
+
+export function useElementWidth() {
+    const [width, setWidth] = React.useState<number>(0);
+    const [mounted, setMounted] = React.useState(false);
+    const containerRef = React.useRef<HTMLDivElement | null>(null);
+    const rafIdRef = React.useRef<number | null>(null);
+
+    React.useEffect(() => {
+        const node = containerRef.current;
+        if (!node) return;
+
+        setMounted(true);
+
+        const measure = () => {
+            if (!containerRef.current) return;
+            const measured = containerRef.current.getBoundingClientRect().width;
+            // Floor down to integer so fractional pixels can never produce a grid wider than parent
+            const floored = Math.floor(measured);
+            if (floored > 0) {
+                setWidth((prev) => (prev === floored ? prev : floored));
+            }
+        };
+
+        measure();
+
+        if (typeof ResizeObserver === 'undefined') return;
+
+        const observer = new ResizeObserver((entries) => {
+            const entry = entries[0];
+            if (!entry) return;
+
+            let measured = 0;
+            if (entry.contentBoxSize && entry.contentBoxSize.length > 0) {
+                measured = entry.contentBoxSize[0].inlineSize;
+            } else if (entry.contentRect) {
+                measured = entry.contentRect.width;
+            } else {
+                measured = entry.target.getBoundingClientRect().width;
+            }
+
+            const floored = Math.floor(measured);
+            if (floored <= 0) return;
+
+            // Coalesce updates with requestAnimationFrame to avoid ResizeObserver loop errors
+            if (rafIdRef.current !== null) {
+                cancelAnimationFrame(rafIdRef.current);
+            }
+            rafIdRef.current = requestAnimationFrame(() => {
+                setWidth((prev) => (prev === floored ? prev : floored));
+                rafIdRef.current = null;
+            });
+        });
+
+        observer.observe(node);
+
+        return () => {
+            if (rafIdRef.current !== null) {
+                cancelAnimationFrame(rafIdRef.current);
+                rafIdRef.current = null;
+            }
+            observer.disconnect();
+        };
+    }, []);
+
+    return { width, containerRef, mounted };
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -113,33 +183,51 @@ export function DashboardGrid({
     onEditInWorkbook,
     emptyState,
 }: DashboardGridProps) {
-    const { width, containerRef, mounted } = useContainerWidth();
+    const { width, containerRef, mounted } = useElementWidth();
+    const [isInteracting, setIsInteracting] = React.useState(false);
+    const layoutRef = React.useRef<LayoutItem[]>(items);
+
+    React.useEffect(() => {
+        layoutRef.current = items;
+    }, [items]);
+
+    // Commit layout changes to parent state & autosave
+    const commitLayout = React.useCallback(
+        (newLayout: readonly LayoutItem[]) => {
+            if (!isEditMode) return;
+            let hasDifferences = false;
+            const currentItems = layoutRef.current;
+            const updated = currentItems.map((item) => {
+                const match = newLayout.find((l) => l.i === item.i);
+                if (
+                    match &&
+                    (match.x !== item.x || match.y !== item.y || match.w !== item.w || match.h !== item.h)
+                ) {
+                    hasDifferences = true;
+                    return {
+                        ...item,
+                        x: match.x,
+                        y: match.y,
+                        w: match.w,
+                        h: match.h,
+                    };
+                }
+                return item;
+            });
+
+            if (hasDifferences) {
+                onLayoutChange(updated);
+            }
+        },
+        [isEditMode, onLayoutChange]
+    );
 
     // Handle layout adjustments from react-grid-layout
     const handleGridChange = (newLayout: readonly LayoutItem[]) => {
         if (!isEditMode) return;
-        let hasDifferences = false;
-        const updated = items.map((item) => {
-            const match = newLayout.find((l) => l.i === item.i);
-            if (
-                match &&
-                (match.x !== item.x || match.y !== item.y || match.w !== item.w || match.h !== item.h)
-            ) {
-                hasDifferences = true;
-                return {
-                    ...item,
-                    x: match.x,
-                    y: match.y,
-                    w: match.w,
-                    h: match.h,
-                };
-            }
-            return item;
-        });
-
-        if (hasDifferences) {
-            onLayoutChange(updated);
-        }
+        // Suppress per-frame state updates while dragging/resizing
+        if (isInteracting) return;
+        commitLayout(newLayout);
     };
 
     // Empty state when dashboard has no widgets
@@ -184,7 +272,7 @@ export function DashboardGrid({
     return (
         <div
             ref={containerRef}
-            className="w-full min-h-0"
+            className="w-full min-w-0 min-h-0"
             onClick={(e) => {
                 // Clicking on empty grid space clears selection
                 if (e.target === e.currentTarget && onSelectWidget) {
@@ -208,9 +296,24 @@ export function DashboardGrid({
                     resizeHandles={['se']}
                     onLayoutChange={handleGridChange}
                     onDragStart={(_layout, _oldItem, newItem) => {
+                        setIsInteracting(true);
                         if (newItem?.i && onSelectWidget) {
                             onSelectWidget(newItem.i);
                         }
+                    }}
+                    onDragStop={(layout) => {
+                        setIsInteracting(false);
+                        commitLayout(layout);
+                    }}
+                    onResizeStart={(_layout, _oldItem, newItem) => {
+                        setIsInteracting(true);
+                        if (newItem?.i && onSelectWidget) {
+                            onSelectWidget(newItem.i);
+                        }
+                    }}
+                    onResizeStop={(layout) => {
+                        setIsInteracting(false);
+                        commitLayout(layout);
                     }}
                 >
                     {items.map((item) => {
@@ -247,6 +350,10 @@ export function DashboardGrid({
                                     error={cacheItem?.error}
                                     isEditMode={isEditMode}
                                     isSelected={isSelected}
+                                    isInteracting={isInteracting}
+                                    w={item.w}
+                                    h={item.h}
+                                    gridWidth={width}
                                     onSelect={() => onSelectWidget?.(item.i)}
                                     onEdit={() => onEditWidget?.(item.i)}
                                     onOpenChart={onOpenChart}

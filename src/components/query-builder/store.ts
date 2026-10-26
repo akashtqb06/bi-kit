@@ -155,7 +155,7 @@ export const useQueryEditorStore = create<QueryEditorState>((set, get) => ({
             queryId: query.id,
             workbookId: query.workbookId,
             queryName: query.name,
-            dataSourceId: query.dataSourceId,
+            dataSourceId: query.dataSourceId || '',
             mode: query.mode,
             definition: def,
             sql: query.sql || '',
@@ -170,6 +170,8 @@ export const useQueryEditorStore = create<QueryEditorState>((set, get) => ({
 
         if (query.dataSourceId) {
             await get().loadSchema(query.dataSourceId);
+        } else {
+            set({ schema: null, compileError: null, isLoadingSchema: false });
         }
     },
 
@@ -534,18 +536,23 @@ export const useQueryEditorStore = create<QueryEditorState>((set, get) => ({
 
         if (!dataSourceId) {
             const message = 'Please select a data source first.';
-            set({ runError: message, isRunning: false });
-            if (!isAutoRun) toast.error(message);
+            if (isAutoRun) {
+                set({ isRunning: false });
+            } else {
+                set({ runError: message, isRunning: false });
+                toast.error(message);
+            }
             return;
         }
 
         if (mode === 'builder' && !definition.source.table) {
             const message = 'Please select a source table in the query builder.';
-            set({
-                isRunning: false,
-                runError: message,
-            });
-            if (!isAutoRun) toast.error(message);
+            if (isAutoRun) {
+                set({ isRunning: false });
+            } else {
+                set({ runError: message, isRunning: false });
+                toast.error(message);
+            }
             return;
         }
 
@@ -641,7 +648,7 @@ export const useQueryEditorStore = create<QueryEditorState>((set, get) => ({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name: queryName,
-                    dataSourceId,
+                    dataSourceId: dataSourceId || null,
                     mode,
                     definition: JSON.stringify(cleanDef),
                     sql: mode === 'sql' ? sql : compiledSql || sql,

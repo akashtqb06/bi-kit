@@ -7,7 +7,18 @@ import {
     openInWorkbook,
     openDashboardInWorkbook,
     downloadChartCsv,
+    exportElementPng,
+    exportChartPng,
+    exportDashboardPng,
+    captureElementPng,
+    slugify,
 } from './chart-actions';
+
+vi.mock('html-to-image', () => ({
+    toPng: vi.fn().mockImplementation(async () => {
+        return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    }),
+}));
 
 describe('chart-actions', () => {
     describe('escapeCsvField', () => {
@@ -168,6 +179,130 @@ describe('chart-actions', () => {
             expect(text).toContain('category,revenue');
             expect(text).toContain('Electronics,5000');
             expect(text).toContain('Books,1200');
+        });
+    });
+
+    describe('PNG Export helpers', () => {
+        let downloadedFilename: string | null = null;
+        let downloadedHref: string | null = null;
+
+        beforeEach(() => {
+            downloadedFilename = null;
+            downloadedHref = null;
+
+            const mockAnchor = {
+                href: '',
+                download: '',
+                click: vi.fn(() => {
+                    downloadedFilename = mockAnchor.download;
+                    downloadedHref = mockAnchor.href;
+                }),
+            };
+
+            vi.stubGlobal(
+                'requestAnimationFrame',
+                vi.fn((cb: () => void) => {
+                    cb();
+                    return 1;
+                })
+            );
+
+            vi.stubGlobal('document', {
+                createElement: vi.fn(() => mockAnchor),
+                body: {
+                    appendChild: vi.fn(),
+                    removeChild: vi.fn(),
+                },
+                documentElement: {
+                    classList: {
+                        contains: vi.fn(() => false),
+                    },
+                },
+                fonts: {
+                    ready: Promise.resolve(),
+                },
+            });
+
+            vi.stubGlobal('window', {
+                getComputedStyle: vi.fn(() => ({
+                    backgroundColor: '#ffffff',
+                    getPropertyValue: vi.fn(() => ''),
+                    getPropertyPriority: vi.fn(() => ''),
+                })),
+            });
+        });
+
+        it('slugifies title for exportChartPng with fallback to chart.png', async () => {
+            expect(slugify('Sales Overview!')).toBe('sales-overview');
+            expect(slugify(undefined, 'chart')).toBe('chart');
+
+            const mockEl = {
+                offsetWidth: 800,
+                offsetHeight: 400,
+                style: { pointerEvents: '' },
+                querySelectorAll: vi.fn(() => []),
+            } as unknown as HTMLElement;
+
+            await exportChartPng(mockEl, 'Revenue by Category');
+            expect(downloadedFilename).toBe('revenue-by-category.png');
+            expect(downloadedHref).toContain('data:image/png;base64');
+
+            await exportChartPng(mockEl);
+            expect(downloadedFilename).toBe('chart.png');
+
+            await exportElementPng(mockEl, { filename: 'generic.png' });
+            expect(downloadedFilename).toBe('generic.png');
+        });
+
+        it('preserves exact dashboard export filename and fallback', async () => {
+            const mockEl = {
+                offsetWidth: 1200,
+                offsetHeight: 800,
+                style: { pointerEvents: '' },
+                querySelector: vi.fn(() => null),
+                querySelectorAll: vi.fn(() => []),
+            } as unknown as HTMLElement;
+
+            await exportDashboardPng(mockEl, 'Q3 Executive Overview');
+            expect(downloadedFilename).toBe('Q3 Executive Overview.png');
+
+            await exportDashboardPng(mockEl);
+            expect(downloadedFilename).toBe('dashboard.png');
+        });
+
+        it('auto-reduces pixelRatio if canvas dimension exceeds 16,000 px', async () => {
+            const mockEl = {
+                offsetWidth: 10000,
+                offsetHeight: 10000,
+                style: { pointerEvents: '' },
+                querySelectorAll: vi.fn(() => []),
+            } as unknown as HTMLElement;
+
+            const result = await captureElementPng(mockEl, { pixelRatio: 2 });
+            expect(result).not.toBeNull();
+            expect(result?.wasReduced).toBe(true);
+            expect(result!.pixelRatio).toBeLessThan(2);
+        });
+
+        it('caps table rows at 100 during export', async () => {
+            const mockRows = Array.from({ length: 120 }, () => ({
+                style: { display: '' },
+            })) as unknown as HTMLElement[];
+
+            const mockEl = {
+                offsetWidth: 600,
+                offsetHeight: 400,
+                style: { pointerEvents: '' },
+                querySelectorAll: vi.fn((sel: string) => {
+                    if (sel === 'tbody tr') return mockRows;
+                    return [];
+                }),
+            } as unknown as HTMLElement;
+
+            const result = await captureElementPng(mockEl);
+            expect(result?.tableTruncated).toBe(true);
+            // Rows beyond index 99 were restored in finally
+            expect(mockRows[100].style.display).toBe('');
         });
     });
 });

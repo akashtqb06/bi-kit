@@ -1,6 +1,6 @@
 import { eq, inArray, or } from 'drizzle-orm';
 import { db } from '@src/lib/db';
-import { charts, dashboards, dataSources, queries, workbooks } from '@src/lib/db/schema';
+import { charts, dashboards, dataSources, folders, queries, workbooks } from '@src/lib/db/schema';
 import { listDataSources } from '@src/lib/data-sources/service';
 import { listWorkbooks } from '@src/lib/workbooks/service';
 
@@ -102,6 +102,11 @@ export async function cleanTestData(): Promise<void> {
         if (wbDashboards.length > 0) {
             db.delete(dashboards).where(eq(dashboards.workbookId, wb.id)).run();
             deletedDashboardsCount += wbDashboards.length;
+        }
+
+        const wbFolders = db.select().from(folders).where(eq(folders.workbookId, wb.id)).all();
+        if (wbFolders.length > 0) {
+            db.delete(folders).where(eq(folders.workbookId, wb.id)).run();
         }
 
         db.delete(workbooks).where(eq(workbooks.id, wb.id)).run();

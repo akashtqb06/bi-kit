@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useMemo, useState, useRef, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   DndContext,
   closestCenter,
@@ -54,6 +54,8 @@ import { OperationRow } from "./operation-row";
 
 export function RightPanel() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const {
     queryId,
     workbookId,
@@ -78,6 +80,18 @@ export function RightPanel() {
     switchToSqlMode,
     switchToBuilderMode,
   } = useQueryEditorStore();
+
+  useEffect(() => {
+    if (searchParams?.get("focus") === "title") {
+      const timer = setTimeout(() => {
+        if (titleInputRef.current) {
+          titleInputRef.current.focus();
+          titleInputRef.current.select();
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [searchParams]);
 
   const [execInfoOpen, setExecInfoOpen] = useState(true);
   const [columnsOpen, setColumnsOpen] = useState(true);
@@ -111,9 +125,15 @@ export function RightPanel() {
 
   const handleSelectOperation = (type: OperationType) => {
     if (type === "source") {
+      if (!dataSourceId) {
+        toast.info("Please select a data source first.");
+        return;
+      }
       const firstTable = schema?.tables[0]?.name || "";
       if (firstTable) {
         setSourceTable(firstTable);
+      } else {
+        toast.info("No tables found in this data source.");
       }
       return;
     }
@@ -206,6 +226,7 @@ export function RightPanel() {
               Query Title
             </label>
             <Input
+              ref={titleInputRef}
               value={queryName}
               onChange={(e) => setQueryName(e.target.value)}
               placeholder="Untitled query"

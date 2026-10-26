@@ -2,8 +2,9 @@ import 'server-only';
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@src/lib/db";
 import { newId } from "@src/lib/db/id";
-import { workbooks, queries, charts, dashboards, users, type Workbook } from "@src/lib/db/schema";
+import { workbooks, queries, charts, dashboards, folders, users, type Workbook } from "@src/lib/db/schema";
 import { ConflictError, NotFoundError } from "@src/lib/connectors/types";
+import { listFolders, type FolderPublic } from "@src/lib/folders/service";
 import type { CreateWorkbookInput } from "@src/lib/schemas";
 import type { PolicyUser } from "@src/lib/auth/policy";
 
@@ -15,6 +16,7 @@ export interface WorkbookPublic {
   id: string;
   name: string;
   description: string;
+  folders?: FolderPublic[];
   createdAt: Date | null;
   updatedAt: Date | null;
 }
@@ -38,11 +40,12 @@ function getDefaultOwnerId(): string | null {
   return null;
 }
 
-function toPublic(row: Workbook): WorkbookPublic {
+function toPublic(row: Workbook, foldersList?: FolderPublic[]): WorkbookPublic {
   return {
     id: row.id,
     name: row.name,
     description: row.description,
+    folders: foldersList,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -137,7 +140,9 @@ export function getWorkbook(id: string): Workbook {
 }
 
 export function getWorkbookPublic(id: string): WorkbookPublic {
-  return toPublic(getWorkbook(id));
+  const wb = getWorkbook(id);
+  const fList = listFolders(id);
+  return toPublic(wb, fList);
 }
 
 export function createWorkbook(
@@ -175,6 +180,7 @@ export function updateWorkbook(
 
 export function duplicateWorkbook(id: string, customName?: string, ownerId?: string): WorkbookWithCounts {
   const source = getWorkbook(id);
+  const sourceFolders = db.select().from(folders).where(eq(folders.workbookId, id)).all();
   const sourceQueries = db.select().from(queries).where(eq(queries.workbookId, id)).all();
   const sourceCharts = db.select().from(charts).where(eq(charts.workbookId, id)).all();
   const sourceDashboards = db.select().from(dashboards).where(eq(dashboards.workbookId, id)).all();
@@ -193,6 +199,22 @@ export function duplicateWorkbook(id: string, customName?: string, ownerId?: str
       })
       .run();
 
+    const folderIdMap = new Map<string, string>();
+    for (const f of sourceFolders) {
+      const newFolderId = newId();
+      folderIdMap.set(f.id, newFolderId);
+      tx.insert(folders)
+        .values({
+          id: newFolderId,
+          workbookId: newWorkbookId,
+          kind: f.kind,
+          name: f.name,
+          parentId: f.parentId ? (folderIdMap.get(f.parentId) ?? null) : null,
+          position: f.position,
+        })
+        .run();
+    }
+
     const queryIdMap = new Map<string, string>();
     for (const q of sourceQueries) {
       const newQueryId = newId();
@@ -206,6 +228,8 @@ export function duplicateWorkbook(id: string, customName?: string, ownerId?: str
           mode: q.mode,
           definition: q.definition,
           sql: q.sql,
+          folderId: q.folderId ? (folderIdMap.get(q.folderId) ?? null) : null,
+          position: q.position,
           createdBy: finalOwnerId,
         })
         .run();
@@ -224,6 +248,8 @@ export function duplicateWorkbook(id: string, customName?: string, ownerId?: str
           name: c.name,
           type: c.type,
           config: c.config,
+          folderId: c.folderId ? (folderIdMap.get(c.folderId) ?? null) : null,
+          position: c.position,
           createdBy: finalOwnerId,
         })
         .run();
@@ -256,6 +282,8 @@ export function duplicateWorkbook(id: string, customName?: string, ownerId?: str
           layout: updatedLayout,
           filters: d.filters,
           autoRefresh: d.autoRefresh,
+          folderId: d.folderId ? (folderIdMap.get(d.folderId) ?? null) : null,
+          position: d.position,
           createdBy: finalOwnerId,
         })
         .run();
@@ -282,6 +310,7 @@ export function bulkDeleteWorkbooks(ids: string[], user?: PolicyUser): void {
     tx.delete(dashboards).where(inArray(dashboards.workbookId, targetIds)).run();
     tx.delete(charts).where(inArray(charts.workbookId, targetIds)).run();
     tx.delete(queries).where(inArray(queries.workbookId, targetIds)).run();
+    tx.delete(folders).where(inArray(folders.workbookId, targetIds)).run();
     tx.delete(workbooks).where(inArray(workbooks.id, targetIds)).run();
   });
 }
@@ -300,5 +329,6 @@ export function deleteWorkbook(id: string): void {
     throw new ConflictError("Cannot delete: workbook has dashboards. Delete them first.");
   }
 
+  db.delete(folders).where(eq(folders.workbookId, id)).run();
   db.delete(workbooks).where(eq(workbooks.id, id)).run();
 }

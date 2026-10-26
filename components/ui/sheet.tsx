@@ -1,22 +1,44 @@
+/**
+ * Rule: `nativeButton` must match the element that is actually rendered.
+ * - The rendered element is a real <button> (including a shadcn <Button> or <button>):
+ *   leave nativeButton at its default (true); remove the nativeButton={false} prop.
+ * - The rendered element is NOT a button (a, Link, div, span, li):
+ *   nativeButton={false} is required.
+ */
+
 "use client"
 
 import * as React from "react"
 import { Dialog as SheetPrimitive } from "@base-ui/react/dialog"
 import { cn } from "cn"
 
-import { Button } from "@/components/ui/button"
+import { Button, resolveNativeButton } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
 
 function Sheet({ ...props }: SheetPrimitive.Root.Props) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />
 }
 
-function SheetTrigger({ ...props }: SheetPrimitive.Trigger.Props) {
-  return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />
+function SheetTrigger({ nativeButton, render, ...props }: SheetPrimitive.Trigger.Props) {
+  return (
+    <SheetPrimitive.Trigger
+      data-slot="sheet-trigger"
+      nativeButton={resolveNativeButton(nativeButton, render)}
+      render={render}
+      {...props}
+    />
+  )
 }
 
-function SheetClose({ ...props }: SheetPrimitive.Close.Props) {
-  return <SheetPrimitive.Close data-slot="sheet-close" {...props} />
+function SheetClose({ nativeButton, render, ...props }: SheetPrimitive.Close.Props) {
+  return (
+    <SheetPrimitive.Close
+      data-slot="sheet-close"
+      nativeButton={resolveNativeButton(nativeButton, render)}
+      render={render}
+      {...props}
+    />
+  )
 }
 
 function SheetPortal({ ...props }: SheetPrimitive.Portal.Props) {

@@ -134,19 +134,24 @@ A realistic Indian e-commerce sample database populated with deterministically g
 
 ### 2. Analytical Entities in Application DB (`data/app.db`)
 - **Data Source**: **"Demo Store"** (SQLite connection referencing `data/sample.db`).
-- **Workbook**: **"Order Analysis"** containing 6 pre-built queries:
-  1. `Orders`: High-level order count.
-  2. `Delivered Orders`: Filtered delivered orders joined with item lines and computed margin values.
-  3. `Revenue by Month`: Monthly revenue aggregations.
-  4. `Revenue by Category`: Category-wise revenue summarization.
-  5. `Customers by Region`: Regional customer distribution.
-  6. `Customer Count by Region`: Geographic customer counts.
+- **Workbook**: **"Order Analysis"** containing folders and 6 pre-built queries:
+  - **Folders**:
+    - Queries: **"Revenue"** (contains `Revenue by Month` and `Revenue by Category`)
+    - Charts: **"Revenue"** (contains `Revenue by Month`, `Revenue Trend`, and `Revenue by Category`)
+    - Dashboards: None (root level)
+  - **Queries**:
+    1. `Orders`: High-level order count (root).
+    2. `Delivered Orders`: Filtered delivered orders joined with item lines and computed margin values (root).
+    3. `Revenue by Month`: Monthly revenue aggregations (in "Revenue" folder).
+    4. `Revenue by Category`: Category-wise revenue summarization (in "Revenue" folder).
+    5. `Customers by Region`: Regional customer distribution (root).
+    6. `Customer Count by Region`: Geographic customer counts (root).
 - **Charts**:
-  - `Total Orders` (Number Card KPI)
-  - `Total Revenue` (Number Card KPI)
-  - `Monthly Revenue Trend` (Line / Area Chart)
-  - `Revenue by Category` (Bar Chart)
-  - `Customers by Region` (Pie / Donut Chart)
+  - `Total Orders` (Number Card KPI, root)
+  - `Revenue by Month` (Bar Chart, in "Revenue" folder)
+  - `Revenue Trend` (Line Chart, in "Revenue" folder)
+  - `Revenue by Category` (Donut Chart, in "Revenue" folder)
+  - `Customers by Region` (Row / Bar Chart, root)
 - **Dashboard**: **"Sales Overview"** combining the above charts into a responsive 12-column grid layout with interactive filters.
 
 ---

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { db } from '@src/lib/db';
-import { charts, dashboards, dataSources, queries, users, workbooks, type User } from '@src/lib/db/schema';
+import { charts, dashboards, dataSources, folders, queries, users, workbooks, type User } from '@src/lib/db/schema';
 import { newId } from '@src/lib/db/id';
 import { SqliteConnector } from '@src/lib/connectors/sqlite-connector';
 import type { SqlParam } from '@src/lib/connectors/types';
@@ -332,6 +332,7 @@ function seedWorkbookEntities(params: {
         db.delete(charts).where(eq(charts.workbookId, workbookId)).run();
         db.delete(queries).where(eq(queries.workbookId, workbookId)).run();
         db.delete(dashboards).where(eq(dashboards.workbookId, workbookId)).run();
+        db.delete(folders).where(eq(folders.workbookId, workbookId)).run();
     } else {
         db.insert(workbooks)
             .values({
@@ -344,11 +345,44 @@ function seedWorkbookEntities(params: {
             .run();
     }
 
+    // Folders (Order Analysis demo: "Revenue" folders for Queries and Charts)
+    let queryRevenueFolderId: string | null = null;
+    let chartRevenueFolderId: string | null = null;
+
+    if (workbookSlug === adminWorkbookSlug) {
+        queryRevenueFolderId = newId();
+        db.insert(folders)
+            .values({
+                id: queryRevenueFolderId,
+                workbookId,
+                kind: 'query',
+                name: 'Revenue',
+                position: 0,
+            })
+            .run();
+
+        chartRevenueFolderId = newId();
+        db.insert(folders)
+            .values({
+                id: chartRevenueFolderId,
+                workbookId,
+                kind: 'chart',
+                name: 'Revenue',
+                position: 0,
+            })
+            .run();
+    }
+
     // 3. Queries
     const queryIds = new Map<string, string>();
     for (const { name, definition } of queriesList) {
         const id = newId();
         queryIds.set(name, id);
+        const queryFolderId =
+            queryRevenueFolderId && (name === 'Revenue by Month' || name === 'Revenue by Category')
+                ? queryRevenueFolderId
+                : null;
+
         db.insert(queries)
             .values({
                 id,
@@ -358,6 +392,8 @@ function seedWorkbookEntities(params: {
                 mode: 'builder',
                 definition: JSON.stringify(definition),
                 sql: '',
+                folderId: queryFolderId,
+                position: 0,
             })
             .run();
     }
@@ -368,6 +404,12 @@ function seedWorkbookEntities(params: {
         const queryId = queryIds.get(chart.queryName);
         if (!queryId) throw new Error(`Missing seeded query: ${chart.queryName}`);
         const id = newId();
+        const revenueChartNames = ['Revenue by Month', 'Revenue Trend', 'Revenue by Category'];
+        const chartFolderId =
+            chartRevenueFolderId && revenueChartNames.includes(chart.name)
+                ? chartRevenueFolderId
+                : null;
+
         db.insert(charts)
             .values({
                 id,
@@ -376,6 +418,8 @@ function seedWorkbookEntities(params: {
                 name: chart.name,
                 type: chart.type,
                 config: JSON.stringify(chartConfigSchema.parse(chart.config)),
+                folderId: chartFolderId,
+                position: 0,
             })
             .run();
         layout.push({ i: id, chartId: id, ...chart.layout });

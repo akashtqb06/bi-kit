@@ -5,6 +5,7 @@ import { charts, workbooks, type Chart } from "@src/lib/db/schema";
 import { NotFoundError } from "@src/lib/connectors/types";
 import { getQuery } from "@src/lib/queries/service";
 import { parseChartConfig, serializeChartConfig } from "@src/lib/db/json-helpers";
+import { validateFolderAssignment } from "@src/lib/folders/service";
 import { newId } from "@src/lib/db/id";
 import type { CreateChartInput } from "@src/lib/schemas";
 
@@ -19,6 +20,8 @@ export interface ChartPublic {
   name: string;
   type: string;
   config: Record<string, unknown>;
+  folderId?: string | null;
+  position?: number;
   createdAt: Date | null;
   updatedAt: Date | null;
   createdBy?: string | null;
@@ -32,6 +35,8 @@ function toPublic(row: Chart): ChartPublic {
     name: row.name,
     type: row.type,
     config: parseChartConfig(row.config),
+    folderId: row.folderId,
+    position: row.position,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     createdBy: row.createdBy,
@@ -79,6 +84,9 @@ export function getChartPublic(id: string): ChartPublic {
 export function createChart(input: CreateChartInput, createdBy?: string): ChartPublic {
   // Derive workbookId from query (enforces same-workbook relationship)
   const query = getQuery(input.queryId);
+  if (input.folderId) {
+    validateFolderAssignment(input.folderId, query.workbookId, 'chart');
+  }
 
   const id = newId();
   db.insert(charts)
@@ -89,6 +97,8 @@ export function createChart(input: CreateChartInput, createdBy?: string): ChartP
       name: input.name,
       type: input.type,
       config: serializeChartConfig(input.config ?? {}),
+      folderId: input.folderId ?? null,
+      position: input.position ?? 0,
       createdBy: createdBy ?? null,
     })
     .run();
@@ -100,13 +110,23 @@ export function updateChart(
   id: string,
   input: Partial<CreateChartInput>
 ): ChartPublic {
-  getChart(id); // throws if missing
+  const existing = getChart(id); // throws if missing
   const updates: Partial<Chart> = { updatedAt: new Date() };
   if (input.name !== undefined) updates.name = input.name;
   if (input.type !== undefined) updates.type = input.type;
   if (input.config !== undefined) updates.config = serializeChartConfig(input.config);
+  if (input.folderId !== undefined) {
+    if (input.folderId !== null) {
+      validateFolderAssignment(input.folderId, existing.workbookId, 'chart');
+    }
+    updates.folderId = input.folderId ?? null;
+  }
+  if (input.position !== undefined) updates.position = input.position;
   if (input.queryId !== undefined) {
-    getQuery(input.queryId);
+    const q = getQuery(input.queryId);
+    if (q.workbookId !== existing.workbookId) {
+      throw new Error("Chart query must belong to the same workbook.");
+    }
     updates.queryId = input.queryId;
   }
   db.update(charts).set(updates).where(eq(charts.id, id)).run();

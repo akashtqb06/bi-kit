@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo, useImperativeHandle } from 'react';
 import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -112,6 +112,8 @@ export interface DashboardEditorProps {
 
 export function DashboardEditor({ dashboardId, workbookId, gridRef }: DashboardEditorProps) {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const initialEditMode = searchParams?.get('edit') === 'true';
     const gridContainerRef = useRef<HTMLDivElement>(null);
     const titleInputRef = useRef<HTMLInputElement>(null);
 
@@ -122,8 +124,16 @@ export function DashboardEditor({ dashboardId, workbookId, gridRef }: DashboardE
     const [layout, setLayout] = useState<LayoutItem[]>([]);
     const [filters, setFilters] = useState<DashboardFilter[]>([]);
     const [filterValues, setFilterValues] = useState<Record<string, unknown>>({});
-    const [isEditMode, setIsEditMode] = useState<boolean>(false);
+    const [isEditMode, setIsEditMode] = useState<boolean>(initialEditMode);
+    const [prevEditParam, setPrevEditParam] = useState<boolean>(initialEditMode);
     const [selectedWidgetId, setSelectedWidgetId] = useState<string | null>(null);
+
+    if (initialEditMode !== prevEditParam) {
+        setPrevEditParam(initialEditMode);
+        if (initialEditMode) {
+            setIsEditMode(true);
+        }
+    }
 
     // Resources & loading
     const [charts, setCharts] = useState<ChartPublic[]>([]);
@@ -610,7 +620,7 @@ export function DashboardEditor({ dashboardId, workbookId, gridRef }: DashboardE
 
     const handleExportPng = async () => {
         if (!gridContainerRef.current) return;
-        await exportDashboardPng(gridContainerRef.current, name || 'dashboard');
+        await exportDashboardPng(gridContainerRef.current, name || 'dashboard', charts);
     };
 
     const handleDuplicate = async () => {
@@ -752,7 +762,7 @@ export function DashboardEditor({ dashboardId, workbookId, gridRef }: DashboardE
     }
 
     return (
-        <div className="flex h-full w-full flex-col min-h-0 overflow-hidden bg-background">
+        <div className="flex h-full w-full flex-col min-h-0 min-w-0 overflow-hidden bg-background">
             {/* ------------------------------------------------------------------- */}
             {/* TOOLBAR: ONE slim row (h-12, px-4, border-b) */}
             {/* ------------------------------------------------------------------- */}
@@ -951,7 +961,7 @@ export function DashboardEditor({ dashboardId, workbookId, gridRef }: DashboardE
             {/* ------------------------------------------------------------------- */}
             <div
                 ref={gridContainerRef}
-                className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable] px-4 pt-4 pb-8 bg-background"
+                className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto [scrollbar-gutter:stable] px-4 pt-4 pb-8 bg-background"
                 onClick={(e) => {
                     // Clicking empty space in scroll container clears selection
                     if (e.target === e.currentTarget) {
