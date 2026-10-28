@@ -270,8 +270,6 @@ function seedWorkbookEntities(params: {
         chartsList,
     } = params;
 
-    const sourceConfig = JSON.stringify({ path: SAMPLE_DB_PATH });
-
     // 1. Data Source (Upsert by stable slug)
     const existingSource = db
         .select()
@@ -282,6 +280,19 @@ function seedWorkbookEntities(params: {
     const sourceId = existingSource?.id ?? newId();
     const now = new Date();
 
+    const managedRel = `files/${sourceId}/data.db`;
+    const dataDir = process.env.DATA_DIR || path.resolve(process.cwd(), 'data');
+    const managedAbs = path.join(dataDir, managedRel);
+    fs.mkdirSync(path.dirname(managedAbs), { recursive: true });
+    fs.copyFileSync(SAMPLE_DB_PATH, managedAbs);
+
+    const sourceConfig = JSON.stringify({
+        managedPath: managedRel,
+        fileName: 'sample.db',
+        importedAt: now.toISOString(),
+        size: fs.statSync(managedAbs).size,
+    });
+
     if (existingSource) {
         db.update(dataSources)
             .set({
@@ -289,6 +300,8 @@ function seedWorkbookEntities(params: {
                 name: sourceName,
                 slug: sourceSlug,
                 type: 'sqlite',
+                status: 'ok',
+                lastTestedAt: now,
                 config: sourceConfig,
                 updatedAt: now,
             })
@@ -302,7 +315,11 @@ function seedWorkbookEntities(params: {
                 name: sourceName,
                 slug: sourceSlug,
                 type: 'sqlite',
+                status: 'ok',
+                lastTestedAt: now,
                 config: sourceConfig,
+                createdAt: now,
+                updatedAt: now,
             })
             .run();
     }
@@ -554,17 +571,126 @@ export async function seedSampleWorkbook(targetUserId?: string): Promise<void> {
     const memberDashboards = db.select().from(dashboards).where(eq(dashboards.ownerId, member.id)).all();
 
     const adminWbId = adminWorkbooks[0]?.id;
-    const adminQueries = adminWbId ? db.select().from(queries).where(eq(queries.workbookId, adminWbId)).all() : [];
+    let adminQueries = adminWbId ? db.select().from(queries).where(eq(queries.workbookId, adminWbId)).all() : [];
     const adminCharts = adminWbId ? db.select().from(charts).where(eq(charts.workbookId, adminWbId)).all() : [];
 
     const memberWbId = memberWorkbooks[0]?.id;
     const memberQueries = memberWbId ? db.select().from(queries).where(eq(queries.workbookId, memberWbId)).all() : [];
     const memberCharts = memberWbId ? db.select().from(charts).where(eq(charts.workbookId, memberWbId)).all() : [];
 
+    // Optional external databases seeding
+    if (process.env.SEED_EXTERNAL === 'true' && adminWbId) {
+        console.log('SEED_EXTERNAL=true: creating external demo sources and queries...');
+        const pgId = newId();
+        const pgConfig = {
+            host: process.env.PG_HOST || 'localhost',
+            port: Number(process.env.PG_PORT || 5433),
+            database: process.env.PG_DATABASE || 'bikit_dev',
+            username: process.env.PG_USER || 'postgres',
+            password: process.env.PG_PASSWORD || 'bi_password_123!',
+            ssl: 'disable',
+        };
+        db.insert(dataSources)
+            .values({
+                id: pgId,
+                ownerId: admin.id,
+                name: 'PostgreSQL Demo',
+                slug: 'postgresql-demo',
+                type: 'postgres',
+                config: JSON.stringify(pgConfig),
+                status: 'ok',
+            })
+            .run();
+
+        db.insert(queries)
+            .values({
+                id: newId(),
+                workbookId: adminWbId,
+                dataSourceId: pgId,
+                name: 'PostgreSQL Customers',
+                mode: 'sql',
+                definition: JSON.stringify({ source: { table: 'customers' }, steps: [] }),
+                sql: 'SELECT customer_id, name, city, state, region FROM "customers" LIMIT 50',
+            })
+            .run();
+
+        const mysqlId = newId();
+        const mysqlConfig = {
+            host: process.env.MYSQL_HOST || 'localhost',
+            port: Number(process.env.MYSQL_PORT || 3307),
+            database: process.env.MYSQL_DATABASE || 'bikit_dev',
+            username: process.env.MYSQL_USER || 'mysql',
+            password: process.env.MYSQL_PASSWORD || 'bi_password_123!',
+            ssl: 'disable',
+        };
+        db.insert(dataSources)
+            .values({
+                id: mysqlId,
+                ownerId: admin.id,
+                name: 'MySQL Demo',
+                slug: 'mysql-demo',
+                type: 'mysql',
+                config: JSON.stringify(mysqlConfig),
+                status: 'ok',
+            })
+            .run();
+
+        db.insert(queries)
+            .values({
+                id: newId(),
+                workbookId: adminWbId,
+                dataSourceId: mysqlId,
+                name: 'MySQL Products',
+                mode: 'sql',
+                definition: JSON.stringify({ source: { table: 'products' }, steps: [] }),
+                sql: 'SELECT product_id, name, category, price FROM `products` LIMIT 50',
+            })
+            .run();
+
+        const mongoId = newId();
+        const mongoConfig = {
+            mode: 'host',
+            host: process.env.MONGO_HOST || 'localhost',
+            port: Number(process.env.MONGO_PORT || 27018),
+            database: process.env.MONGO_DATABASE || 'bikit_dev',
+            username: process.env.MONGO_USER || 'mongoadmin',
+            password: process.env.MONGO_PASSWORD || 'bi_password_123!',
+            authSource: 'admin',
+        };
+        db.insert(dataSources)
+            .values({
+                id: mongoId,
+                ownerId: admin.id,
+                name: 'MongoDB Demo',
+                slug: 'mongodb-demo',
+                type: 'mongodb',
+                config: JSON.stringify(mongoConfig),
+                status: 'ok',
+            })
+            .run();
+
+        db.insert(queries)
+            .values({
+                id: newId(),
+                workbookId: adminWbId,
+                dataSourceId: mongoId,
+                name: 'MongoDB Reviews Pipeline',
+                mode: 'pipeline',
+                definition: JSON.stringify({ source: { table: 'reviews' }, steps: [] }),
+                sql: '[\n  {\n    "$match": { "score": { "$gte": 4 } }\n  },\n  {\n    "$limit": 50\n  }\n]',
+            })
+            .run();
+
+        adminQueries = db.select().from(queries).where(eq(queries.workbookId, adminWbId)).all();
+    }
+
+    const expectedAdminSources = process.env.SEED_EXTERNAL === 'true' ? 4 : 1;
+    const expectedAdminQueries = process.env.SEED_EXTERNAL === 'true' ? 8 : 5;
+
     if (
-        adminSources.length !== 1 ||
+        adminSources.length !== expectedAdminSources ||
         adminWorkbooks.length !== 1 ||
-        adminQueries.length !== 5 ||
+        adminQueries.length !== expectedAdminQueries ||
         adminCharts.length !== 5 ||
         adminDashboards.length !== 1 ||
         memberSources.length !== 1 ||

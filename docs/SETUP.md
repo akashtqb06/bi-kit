@@ -411,7 +411,7 @@ bi-kit/
     └── lib/                   # Server domain logic, query compilation, database
         ├── auth/              # Password hashing, sessions, policies, DAL, actions
         ├── charts/            # Chart CRUD service, series aggregations
-        ├── connectors/        # SQLite & worker query execution connectors
+        ├── connectors/        # Pluggable connector framework (Postgres, MySQL, MSSQL, Mongo, SQLite, CSV, Excel)
         ├── dashboards/        # Dashboard CRUD, layout serialization, filter injections
         ├── data-sources/      # Data source registration, CSV parsing & inference
         ├── db/                # Drizzle schema, SQLite connection singleton, migrations

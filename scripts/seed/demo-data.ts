@@ -169,8 +169,6 @@ const statuses = ['delivered', 'shipped', 'processing', 'canceled', 'returned'] 
 const paymentTypes = ['credit_card', 'upi', 'debit_card', 'voucher', 'cash_on_delivery'] as const;
 
 type Location = (typeof locations)[number];
-type Product = { productId: string; sellerId: string; category: string; price: number };
-type Customer = { customerId: string };
 
 function createRandom(seed: number): () => number {
     let state = seed >>> 0;
@@ -320,6 +318,197 @@ function createSchema(database: Database.Database): void {
     `);
 }
 
+export interface DemoCustomer {
+    customer_id: string;
+    name: string;
+    email: string;
+    city: string;
+    state: string;
+    region: string;
+    signup_date: string;
+}
+
+export interface DemoSeller {
+    seller_id: string;
+    name: string;
+    city: string;
+    state: string;
+    region: string;
+    joined_date: string;
+}
+
+export interface DemoProduct {
+    product_id: string;
+    name: string;
+    category: string;
+    seller_id: string;
+    price: number;
+    cost: number;
+    created_at: string;
+}
+
+export interface DemoOrder {
+    id: string;
+    order_id: string;
+    customer_id: string;
+    status: (typeof statuses)[number];
+    order_status: (typeof statuses)[number];
+    created_at: string;
+    order_purchase_timestamp: string;
+    order_delivered_timestamp: string | null;
+    total: number;
+    payment_type: (typeof paymentTypes)[number];
+}
+
+export interface DemoOrderItem {
+    order_id: string;
+    product_id: string;
+    seller_id: string;
+    quantity: number;
+    price: number;
+    freight_value: number;
+}
+
+export interface DemoReview {
+    review_id: string;
+    order_id: string;
+    rating: number;
+    created_at: string;
+}
+
+export interface DemoDataset {
+    customers: DemoCustomer[];
+    sellers: DemoSeller[];
+    products: DemoProduct[];
+    orders: DemoOrder[];
+    orderItems: DemoOrderItem[];
+    reviews: DemoReview[];
+}
+
+export function generateDataset(options?: { seed?: number; orderCount?: number }): DemoDataset {
+    const random = createRandom(options?.seed ?? SEED);
+
+    const customers: DemoCustomer[] = Array.from({ length: 2_000 }, (_, index) => {
+        const customerId = `CUS${String(index + 1).padStart(5, '0')}`;
+        const location = choose<Location>(locations, random);
+        const firstName = choose(firstNames, random);
+        const lastName = choose(lastNames, random);
+        return {
+            customer_id: customerId,
+            name: `${firstName} ${lastName}`,
+            email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}.${index + 1}@example.in`,
+            city: location.city,
+            state: location.state,
+            region: location.region,
+            signup_date: randomTimestamp(Date.UTC(2022, 0, 1), Date.UTC(2025, 11, 31), random),
+        };
+    });
+
+    const sellers: DemoSeller[] = Array.from({ length: 60 }, (_, index) => {
+        const sellerId = `SEL${String(index + 1).padStart(3, '0')}`;
+        const location = choose(locations, random);
+        return {
+            seller_id: sellerId,
+            name: `${choose(sellerPrefixes, random)} ${choose(sellerSuffixes, random)} ${String(index + 1).padStart(2, '0')}`,
+            city: location.city,
+            state: location.state,
+            region: location.region,
+            joined_date: randomTimestamp(Date.UTC(2022, 0, 1), Date.UTC(2023, 11, 31), random),
+        };
+    });
+
+    const products: DemoProduct[] = Array.from({ length: 400 }, (_, index) => {
+        const category = choose(categories, random);
+        const seller = choose(sellers, random);
+        const price = rounded(integer(category.min, category.max, random));
+        const nounOptions = productNouns[category.name];
+        if (!nounOptions) throw new Error(`No product names are configured for ${category.name}.`);
+        const noun = choose(nounOptions, random);
+        const margin = 0.55 + random() * 0.25;
+        return {
+            product_id: `PRD${String(index + 1).padStart(4, '0')}`,
+            name: `${choose(productAdjectives, random)} ${noun}`,
+            category: category.name,
+            seller_id: seller.seller_id,
+            price,
+            cost: rounded(price * margin),
+            created_at: randomTimestamp(Date.UTC(2023, 0, 1), Date.UTC(2025, 11, 31), random),
+        };
+    });
+
+    const orderRows: DemoOrder[] = [];
+    const itemRows: DemoOrderItem[] = [];
+    const reviewRows: DemoReview[] = [];
+    const statusThresholds = [0.85, 0.9, 0.95, 0.98, 1];
+
+    const targetOrderCount = options?.orderCount ?? DEFAULT_ORDER_COUNT;
+    for (let index = 0; index < targetOrderCount; index++) {
+        const orderId = `ORD${String(index + 1).padStart(6, '0')}`;
+        const customer = choose(customers, random);
+        const purchase = purchaseDate(random);
+        const statusRoll = random();
+        const statusIndex = statusThresholds.findIndex((threshold) => statusRoll < threshold);
+        const status = statuses[statusIndex < 0 ? statuses.length - 1 : statusIndex];
+        if (!status) throw new Error('Order status was not found.');
+        const delivered = status === 'delivered';
+        const deliveredAt = delivered
+            ? timestamp(new Date(purchase.getTime() + integer(1, 8, random) * 86_400_000))
+            : null;
+        const itemCount = integer(1, 4, random);
+        let orderTotal = 0;
+        for (let itemIndex = 0; itemIndex < itemCount; itemIndex++) {
+            const product = choose(products, random);
+            const quantity = integer(1, 4, random);
+            const price = rounded(product.price * (0.9 + random() * 0.1));
+            const freight = rounded(integer(35, 480, random) + random());
+            orderTotal += price * quantity + freight;
+            itemRows.push({
+                order_id: orderId,
+                product_id: product.product_id,
+                seller_id: product.seller_id,
+                quantity,
+                price,
+                freight_value: freight,
+            });
+        }
+
+        orderRows.push({
+            id: orderId,
+            order_id: orderId,
+            customer_id: customer.customer_id,
+            status,
+            order_status: status,
+            created_at: timestamp(purchase),
+            order_purchase_timestamp: timestamp(purchase),
+            order_delivered_timestamp: deliveredAt,
+            total: rounded(orderTotal),
+            payment_type: choose(paymentTypes, random),
+        });
+
+        if (delivered && random() < 0.6) {
+            const ratingRoll = random();
+            const rating =
+                ratingRoll < 0.08 ? 1 : ratingRoll < 0.18 ? 2 : ratingRoll < 0.38 ? 3 : ratingRoll < 0.72 ? 4 : 5;
+            const createdAt = new Date(purchase.getTime() + integer(2, 18, random) * 86_400_000);
+            reviewRows.push({
+                review_id: `REV${String(reviewRows.length + 1).padStart(6, '0')}`,
+                order_id: orderId,
+                rating,
+                created_at: timestamp(createdAt),
+            });
+        }
+    }
+
+    return {
+        customers,
+        sellers,
+        products,
+        orders: orderRows,
+        orderItems: itemRows,
+        reviews: reviewRows,
+    };
+}
+
 export function seedDemoDatabase(options?: { orderCount?: number }): void {
     assertTestIsolationGuard(SAMPLE_DB_PATH);
     const startedAt = performance.now();
@@ -329,202 +518,101 @@ export function seedDemoDatabase(options?: { orderCount?: number }): void {
     }
 
     const database = new Database(SAMPLE_DB_PATH);
-    const random = createRandom(SEED);
     try {
         database.pragma('foreign_keys = ON');
         database.pragma('journal_mode = DELETE');
         createSchema(database);
 
-        const customers: Customer[] = Array.from({ length: 2_000 }, (_, index) => ({
-            customerId: `CUS${String(index + 1).padStart(5, '0')}`,
-        }));
+        const dataset = generateDataset(options);
+
         const customerInsert = database.prepare(
             'INSERT INTO customers (customer_id, name, email, city, state, region, signup_date) VALUES (?, ?, ?, ?, ?, ?, ?)'
         );
-        batchInsert(database, customers, BATCH_SIZE, ({ customerId }, index) => {
-            const location = choose<Location>(locations, random);
-            const firstName = choose(firstNames, random);
-            const lastName = choose(lastNames, random);
+        batchInsert(database, dataset.customers, BATCH_SIZE, (row) => {
             customerInsert.run(
-                customerId,
-                `${firstName} ${lastName}`,
-                `${firstName.toLowerCase()}.${lastName.toLowerCase()}.${index + 1}@example.in`,
-                location.city,
-                location.state,
-                location.region,
-                randomTimestamp(Date.UTC(2022, 0, 1), Date.UTC(2025, 11, 31), random)
+                row.customer_id,
+                row.name,
+                row.email,
+                row.city,
+                row.state,
+                row.region,
+                row.signup_date
             );
         });
 
-        const sellers = Array.from({ length: 60 }, (_, index) => ({
-            sellerId: `SEL${String(index + 1).padStart(3, '0')}`,
-        }));
         const sellerInsert = database.prepare(
             'INSERT INTO sellers (seller_id, name, city, state, region, joined_date) VALUES (?, ?, ?, ?, ?, ?)'
         );
-        batchInsert(database, sellers, BATCH_SIZE, ({ sellerId }, index) => {
-            const location = choose(locations, random);
+        batchInsert(database, dataset.sellers, BATCH_SIZE, (row) => {
             sellerInsert.run(
-                sellerId,
-                `${choose(sellerPrefixes, random)} ${choose(sellerSuffixes, random)} ${String(index + 1).padStart(2, '0')}`,
-                location.city,
-                location.state,
-                location.region,
-                randomTimestamp(Date.UTC(2022, 0, 1), Date.UTC(2023, 11, 31), random)
+                row.seller_id,
+                row.name,
+                row.city,
+                row.state,
+                row.region,
+                row.joined_date
             );
         });
 
-        const products: Product[] = Array.from({ length: 400 }, (_, index) => {
-            const category = choose(categories, random);
-            const seller = choose(sellers, random);
-            const price = rounded(integer(category.min, category.max, random));
-            return {
-                productId: `PRD${String(index + 1).padStart(4, '0')}`,
-                sellerId: seller.sellerId,
-                category: category.name,
-                price,
-            };
-        });
         const productInsert = database.prepare(
             'INSERT INTO products (product_id, name, category, seller_id, price, cost, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
         );
-        batchInsert(database, products, BATCH_SIZE, (product) => {
-            const nounOptions = productNouns[product.category];
-            if (!nounOptions) throw new Error(`No product names are configured for ${product.category}.`);
-            const noun = choose(nounOptions, random);
-            const margin = 0.55 + random() * 0.25;
+        batchInsert(database, dataset.products, BATCH_SIZE, (row) => {
             productInsert.run(
-                product.productId,
-                `${choose(productAdjectives, random)} ${noun}`,
-                product.category,
-                product.sellerId,
-                product.price,
-                rounded(product.price * margin),
-                randomTimestamp(Date.UTC(2023, 0, 1), Date.UTC(2025, 11, 31), random)
+                row.product_id,
+                row.name,
+                row.category,
+                row.seller_id,
+                row.price,
+                row.cost,
+                row.created_at
             );
         });
-
-        const orderRows: {
-            orderId: string;
-            customerId: string;
-            status: (typeof statuses)[number];
-            orderStatus: (typeof statuses)[number];
-            createdAt: string;
-            purchasedAt: string;
-            deliveredAt: string | null;
-            total: number;
-            paymentType: (typeof paymentTypes)[number];
-        }[] = [];
-        const itemRows: {
-            orderId: string;
-            product: Product;
-            quantity: number;
-            price: number;
-            freight: number;
-        }[] = [];
-        const reviewRows: { reviewId: string; orderId: string; rating: number; createdAt: string }[] = [];
-        const statusThresholds = [0.85, 0.9, 0.95, 0.98, 1];
-
-        const targetOrderCount = options?.orderCount ?? DEFAULT_ORDER_COUNT;
-        for (let index = 0; index < targetOrderCount; index++) {
-            const orderId = `ORD${String(index + 1).padStart(6, '0')}`;
-            const customer = choose(customers, random);
-            const purchase = purchaseDate(random);
-            const statusRoll = random();
-            const statusIndex = statusThresholds.findIndex((threshold) => statusRoll < threshold);
-            const status = statuses[statusIndex < 0 ? statuses.length - 1 : statusIndex];
-            if (!status) throw new Error('Order status was not found.');
-            const delivered = status === 'delivered';
-            const deliveredAt = delivered
-                ? timestamp(new Date(purchase.getTime() + integer(1, 8, random) * 86_400_000))
-                : null;
-            const itemCount = integer(1, 4, random);
-            let orderTotal = 0;
-            for (let itemIndex = 0; itemIndex < itemCount; itemIndex++) {
-                const product = choose(products, random);
-                const quantity = integer(1, 4, random);
-                const price = rounded(product.price * (0.9 + random() * 0.1));
-                const freight = rounded(integer(35, 480, random) + random());
-                orderTotal += price * quantity + freight;
-                itemRows.push({
-                    orderId,
-                    product,
-                    quantity,
-                    price,
-                    freight,
-                });
-            }
-
-            orderRows.push({
-                orderId,
-                customerId: customer.customerId,
-                status,
-                orderStatus: status,
-                createdAt: timestamp(purchase),
-                purchasedAt: timestamp(purchase),
-                deliveredAt,
-                total: rounded(orderTotal),
-                paymentType: choose(paymentTypes, random),
-            });
-
-            if (delivered && random() < 0.6) {
-                const ratingRoll = random();
-                const rating =
-                    ratingRoll < 0.08 ? 1 : ratingRoll < 0.18 ? 2 : ratingRoll < 0.38 ? 3 : ratingRoll < 0.72 ? 4 : 5;
-                const createdAt = new Date(purchase.getTime() + integer(2, 18, random) * 86_400_000);
-                reviewRows.push({
-                    reviewId: `REV${String(reviewRows.length + 1).padStart(6, '0')}`,
-                    orderId,
-                    rating,
-                    createdAt: timestamp(createdAt),
-                });
-            }
-        }
 
         const orderInsert = database.prepare(
             'INSERT INTO orders (id, order_id, customer_id, status, order_status, created_at, order_purchase_timestamp, order_delivered_timestamp, total, payment_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
-        batchInsert(database, orderRows, BATCH_SIZE, (row) => {
+        batchInsert(database, dataset.orders, BATCH_SIZE, (row) => {
             orderInsert.run(
-                row.orderId,
-                row.orderId,
-                row.customerId,
+                row.id,
+                row.order_id,
+                row.customer_id,
                 row.status,
-                row.orderStatus,
-                row.createdAt,
-                row.purchasedAt,
-                row.deliveredAt,
+                row.order_status,
+                row.created_at,
+                row.order_purchase_timestamp,
+                row.order_delivered_timestamp,
                 row.total,
-                row.paymentType
+                row.payment_type
             );
         });
 
         const itemInsert = database.prepare(
             'INSERT INTO order_items (order_id, product_id, seller_id, quantity, price, freight_value) VALUES (?, ?, ?, ?, ?, ?)'
         );
-        batchInsert(database, itemRows, BATCH_SIZE, (row) => {
+        batchInsert(database, dataset.orderItems, BATCH_SIZE, (row) => {
             itemInsert.run(
-                row.orderId,
-                row.product.productId,
-                row.product.sellerId,
+                row.order_id,
+                row.product_id,
+                row.seller_id,
                 row.quantity,
                 row.price,
-                row.freight
+                row.freight_value
             );
         });
 
         const reviewInsert = database.prepare(
             'INSERT INTO reviews (review_id, order_id, rating, created_at) VALUES (?, ?, ?, ?)'
         );
-        batchInsert(database, reviewRows, BATCH_SIZE, (row) => {
-            reviewInsert.run(row.reviewId, row.orderId, row.rating, row.createdAt);
+        batchInsert(database, dataset.reviews, BATCH_SIZE, (row) => {
+            reviewInsert.run(row.review_id, row.order_id, row.rating, row.created_at);
         });
 
         const integrity = database.pragma('foreign_key_check') as unknown[];
         if (integrity.length > 0) throw new Error('Generated sample data contains orphan foreign keys.');
-        const deliveredCount = orderRows.filter((order) => order.status === 'delivered').length;
+        const deliveredCount = dataset.orders.filter((order) => order.status === 'delivered').length;
         console.log(
-            `Seeded ${orderRows.length.toLocaleString()} orders, ${itemRows.length.toLocaleString()} items, and ${reviewRows.length.toLocaleString()} reviews (${deliveredCount.toLocaleString()} delivered) in ${((performance.now() - startedAt) / 1_000).toFixed(1)}s.`
+            `Seeded ${dataset.orders.length.toLocaleString()} orders, ${dataset.orderItems.length.toLocaleString()} items, and ${dataset.reviews.length.toLocaleString()} reviews (${deliveredCount.toLocaleString()} delivered) in ${((performance.now() - startedAt) / 1_000).toFixed(1)}s.`
         );
     } catch (error) {
         database.close();

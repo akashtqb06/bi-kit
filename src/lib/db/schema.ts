@@ -64,6 +64,19 @@ export const appSettings = sqliteTable('app_settings', {
     value: text('value', { mode: 'json' }).notNull().$type<unknown>(),
 });
 
+export const auditLog = sqliteTable('audit_log', {
+    id: text('id')
+        .primaryKey()
+        .$defaultFn(() => newId()),
+    userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
+    action: text('action').notNull(),
+    dataSourceId: text('data_source_id'),
+    host: text('host'),
+    at: integer('at', { mode: 'timestamp' })
+        .notNull()
+        .default(sql`(unixepoch())`),
+});
+
 export const dataSources = sqliteTable(
     'data_sources',
     {
@@ -75,8 +88,14 @@ export const dataSources = sqliteTable(
             .references(() => users.id, { onDelete: 'cascade' }),
         name: text('name').notNull(),
         slug: text('slug').unique(),
-        type: text('type', { enum: ['sqlite', 'csv'] }).notNull(),
-        config: text('config').notNull(), // JSON — validated via json-helpers
+        type: text('type').notNull(),
+        config: text('config').notNull(), // JSON — encrypted secrets where applicable
+        status: text('status', { enum: ['unknown', 'ok', 'error'] })
+            .notNull()
+            .default('unknown'),
+        lastTestedAt: integer('last_tested_at', { mode: 'timestamp' }),
+        lastError: text('last_error'),
+        serverVersion: text('server_version'),
         createdAt: integer('created_at', { mode: 'timestamp' })
             .notNull()
             .default(sql`(unixepoch())`),
@@ -86,6 +105,16 @@ export const dataSources = sqliteTable(
     },
     (table) => [index('data_sources_owner_id_idx').on(table.ownerId)]
 );
+
+export const schemaCache = sqliteTable('schema_cache', {
+    dataSourceId: text('data_source_id')
+        .primaryKey()
+        .references(() => dataSources.id, { onDelete: 'cascade' }),
+    snapshot: text('snapshot').notNull(), // JSON SchemaSnapshot
+    fetchedAt: integer('fetched_at', { mode: 'timestamp' })
+        .notNull()
+        .default(sql`(unixepoch())`),
+});
 
 export const workbooks = sqliteTable(
     'workbooks',
@@ -148,7 +177,7 @@ export const queries = sqliteTable(
         dataSourceId: text('data_source_id')
             .notNull()
             .references(() => dataSources.id, { onDelete: 'cascade' }),
-        mode: text('mode', { enum: ['builder', 'sql'] })
+        mode: text('mode', { enum: ['builder', 'sql', 'pipeline'] })
             .notNull()
             .default('sql'),
         definition: text('definition').notNull().default('[]'), // JSON builder steps
@@ -283,6 +312,8 @@ export const dashboardViews = sqliteTable(
 // ---------------------------------------------------------------------------
 export type DataSource = typeof dataSources.$inferSelect;
 export type InsertDataSource = typeof dataSources.$inferInsert;
+export type SchemaCache = typeof schemaCache.$inferSelect;
+export type InsertSchemaCache = typeof schemaCache.$inferInsert;
 export type Workbook = typeof workbooks.$inferSelect;
 export type InsertWorkbook = typeof workbooks.$inferInsert;
 export type Folder = typeof folders.$inferSelect;
@@ -303,3 +334,5 @@ export type Session = typeof sessions.$inferSelect;
 export type InsertSession = typeof sessions.$inferInsert;
 export type LoginAttempt = typeof loginAttempts.$inferSelect;
 export type AppSetting = typeof appSettings.$inferSelect;
+export type AuditLogEntry = typeof auditLog.$inferSelect;
+export type InsertAuditLogEntry = typeof auditLog.$inferInsert;

@@ -3,6 +3,7 @@ import * as path from 'path';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createConnector } from './factory';
+import type { SqliteConnector } from './sqlite-connector';
 import type { DataSource } from '../db/schema';
 import { DATA_DIR } from '../db/paths';
 
@@ -24,6 +25,10 @@ describe('connector security', () => {
             slug: null,
             type: 'sqlite',
             config: JSON.stringify({ path: sourcePath }),
+            status: 'unknown',
+            lastTestedAt: null,
+            lastError: null,
+            serverVersion: null,
             createdAt: new Date(),
             updatedAt: new Date(),
         };
@@ -55,7 +60,7 @@ describe('connector security', () => {
     });
 
     it('enforces read-only execution and the result row cap', async () => {
-        const connector = createConnector(source);
+        const connector = createConnector(source) as SqliteConnector;
         try {
             await expect(
                 connector.execute('DELETE FROM items', [], { limit: 2, timeoutMs: 1_000 })
@@ -84,7 +89,7 @@ describe('connector security', () => {
     });
 
     it('terminates a query that exceeds its deadline', async () => {
-        const connector = createConnector(source);
+        const connector = createConnector(source) as SqliteConnector;
         try {
             await expect(
                 connector.execute(

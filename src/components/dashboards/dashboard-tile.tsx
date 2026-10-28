@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import {
     DropdownMenu,
@@ -22,6 +21,7 @@ import {
     DownloadIcon,
     PencilIcon,
     CopyIcon,
+    Loader2Icon,
 } from 'lucide-react';
 import { ChartRenderer } from '@src/components/charts/chart-renderer';
 import { ChartTitle } from '@src/components/charts/chart-title';
@@ -371,9 +371,9 @@ export function DashboardWidget({
 
         if ((isLoading || isRefetching) && !queryResult) {
             return (
-                <div className="flex flex-col gap-2 p-3 h-full w-full justify-center items-center">
-                    <Skeleton className="h-4 w-32 rounded" />
-                    <Skeleton className="h-full w-full rounded" />
+                <div className="flex flex-col gap-2 p-4 h-full w-full justify-center items-center text-center">
+                    <Loader2Icon className="size-5 animate-spin text-primary" />
+                    <span className="text-xs text-muted-foreground font-medium">Waiting for connection...</span>
                 </div>
             );
         }
@@ -420,8 +420,9 @@ export function DashboardWidget({
                     showTitle={false}
                 />
                 {(isLoading || isRefetching) && (
-                    <div className="absolute inset-0 bg-background/50 backdrop-blur-[1px] flex items-center justify-center z-20 pointer-events-none rounded-lg">
-                        <RefreshCwIcon className="size-5 animate-spin text-muted-foreground" />
+                    <div className="absolute inset-0 bg-background/60 backdrop-blur-[1px] flex flex-col items-center justify-center gap-1.5 z-20 pointer-events-none rounded-lg text-xs text-muted-foreground font-medium">
+                        <RefreshCwIcon className="size-5 animate-spin text-primary" />
+                        <span>Waiting for connection...</span>
                     </div>
                 )}
             </div>

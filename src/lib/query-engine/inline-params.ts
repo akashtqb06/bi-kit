@@ -1,16 +1,19 @@
+import type { SqlDialect } from '@src/lib/connectors/dialects/types';
+
 // ---------------------------------------------------------------------------
 // inlineParams
 //
 // Tokenizes SQL and safely inlines bound parameters as escaped SQL literals.
-// Skips '?' inside single-quoted strings, double-quoted identifiers, backtick
-// identifiers, line comments (-- ...), and block comments (/* ... */).
+// Skips parameters inside single-quoted strings, quoted identifiers, and comments.
+// Supports ?, $1..$n (PostgreSQL), and @p1..@pn (MSSQL).
 // ---------------------------------------------------------------------------
 
-export function inlineParams(sql: string, params: unknown[]): string {
+export function inlineParams(sql: string, params: unknown[], dialect?: SqlDialect | string): string {
     if (!params || params.length === 0) {
         return sql;
     }
 
+    const dialectName = typeof dialect === 'string' ? dialect.toLowerCase() : dialect?.name?.toLowerCase() || 'sqlite';
     let paramIndex = 0;
     let result = '';
     let i = 0;
@@ -88,7 +91,30 @@ export function inlineParams(sql: string, params: unknown[]): string {
             continue;
         }
 
-        // 4. Line comment: -- ... \n
+        // 4. Bracketed identifier: [...] (MSSQL)
+        if (char === '[') {
+            let id = '[';
+            i++;
+            while (i < n) {
+                if (sql[i] === ']') {
+                    id += ']';
+                    if (i + 1 < n && sql[i + 1] === ']') {
+                        id += ']';
+                        i += 2;
+                    } else {
+                        i++;
+                        break;
+                    }
+                } else {
+                    id += sql[i];
+                    i++;
+                }
+            }
+            result += id;
+            continue;
+        }
+
+        // 5. Line comment: -- ... \n
         if (char === '-' && i + 1 < n && sql[i + 1] === '-') {
             let comment = '--';
             i += 2;
@@ -100,7 +126,7 @@ export function inlineParams(sql: string, params: unknown[]): string {
             continue;
         }
 
-        // 5. Block comment: /* ... */
+        // 6. Block comment: /* ... */
         if (char === '/' && i + 1 < n && sql[i + 1] === '*') {
             let comment = '/*';
             i += 2;
@@ -117,7 +143,43 @@ export function inlineParams(sql: string, params: unknown[]): string {
             continue;
         }
 
-        // 6. Parameter placeholder: ?
+        // 7. Postgres placeholder: $1, $2...
+        if (char === '$' && (dialectName === 'postgres' || dialectName === 'postgresql') && i + 1 < n && /[0-9]/.test(sql[i + 1])) {
+            let phDigits = '';
+            let j = i + 1;
+            while (j < n && /[0-9]/.test(sql[j])) {
+                phDigits += sql[j];
+                j++;
+            }
+            const idx = parseInt(phDigits, 10) - 1;
+            if (idx >= 0 && idx < params.length) {
+                result += formatSqlLiteral(params[idx]);
+            } else {
+                result += `$${phDigits}`;
+            }
+            i = j;
+            continue;
+        }
+
+        // 8. MSSQL placeholder: @p1, @p2...
+        if (char === '@' && (dialectName === 'mssql' || dialectName === 'sqlserver') && sql.slice(i, i + 2).toLowerCase() === '@p' && i + 2 < n && /[0-9]/.test(sql[i + 2])) {
+            let phDigits = '';
+            let j = i + 2;
+            while (j < n && /[0-9]/.test(sql[j])) {
+                phDigits += sql[j];
+                j++;
+            }
+            const idx = parseInt(phDigits, 10) - 1;
+            if (idx >= 0 && idx < params.length) {
+                result += formatSqlLiteral(params[idx]);
+            } else {
+                result += `@p${phDigits}`;
+            }
+            i = j;
+            continue;
+        }
+
+        // 9. Standard positional placeholder: ?
         if (char === '?') {
             if (paramIndex < params.length) {
                 const val = params[paramIndex++];
@@ -158,4 +220,3 @@ function formatSqlLiteral(val: unknown): string {
     }
     return `'${String(val).replace(/'/g, "''")}'`;
 }
-

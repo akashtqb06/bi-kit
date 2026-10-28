@@ -154,11 +154,12 @@ export function OperationRow({
   }
 
   // Render descriptive sentence with chips
+  const isCollection = schema?.tables.some((t) => t.kind === "collection");
   const renderSentence = () => {
     if (isSource) {
       return (
         <span className="text-xs text-foreground/90 leading-snug">
-          Select <OperationChip>{sourceTable || "source"}</OperationChip> table
+          Select <OperationChip>{sourceTable || "source"}</OperationChip> {isCollection ? "collection" : "table"}
         </span>
       );
     }

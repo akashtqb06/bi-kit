@@ -18,7 +18,7 @@ export interface QueryPublic {
   workbookId: string;
   name: string;
   dataSourceId: string;
-  mode: "builder" | "sql";
+  mode: "builder" | "sql" | "pipeline";
   definition: string; // raw JSON string of builder steps
   sql: string;
   folderId?: string | null;
@@ -34,7 +34,7 @@ function toPublic(row: Query): QueryPublic {
     workbookId: row.workbookId,
     name: row.name,
     dataSourceId: row.dataSourceId,
-    mode: row.mode as "builder" | "sql",
+    mode: row.mode as "builder" | "sql" | "pipeline",
     definition: row.definition,
     sql: row.sql,
     folderId: row.folderId,

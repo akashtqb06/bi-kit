@@ -32,7 +32,7 @@ export function parseDataSourceConfig(
 }
 
 export function serializeDataSourceConfig(
-  config: SqliteSourceConfig | CsvSourceConfig
+  config: unknown
 ): string {
   return JSON.stringify(config);
 }

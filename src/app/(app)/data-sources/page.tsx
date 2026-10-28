@@ -6,7 +6,8 @@ import type { ColumnFiltersState, PaginationState, RowSelectionState, SortingSta
 import type { LegacyColumnDef } from '@tanstack/react-table/legacy';
 import {
     DatabaseIcon,
-    FileTextIcon,
+    FileSpreadsheetIcon,
+    LayersIcon,
     MoreHorizontalIcon,
     Trash2Icon,
     TableIcon,
@@ -16,8 +17,10 @@ import {
     PlusIcon,
     PencilIcon,
     PlugZapIcon,
+    RefreshCwIcon,
     AlertCircleIcon,
     SearchIcon,
+    CheckCircle2Icon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -61,20 +64,46 @@ import { useCurrentUser } from '@src/components/auth/user-provider';
 import type { DataSourcePublic } from '@src/lib/data-sources/service';
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Helpers & Metadata
 // ---------------------------------------------------------------------------
 
-const typeIcons: Record<string, React.ReactNode> = {
-    sqlite: <DatabaseIcon className="size-3.5" />,
-    csv: <FileTextIcon className="size-3.5" />,
+const connectorMeta: Record<
+    string,
+    { label: string; category: 'sql' | 'nosql' | 'file'; icon: React.ReactNode }
+> = {
+    postgres: { label: 'PostgreSQL', category: 'sql', icon: <DatabaseIcon className="size-3.5 text-blue-500" /> },
+    postgresql: { label: 'PostgreSQL', category: 'sql', icon: <DatabaseIcon className="size-3.5 text-blue-500" /> },
+    mysql: { label: 'MySQL', category: 'sql', icon: <DatabaseIcon className="size-3.5 text-blue-500" /> },
+    mssql: { label: 'SQL Server', category: 'sql', icon: <DatabaseIcon className="size-3.5 text-blue-500" /> },
+    mongodb: { label: 'MongoDB', category: 'nosql', icon: <LayersIcon className="size-3.5 text-emerald-500" /> },
+    sqlite: { label: 'SQLite', category: 'file', icon: <DatabaseIcon className="size-3.5 text-amber-500" /> },
+    csv: { label: 'CSV', category: 'file', icon: <FileSpreadsheetIcon className="size-3.5 text-amber-500" /> },
+    excel: { label: 'Excel', category: 'file', icon: <FileSpreadsheetIcon className="size-3.5 text-amber-500" /> },
 };
 
-const typeLabels: Record<string, string> = {
-    sqlite: 'SQLite',
-    csv: 'CSV',
-};
+function getCategoryBadge(category?: string) {
+    if (category === 'nosql') {
+        return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20';
+    }
+    if (category === 'file') {
+        return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20';
+    }
+    return 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20';
+}
 
-function formatRelativeTime(date: Date | string | null): string {
+function formatBytes(bytes?: unknown): string {
+    if (typeof bytes !== 'number' || Number.isNaN(bytes) || bytes <= 0) return '';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let val = bytes;
+    let unitIdx = 0;
+    while (val >= 1024 && unitIdx < units.length - 1) {
+        val /= 1024;
+        unitIdx++;
+    }
+    return `${val.toFixed(unitIdx === 0 ? 0 : 1)} ${units[unitIdx]}`;
+}
+
+function formatRelativeTime(date: Date | string | null | undefined): string {
     if (!date) return '—';
     try {
         const d = typeof date === 'string' ? new Date(date) : date;
@@ -83,11 +112,11 @@ function formatRelativeTime(date: Date | string | null): string {
         const diffSec = Math.floor(diffMs / 1000);
         if (diffSec < 60) return 'just now';
         const diffMin = Math.floor(diffSec / 60);
-        if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? '' : 's'} ago`;
+        if (diffMin < 60) return `${diffMin}m ago`;
         const diffHour = Math.floor(diffMin / 60);
-        if (diffHour < 24) return `${diffHour} hour${diffHour === 1 ? '' : 's'} ago`;
+        if (diffHour < 24) return `${diffHour}h ago`;
         const diffDay = Math.floor(diffHour / 24);
-        if (diffDay < 30) return `${diffDay} day${diffDay === 1 ? '' : 's'} ago`;
+        if (diffDay < 30) return `${diffDay}d ago`;
         return new Intl.DateTimeFormat('en-US', {
             year: 'numeric',
             month: 'short',
@@ -98,7 +127,7 @@ function formatRelativeTime(date: Date | string | null): string {
     }
 }
 
-function formatFullDateTime(date: Date | string | null): string {
+function formatFullDateTime(date: Date | string | null | undefined): string {
     if (!date) return '';
     try {
         return new Intl.DateTimeFormat('en-US', {
@@ -110,7 +139,7 @@ function formatFullDateTime(date: Date | string | null): string {
     }
 }
 
-type ConnectionStatus = 'unknown' | 'testing' | 'connected' | 'error';
+type ConnectionStatus = 'unknown' | 'testing' | 'connected' | 'error' | 'ok';
 
 // ---------------------------------------------------------------------------
 // Main Page Content Component
@@ -130,11 +159,13 @@ function DataSourcesContent() {
 
     // Dialog & Sheet states
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [sourceToEdit, setSourceToEdit] = useState<DataSourcePublic | null>(null);
     const [replaceTarget, setReplaceTarget] = useState<{ id: string; name: string } | null>(null);
 
     const [schemaSheetOpen, setSchemaSheetOpen] = useState(false);
     const [schemaSourceId, setSchemaSourceId] = useState<string | null>(null);
     const [schemaSourceName, setSchemaSourceName] = useState('');
+    const [schemaSourceType, setSchemaSourceType] = useState<string | undefined>(undefined);
 
     const [renameOpen, setRenameOpen] = useState(false);
     const [renameTarget, setRenameTarget] = useState<DataSourcePublic | null>(null);
@@ -150,9 +181,7 @@ function DataSourcesContent() {
     const [searchQuery, setSearchQuery] = useState(initialQuery);
 
     const initialType = searchParams.get('type') ?? 'all';
-    const [typeFilter, setTypeFilter] = useState<'all' | 'sqlite' | 'csv'>(
-        initialType === 'sqlite' || initialType === 'csv' ? initialType : 'all'
-    );
+    const [typeFilter, setTypeFilter] = useState<string>(initialType);
 
     const initialSorting = useMemo<SortingState>(() => {
         const sortParam = searchParams.get('sort');
@@ -245,15 +274,24 @@ function DataSourcesContent() {
     // Actions & Handlers
     // ---------------------------------------------------------------------------
 
-    const handleSchemaView = useCallback((id: string, name: string) => {
+    const handleSchemaView = useCallback((id: string, name: string, type?: string) => {
         setSchemaSourceId(id);
         setSchemaSourceName(name);
+        setSchemaSourceType(type);
         setSchemaSheetOpen(true);
+    }, []);
+
+    const handleOpenEdit = useCallback((source: DataSourcePublic) => {
+        setSourceToEdit(source);
+        setDialogOpen(true);
     }, []);
 
     const handleDataSourceDialogChange = useCallback((open: boolean) => {
         setDialogOpen(open);
-        if (!open) setReplaceTarget(null);
+        if (!open) {
+            setSourceToEdit(null);
+            setReplaceTarget(null);
+        }
     }, []);
 
     const loadSampleData = async () => {
@@ -278,8 +316,11 @@ function DataSourcesContent() {
         setStatusMap((prev) => ({ ...prev, [id]: 'testing' }));
         try {
             const res = await fetch(`/api/data-sources/${id}/test`, { method: 'POST' });
-            const json = (await res.json()) as { data?: { ok: boolean; tableCount?: number }; error?: string };
-            if (!res.ok) {
+            const json = (await res.json()) as {
+                data?: { ok: boolean; tableCount?: number; serverVersion?: string; latencyMs?: number };
+                error?: string;
+            };
+            if (!res.ok || !json.data?.ok) {
                 setStatusMap((prev) => ({ ...prev, [id]: 'error' }));
                 toast.error(`Connection to "${name}" failed`, {
                     description: json.error ?? 'Connection test failed.',
@@ -287,11 +328,13 @@ function DataSourcesContent() {
                 return;
             }
             setStatusMap((prev) => ({ ...prev, [id]: 'connected' }));
-            const countDesc = json.data?.tableCount !== undefined ? ` (${json.data.tableCount} tables)` : '';
+            const countDesc = json.data.tableCount !== undefined ? ` (${json.data.tableCount} tables)` : '';
             toast.success(`Connection to "${name}" successful${countDesc}`);
-            if (json.data?.tableCount !== undefined) {
+            if (json.data.tableCount !== undefined) {
                 const count = json.data.tableCount;
-                setDataSources((prev) => prev.map((ds) => (ds.id === id ? { ...ds, tableCount: count } : ds)));
+                setDataSources((prev) =>
+                    prev.map((ds) => (ds.id === id ? { ...ds, tableCount: count, status: 'ok', lastTestedAt: new Date() } : ds))
+                );
             }
         } catch {
             setStatusMap((prev) => ({ ...prev, [id]: 'error' }));
@@ -300,6 +343,23 @@ function DataSourcesContent() {
             });
         }
     }, []);
+
+    const refreshSchema = useCallback(async (id: string, name: string) => {
+        const promise = fetch(`/api/data-sources/${id}/schema?refresh=1`).then(async (res) => {
+            const json = (await res.json()) as { data?: { tables?: unknown[] }; error?: string };
+            if (!res.ok || !json.data) {
+                throw new Error(json.error ?? 'Failed to refresh schema');
+            }
+            await fetchDataSources();
+            return json.data;
+        });
+
+        toast.promise(promise, {
+            loading: `Refreshing schema for "${name}"...`,
+            success: (data) => `Schema refreshed successfully (${data.tables?.length ?? 0} tables)`,
+            error: (err) => (err instanceof Error ? err.message : 'Failed to refresh schema'),
+        });
+    }, [fetchDataSources]);
 
     const openRenameDialog = useCallback((source: DataSourcePublic) => {
         setRenameTarget(source);
@@ -469,18 +529,47 @@ function DataSourcesContent() {
                 header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
                 cell: ({ row }) => {
                     const source = row.original;
+                    const meta = connectorMeta[source.type] ?? {
+                        label: source.type,
+                        category: 'sql',
+                        icon: <DatabaseIcon className="size-4 text-muted-foreground" />,
+                    };
+
+                    // Compute sanitized secondary details
+                    let secondaryText = '';
+                    const cfg = source.config || {};
+                    if (meta.category === 'sql' || meta.category === 'nosql') {
+                        if (cfg.host && cfg.database) {
+                            const portStr = cfg.port ? `:${cfg.port}` : '';
+                            secondaryText = `${cfg.host}${portStr} • ${cfg.database}`;
+                        } else if (cfg.database) {
+                            secondaryText = String(cfg.database);
+                        }
+                    } else if (meta.category === 'file') {
+                        const fileStr = typeof cfg.fileName === 'string' ? cfg.fileName : 'Managed database file';
+                        const sizeStr = formatBytes(cfg.size);
+                        secondaryText = sizeStr ? `${fileStr} • ${sizeStr}` : fileStr;
+                    }
+
                     return (
-                        <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground shrink-0">
-                                {typeIcons[source.type] ?? <DatabaseIcon className="size-3.5" />}
+                        <div className="flex items-start gap-2.5 py-0.5">
+                            <span className="mt-1 shrink-0">
+                                {meta.icon}
                             </span>
-                            <button
-                                type="button"
-                                onClick={() => handleSchemaView(source.id, source.name)}
-                                className="font-medium text-foreground hover:underline text-left truncate max-w-[240px] sm:max-w-xs"
-                            >
-                                {source.name}
-                            </button>
+                            <div className="flex flex-col min-w-0">
+                                <button
+                                    type="button"
+                                    onClick={() => handleSchemaView(source.id, source.name, source.type)}
+                                    className="font-medium text-foreground hover:underline text-left truncate max-w-[240px] sm:max-w-xs"
+                                >
+                                    {source.name}
+                                </button>
+                                {secondaryText && (
+                                    <span className="text-[11px] font-mono text-muted-foreground truncate max-w-[240px] sm:max-w-xs">
+                                        {secondaryText}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     );
                 },
@@ -490,14 +579,23 @@ function DataSourcesContent() {
             ...adminColumns,
             {
                 accessorKey: 'type',
-                header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
+                header: ({ column }) => <DataTableColumnHeader column={column} title="Connector" />,
                 cell: ({ row }) => {
                     const type = row.original.type;
+                    const meta = connectorMeta[type] ?? {
+                        label: type,
+                        category: 'sql',
+                        icon: <DatabaseIcon className="size-3.5 text-muted-foreground" />,
+                    };
+                    const badgeClass = getCategoryBadge(meta.category);
+
                     return (
-                        <Badge variant="secondary" className="gap-1.5 font-normal">
-                            {typeIcons[type]}
-                            {typeLabels[type] ?? type}
-                        </Badge>
+                        <div className="flex items-center gap-1.5">
+                            <Badge variant="outline" className={`gap-1.5 font-normal text-xs ${badgeClass}`}>
+                                {meta.icon}
+                                {meta.label}
+                            </Badge>
+                        </div>
                     );
                 },
                 enableSorting: true,
@@ -532,11 +630,13 @@ function DataSourcesContent() {
                 id: 'status',
                 header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
                 cell: ({ row }) => {
-                    const id = row.original.id;
-                    const name = row.original.name;
-                    const status = statusMap[id] ?? 'unknown';
+                    const source = row.original;
+                    const id = source.id;
+                    const name = source.name;
+                    const overrideStatus = statusMap[id];
+                    const effectiveStatus = overrideStatus ?? (source.status || 'unknown');
 
-                    if (status === 'testing') {
+                    if (effectiveStatus === 'testing') {
                         return (
                             <Badge variant="secondary" className="gap-1 text-muted-foreground font-normal">
                                 <Loader2Icon className="size-3 animate-spin" />
@@ -544,18 +644,34 @@ function DataSourcesContent() {
                             </Badge>
                         );
                     }
-                    if (status === 'connected') {
+                    if (effectiveStatus === 'connected' || effectiveStatus === 'ok') {
                         return (
-                            <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 font-normal">
-                                Connected
-                            </Badge>
+                            <Tooltip>
+                                <TooltipTrigger render={
+                                    <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 font-normal cursor-help gap-1">
+                                        <CheckCircle2Icon className="size-3 text-emerald-500" />
+                                        Connected
+                                    </Badge>
+                                } />
+                                <TooltipContent>
+                                    Last tested {formatRelativeTime(source.lastTestedAt)}
+                                </TooltipContent>
+                            </Tooltip>
                         );
                     }
-                    if (status === 'error') {
+                    if (effectiveStatus === 'error') {
                         return (
-                            <Badge variant="destructive" className="font-normal">
-                                Error
-                            </Badge>
+                            <Tooltip>
+                                <TooltipTrigger render={
+                                    <Badge variant="destructive" className="font-normal cursor-help gap-1">
+                                        <AlertCircleIcon className="size-3" />
+                                        Error
+                                    </Badge>
+                                } />
+                                <TooltipContent className="max-w-xs text-xs font-mono">
+                                    {source.lastError || 'Connection test failed.'}
+                                </TooltipContent>
+                            </Tooltip>
                         );
                     }
                     return (
@@ -601,6 +717,8 @@ function DataSourcesContent() {
                 id: 'actions',
                 cell: ({ row }) => {
                     const source = row.original;
+                    const isFile = source.type === 'csv' || source.type === 'excel' || source.type === 'sqlite';
+
                     return (
                         <div className="flex justify-end">
                             <DropdownMenu>
@@ -609,8 +727,8 @@ function DataSourcesContent() {
                                 >
                                     <MoreHorizontalIcon className="size-4" />
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
-                                    <DropdownMenuItem onClick={() => handleSchemaView(source.id, source.name)}>
+                                <DropdownMenuContent align="end" className="w-52">
+                                    <DropdownMenuItem onClick={() => handleSchemaView(source.id, source.name, source.type)}>
                                         <TableIcon className="mr-2 size-4" />
                                         View schema
                                     </DropdownMenuItem>
@@ -618,11 +736,15 @@ function DataSourcesContent() {
                                         <PlugZapIcon className="mr-2 size-4" />
                                         Test connection
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => openRenameDialog(source)}>
-                                        <PencilIcon className="mr-2 size-4" />
-                                        Rename
+                                    <DropdownMenuItem onClick={() => refreshSchema(source.id, source.name)}>
+                                        <RefreshCwIcon className="mr-2 size-4" />
+                                        Refresh schema
                                     </DropdownMenuItem>
-                                    {source.type === 'csv' && (
+                                    <DropdownMenuItem onClick={() => handleOpenEdit(source)}>
+                                        <PencilIcon className="mr-2 size-4" />
+                                        Edit
+                                    </DropdownMenuItem>
+                                    {isFile && (
                                         <DropdownMenuItem
                                             onClick={() => setReplaceTarget({ id: source.id, name: source.name })}
                                         >
@@ -630,6 +752,10 @@ function DataSourcesContent() {
                                             Replace file
                                         </DropdownMenuItem>
                                     )}
+                                    <DropdownMenuItem onClick={() => openRenameDialog(source)}>
+                                        <PencilIcon className="mr-2 size-4" />
+                                        Rename
+                                    </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem
                                         variant="destructive"
@@ -650,7 +776,7 @@ function DataSourcesContent() {
                 enableHiding: false,
             },
         ];
-    }, [handleSchemaView, testConnection, openRenameDialog, statusMap, currentUser]);
+    }, [handleSchemaView, handleOpenEdit, testConnection, refreshSchema, openRenameDialog, statusMap, currentUser]);
 
     // Controlled column filters
     const columnFilters = useMemo<ColumnFiltersState>(() => {
@@ -665,23 +791,23 @@ function DataSourcesContent() {
     const typeFilterControl = (
         <Select
             value={typeFilter}
-            items={[
-                { value: 'all', label: 'All Types' },
-                { value: 'sqlite', label: 'SQLite' },
-                { value: 'csv', label: 'CSV' },
-            ]}
             onValueChange={(val) => {
-                setTypeFilter(val as 'all' | 'sqlite' | 'csv');
+                if (val) setTypeFilter(val);
                 setPagination((prev) => ({ ...prev, pageIndex: 0 }));
             }}
         >
-            <SelectTrigger className="h-9 w-[130px] text-xs sm:text-sm">
+            <SelectTrigger className="h-9 w-[140px] text-xs sm:text-sm">
                 <SelectValue placeholder="All types" />
             </SelectTrigger>
             <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="postgres">PostgreSQL</SelectItem>
+                <SelectItem value="mysql">MySQL</SelectItem>
+                <SelectItem value="mssql">SQL Server</SelectItem>
+                <SelectItem value="mongodb">MongoDB</SelectItem>
                 <SelectItem value="sqlite">SQLite</SelectItem>
                 <SelectItem value="csv">CSV</SelectItem>
+                <SelectItem value="excel">Excel</SelectItem>
             </SelectContent>
         </Select>
     );
@@ -691,7 +817,7 @@ function DataSourcesContent() {
         <div className="flex flex-col items-center justify-center p-12 text-center">
             <DatabaseIcon className="mb-3 size-10 text-muted-foreground/50" />
             <p className="text-sm font-medium">No data sources yet</p>
-            <p className="mt-1 text-xs text-muted-foreground">Add a data source to start querying your data.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Add a database or file data source to begin querying.</p>
             <div className="mt-4 flex items-center gap-2">
                 <Button onClick={() => setDialogOpen(true)}>
                     <PlusIcon className="mr-1.5 size-4" />
@@ -731,6 +857,10 @@ function DataSourcesContent() {
         </div>
     );
 
+    const existingDataSourceNames = useMemo(() => {
+        return dataSources.map((d) => d.name);
+    }, [dataSources]);
+
     return (
         <div className="h-full min-h-0 flex flex-col gap-6 p-6 overflow-hidden">
             {/* Header */}
@@ -738,7 +868,7 @@ function DataSourcesContent() {
                 <div>
                     <div>
                         <h1 className="text-xl font-semibold tracking-tight">Data Sources</h1>
-                        <p className="text-sm text-muted-foreground">Connect SQl lite and csv</p>
+                        <p className="text-sm text-muted-foreground">Connect SQL databases, MongoDB, CSV, Excel, and SQLite files</p>
                     </div>
                 </div>
                 <Button onClick={() => setDialogOpen(true)}>
@@ -768,7 +898,7 @@ function DataSourcesContent() {
                 columnFilters={columnFilters}
                 rowSelection={rowSelection}
                 onRowSelectionChange={setRowSelection}
-                onRowClick={(row) => handleSchemaView(row.id, row.name)}
+                onRowClick={(row) => handleSchemaView(row.id, row.name, row.type)}
                 emptyState={emptyState}
                 emptySearchState={emptySearchState}
                 onDeleteSelected={handleBulkDelete}
@@ -776,19 +906,22 @@ function DataSourcesContent() {
                 deleteConfirmDescription="This action cannot be undone. Sources with dependent queries will be blocked from deletion."
             />
 
-            {/* Add / Replace Data Source Dialog */}
+            {/* Add / Edit Data Source Wizard Dialog */}
             <AddDataSourceDialog
-                key={replaceTarget?.id ?? 'add'}
+                key={sourceToEdit?.id ?? replaceTarget?.id ?? 'add'}
                 open={dialogOpen || replaceTarget !== null}
                 onOpenChange={handleDataSourceDialogChange}
                 onSuccess={fetchDataSources}
+                sourceToEdit={sourceToEdit}
                 sourceToReplace={replaceTarget}
+                existingNames={existingDataSourceNames}
             />
 
             {/* Schema Browser Sheet */}
             <SchemaBrowserSheet
                 dataSourceId={schemaSourceId}
                 dataSourceName={schemaSourceName}
+                dataSourceType={schemaSourceType}
                 open={schemaSheetOpen}
                 onOpenChange={setSchemaSheetOpen}
             />

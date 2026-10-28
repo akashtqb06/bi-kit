@@ -1,20 +1,24 @@
 import 'server-only';
-import { rmSync } from 'node:fs';
+import { rmSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { count, eq, inArray } from 'drizzle-orm';
 import { db } from '@src/lib/db';
-import { dataSources, queries, users, type DataSource } from '@src/lib/db/schema';
+import { dataSources, queries, users, schemaCache, type DataSource } from '@src/lib/db/schema';
 import { serializeDataSourceConfig } from '@src/lib/db/json-helpers';
 import { newId } from '@src/lib/db/id';
 import { csvSourceConfigSchema, type CreateDataSourceInput, type DataSourceType } from '@src/lib/schemas';
-import { ConflictError, NotFoundError } from '@src/lib/connectors/types';
+import { ConflictError, NotFoundError, type SchemaSnapshot } from '@src/lib/connectors/types';
 import { createConnector } from '@src/lib/connectors/factory';
+import { invalidateConnector } from '@src/lib/connectors/manager';
+import { getManagedDirForSource } from '@src/lib/connectors/storage';
+import { getConnectorDefinition } from '@src/lib/connectors/registry';
+import { toPublicConfig, mergeStoredSecrets, encryptSecretFields } from '@src/lib/connectors/secrets';
 import { importCsvToDatabase } from './csv-import';
 import { CSV_DIR } from '@src/lib/db/paths';
 import type { PolicyUser } from '@src/lib/auth/policy';
 
 // ---------------------------------------------------------------------------
-// Public shape — never includes config (contains file paths)
+// Public shape — never includes raw secrets
 // ---------------------------------------------------------------------------
 
 export interface DataSourcePublic {
@@ -22,10 +26,15 @@ export interface DataSourcePublic {
     ownerId?: string;
     owner?: { id: string; name: string | null; email: string; avatarUrl?: string | null };
     name: string;
-    type: DataSourceType;
+    type: string;
     slug?: string | null;
+    status?: 'unknown' | 'ok' | 'error';
+    lastTestedAt?: Date | null;
+    lastError?: string | null;
+    serverVersion?: string | null;
     queryCount?: number;
     tableCount?: number | null;
+    config?: Record<string, unknown>;
     createdAt: Date | null;
     updatedAt: Date | null;
 }
@@ -39,14 +48,30 @@ function getDefaultOwnerId(): string | null {
 }
 
 function toPublic(row: DataSource, queryCount = 0, tableCount: number | null = null): DataSourcePublic {
+    let publicConfig: Record<string, unknown> = {};
+    try {
+        const rawConfig = JSON.parse(row.config) as Record<string, unknown>;
+        const def = getConnectorDefinition(row.type);
+        publicConfig = toPublicConfig(def, rawConfig);
+    } catch {
+        // ignore
+    }
+
+    const hasConfig = Object.keys(publicConfig).length > 0;
+
     return {
         id: row.id,
         ownerId: row.ownerId,
         name: row.name,
-        type: row.type as DataSourceType,
+        type: row.type,
         slug: row.slug,
+        status: (row.status as 'unknown' | 'ok' | 'error') || 'unknown',
+        lastTestedAt: row.lastTestedAt,
+        lastError: row.lastError,
+        serverVersion: row.serverVersion,
         queryCount,
         tableCount,
+        ...(hasConfig ? { config: publicConfig } : {}),
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
     };
@@ -65,6 +90,10 @@ export function listDataSources(user?: PolicyUser): DataSourcePublic[] {
             slug: dataSources.slug,
             type: dataSources.type,
             config: dataSources.config,
+            status: dataSources.status,
+            lastTestedAt: dataSources.lastTestedAt,
+            lastError: dataSources.lastError,
+            serverVersion: dataSources.serverVersion,
             createdAt: dataSources.createdAt,
             updatedAt: dataSources.updatedAt,
             ownerName: users.name,
@@ -84,26 +113,54 @@ export function listDataSources(user?: PolicyUser): DataSourcePublic[] {
         .groupBy(dataSources.id, users.id)
         .all();
 
-    return rows.map((row) => {
-        let tableCount: number | null = null;
+    // Check schema cache for table counts
+    const allCaches = db.select().from(schemaCache).all();
+    const cacheMap = new Map<string, number>();
+    for (const c of allCaches) {
         try {
-            const connector = createConnector({
-                id: row.id,
-                ownerId: row.ownerId,
-                name: row.name,
-                slug: row.slug,
-                type: row.type,
-                config: row.config,
-                createdAt: row.createdAt,
-                updatedAt: row.updatedAt,
-            });
-            try {
-                tableCount = connector.getTables().length;
-            } finally {
-                connector.close();
-            }
+            const snap = JSON.parse(c.snapshot) as SchemaSnapshot;
+            cacheMap.set(c.dataSourceId, snap.tables?.length ?? 0);
         } catch {
-            tableCount = null;
+            // ignore
+        }
+    }
+
+    return rows.map((row) => {
+        let tableCount: number | null = cacheMap.get(row.id) ?? null;
+
+        if (tableCount === null && (row.type === 'sqlite' || row.type === 'csv')) {
+            try {
+                const connector = createConnector({
+                    id: row.id,
+                    ownerId: row.ownerId,
+                    name: row.name,
+                    slug: row.slug,
+                    type: row.type,
+                    config: row.config,
+                    status: row.status,
+                    lastTestedAt: row.lastTestedAt,
+                    lastError: row.lastError,
+                    serverVersion: row.serverVersion,
+                    createdAt: row.createdAt,
+                    updatedAt: row.updatedAt,
+                });
+                try {
+                    tableCount = connector.getTables ? (connector.getTables() as unknown as string[]).length : null;
+                } finally {
+                    connector.close?.();
+                }
+            } catch {
+                tableCount = null;
+            }
+        }
+
+        let publicConfig: Record<string, unknown> = {};
+        try {
+            const rawConfig = JSON.parse(row.config) as Record<string, unknown>;
+            const def = getConnectorDefinition(row.type);
+            publicConfig = toPublicConfig(def, rawConfig);
+        } catch {
+            // ignore
         }
 
         return {
@@ -119,8 +176,13 @@ export function listDataSources(user?: PolicyUser): DataSourcePublic[] {
                 : undefined,
             name: row.name,
             type: row.type as DataSourceType,
+            status: (row.status as 'unknown' | 'ok' | 'error') || 'unknown',
+            lastTestedAt: row.lastTestedAt,
+            lastError: row.lastError,
+            serverVersion: row.serverVersion,
             queryCount: Number(row.queryCount ?? 0),
             tableCount,
+            ...(Object.keys(publicConfig).length > 0 ? { config: publicConfig } : {}),
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
         };
@@ -143,25 +205,29 @@ export function getDataSourcePublic(id: string): DataSourcePublic {
         .where(eq(queries.dataSourceId, id))
         .get();
 
-    let tableCount: number | null = null;
-    try {
-        const connector = createConnector(row);
+    const cached = getCachedSchema(id);
+    let tableCount: number | null = cached?.tables?.length ?? null;
+
+    if (tableCount === null && (row.type === 'sqlite' || row.type === 'csv')) {
         try {
-            tableCount = connector.getTables().length;
-        } finally {
-            connector.close();
+            const connector = createConnector(row);
+            try {
+                tableCount = connector.getTables ? (connector.getTables() as unknown as string[]).length : null;
+            } finally {
+                connector.close?.();
+            }
+        } catch {
+            tableCount = null;
         }
-    } catch {
-        tableCount = null;
     }
     return toPublic(row, queryCountResult?.count ?? 0, tableCount);
 }
 
 export function createDataSource(
-    input: CreateDataSourceInput & { ownerId?: string | null; slug?: string },
+    input: CreateDataSourceInput & { ownerId?: string | null; slug?: string; status?: 'unknown' | 'ok' | 'error' },
     ownerId?: string | null
 ): DataSourcePublic {
-    const configJson = serializeDataSourceConfig(input.config);
+    const configJson = typeof input.config === 'string' ? input.config : serializeDataSourceConfig(input.config);
     const finalOwnerId = ownerId ?? input.ownerId ?? getDefaultOwnerId();
     const insertedId = newId();
 
@@ -173,6 +239,7 @@ export function createDataSource(
             slug: input.slug,
             type: input.type,
             config: configJson,
+            status: input.status || 'unknown',
         })
         .run();
 
@@ -202,10 +269,10 @@ export function createCsvDataSource(
             })
             .run();
     } catch (error) {
-        removeCsvDatabase(config.dbPath);
+        removeCsvDatabase(config.dbPath || config.managedPath || '');
         throw error;
     }
-    return { source: getDataSourcePublic(id), rowCount: config.rowCount };
+    return { source: getDataSourcePublic(id), rowCount: config.rowCount ?? 0 };
 }
 
 export function replaceCsvDataSource(
@@ -224,7 +291,8 @@ export function replaceCsvDataSource(
         .where(eq(dataSources.id, id))
         .run();
 
-    return { source: getDataSourcePublic(id), rowCount: config.rowCount };
+    void invalidateConnector(id);
+    return { source: getDataSourcePublic(id), rowCount: config.rowCount ?? 0 };
 }
 
 function removeCsvDatabase(dbPath: string): void {
@@ -239,7 +307,7 @@ function removeCsvDatabase(dbPath: string): void {
 
 export interface UpdateDataSourceInput {
     name?: string;
-    config?: { path: string };
+    config?: Record<string, unknown>;
 }
 
 export function updateDataSource(id: string, input: UpdateDataSourceInput): DataSourcePublic {
@@ -248,15 +316,85 @@ export function updateDataSource(id: string, input: UpdateDataSourceInput): Data
     const updates: Partial<DataSource> = {};
     if (input.name !== undefined) updates.name = input.name;
     if (input.config !== undefined) {
-        updates.config = serializeDataSourceConfig({
-            ...(JSON.parse(existing.config) as { path: string }),
-            ...input.config,
-        });
+        const def = getConnectorDefinition(existing.type);
+        let storedConfig: Record<string, unknown> = {};
+        try {
+            storedConfig = JSON.parse(existing.config) as Record<string, unknown>;
+        } catch {
+            // ignore
+        }
+        let mergedConfig = mergeStoredSecrets(def, input.config, storedConfig);
+        if (def) {
+            mergedConfig = encryptSecretFields(def, mergedConfig);
+        }
+        updates.config = JSON.stringify(mergedConfig);
+        updates.status = 'unknown';
     }
     updates.updatedAt = new Date();
 
     db.update(dataSources).set(updates).where(eq(dataSources.id, id)).run();
+    void invalidateConnector(id);
     return getDataSourcePublic(id);
+}
+
+export function updateDataSourceStatus(
+    id: string,
+    statusData: {
+        status: 'unknown' | 'ok' | 'error';
+        lastTestedAt?: Date;
+        serverVersion?: string | null;
+        lastError?: string | null;
+    }
+): void {
+    db.update(dataSources)
+        .set({
+            status: statusData.status,
+            lastTestedAt: statusData.lastTestedAt ?? new Date(),
+            serverVersion: statusData.serverVersion,
+            lastError: statusData.lastError,
+            updatedAt: new Date(),
+        })
+        .where(eq(dataSources.id, id))
+        .run();
+}
+
+export function getCachedSchema(dataSourceId: string): SchemaSnapshot | null {
+    const row = db.select().from(schemaCache).where(eq(schemaCache.dataSourceId, dataSourceId)).get();
+    if (!row) return null;
+    try {
+        return JSON.parse(row.snapshot) as SchemaSnapshot;
+    } catch {
+        return null;
+    }
+}
+
+export function getCachedSchemaWithMeta(dataSourceId: string): { snapshot: SchemaSnapshot; fetchedAt: Date } | null {
+    const row = db.select().from(schemaCache).where(eq(schemaCache.dataSourceId, dataSourceId)).get();
+    if (!row) return null;
+    try {
+        const snapshot = JSON.parse(row.snapshot) as SchemaSnapshot;
+        return { snapshot, fetchedAt: row.fetchedAt };
+    } catch {
+        return null;
+    }
+}
+
+export function setCachedSchema(dataSourceId: string, snapshot: SchemaSnapshot): void {
+    const json = JSON.stringify(snapshot);
+    db.insert(schemaCache)
+        .values({
+            dataSourceId,
+            snapshot: json,
+            fetchedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+            target: schemaCache.dataSourceId,
+            set: {
+                snapshot: json,
+                fetchedAt: new Date(),
+            },
+        })
+        .run();
 }
 
 export function getDependentQueries(id: string): { id: string; name: string }[] {
@@ -280,11 +418,26 @@ export function deleteDataSource(id: string): void {
     }
 
     if (source.type === 'csv') {
-        const config = csvSourceConfigSchema.parse(JSON.parse(source.config) as unknown);
-        removeCsvDatabase(config.dbPath);
+        try {
+            const config = JSON.parse(source.config) as Record<string, string>;
+            if (config.dbPath) removeCsvDatabase(config.dbPath);
+        } catch {
+            // ignore
+        }
+    }
+
+    // Clean up managed storage files if existing
+    const managedDir = getManagedDirForSource(id);
+    if (existsSync(managedDir)) {
+        try {
+            rmSync(managedDir, { recursive: true, force: true });
+        } catch {
+            // ignore
+        }
     }
 
     db.delete(dataSources).where(eq(dataSources.id, id)).run();
+    void invalidateConnector(id);
 }
 
 export interface BulkDeleteDataSourcesResult {
@@ -337,13 +490,22 @@ export function bulkDeleteDataSources(ids: string[], user?: PolicyUser): BulkDel
             } else {
                 if (source.type === 'csv') {
                     try {
-                        const config = csvSourceConfigSchema.parse(JSON.parse(source.config) as unknown);
-                        removeCsvDatabase(config.dbPath);
+                        const config = JSON.parse(source.config) as Record<string, string>;
+                        if (config.dbPath) removeCsvDatabase(config.dbPath);
                     } catch {
                         // ignore file deletion errors
                     }
                 }
+                const managedDir = getManagedDirForSource(id);
+                if (existsSync(managedDir)) {
+                    try {
+                        rmSync(managedDir, { recursive: true, force: true });
+                    } catch {
+                        // ignore
+                    }
+                }
                 db.delete(dataSources).where(eq(dataSources.id, id)).run();
+                void invalidateConnector(id);
                 deleted.push(id);
             }
         }

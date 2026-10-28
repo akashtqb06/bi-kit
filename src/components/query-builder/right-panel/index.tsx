@@ -28,10 +28,22 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   DatabaseIcon,
   ChevronDownIcon,
@@ -43,12 +55,15 @@ import {
   Code2Icon,
   SlidersHorizontalIcon,
   Loader2Icon,
+  LayersIcon,
+  FileSpreadsheetIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { defaultChartConfig } from "@src/lib/schemas";
 import { cn } from "@/lib/utils";
 import { useQueryEditorStore, cleanDefinitionForCompile } from "../store";
 import { getAvailableColumnsForStep } from "@src/lib/query-engine/infer-columns";
+import { getDialect } from "@src/lib/connectors/dialects";
 import { AddOperationPopover, type OperationType } from "./add-operation-popover";
 import { OperationRow } from "./operation-row";
 
@@ -97,6 +112,53 @@ export function RightPanel() {
   const [columnsOpen, setColumnsOpen] = useState(true);
   const [openTables, setOpenTables] = useState<Record<string, boolean>>({});
   const [isCreatingChart, setIsCreatingChart] = useState(false);
+  const [switchGuardOpen, setSwitchGuardOpen] = useState(false);
+  const [pendingSourceId, setPendingSourceId] = useState<string | null>(null);
+
+  const activeDs = useMemo(() => {
+    return dataSources.find((d) => d.id === dataSourceId);
+  }, [dataSources, dataSourceId]);
+
+  const activeDialect = useMemo(() => {
+    return getDialect(activeDs?.type);
+  }, [activeDs]);
+
+  const groupedDataSources = useMemo(() => {
+    const databases = dataSources.filter(
+      (d) => d.type === "postgres" || d.type === "postgresql" || d.type === "mysql" || d.type === "mssql"
+    );
+    const nosql = dataSources.filter((d) => d.type === "mongodb");
+    const files = dataSources.filter(
+      (d) => d.type === "sqlite" || d.type === "csv" || d.type === "excel"
+    );
+    return { databases, nosql, files };
+  }, [dataSources]);
+
+  const executeDataSourceSwitch = async (targetId: string) => {
+    await setDataSourceId(targetId);
+    const updatedSchema = useQueryEditorStore.getState().schema;
+    const currentDef = useQueryEditorStore.getState().definition;
+    if (currentDef.source.table && updatedSchema) {
+      const exists = updatedSchema.tables.some(
+        (t) => t.name.toLowerCase() === currentDef.source.table.toLowerCase()
+      );
+      if (!exists) {
+        toast.warning(
+          `Table "${currentDef.source.table}" was not found in the new data source. Please select a valid table.`
+        );
+      }
+    }
+  };
+
+  const handleDataSourceSelect = (targetId: string | null) => {
+    if (!targetId || targetId === dataSourceId) return;
+    if (mode === "sql" || mode === "pipeline") {
+      setPendingSourceId(targetId);
+      setSwitchGuardOpen(true);
+    } else {
+      void executeDataSourceSwitch(targetId);
+    }
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -244,9 +306,7 @@ export function RightPanel() {
             ) : (
               <Select
                 value={dataSourceId}
-                onValueChange={(val) => {
-                  if (val) void setDataSourceId(val);
-                }}
+                onValueChange={(val) => handleDataSourceSelect(val)}
                 items={dataSourceItems}
               >
                 <SelectTrigger className="h-8 text-xs bg-background w-full">
@@ -256,17 +316,62 @@ export function RightPanel() {
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  {dataSources.map((ds) => (
-                    <SelectItem key={ds.id} value={ds.id} className="text-xs">
-                      <span className="flex items-center gap-1.5 truncate">
-                        <DatabaseIcon className="size-3 text-muted-foreground shrink-0" />
-                        <span className="font-medium truncate">{ds.name}</span>
-                        <span className="text-[10px] text-muted-foreground uppercase shrink-0">
-                          ({ds.type})
-                        </span>
-                      </span>
-                    </SelectItem>
-                  ))}
+                  {groupedDataSources.databases.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider px-2 py-1">
+                        Databases
+                      </SelectLabel>
+                      {groupedDataSources.databases.map((ds) => (
+                        <SelectItem key={ds.id} value={ds.id} className="text-xs">
+                          <span className="flex items-center gap-1.5 truncate">
+                            <DatabaseIcon className="size-3 text-blue-500 shrink-0" />
+                            <span className="font-medium truncate">{ds.name}</span>
+                            <span className="text-[10px] text-muted-foreground uppercase shrink-0">
+                              ({ds.type})
+                            </span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
+
+                  {groupedDataSources.nosql.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider px-2 py-1">
+                        NoSQL
+                      </SelectLabel>
+                      {groupedDataSources.nosql.map((ds) => (
+                        <SelectItem key={ds.id} value={ds.id} className="text-xs">
+                          <span className="flex items-center gap-1.5 truncate">
+                            <LayersIcon className="size-3 text-emerald-500 shrink-0" />
+                            <span className="font-medium truncate">{ds.name}</span>
+                            <span className="text-[10px] text-muted-foreground uppercase shrink-0">
+                              ({ds.type})
+                            </span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
+
+                  {groupedDataSources.files.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider px-2 py-1">
+                        Files
+                      </SelectLabel>
+                      {groupedDataSources.files.map((ds) => (
+                        <SelectItem key={ds.id} value={ds.id} className="text-xs">
+                          <span className="flex items-center gap-1.5 truncate">
+                            <FileSpreadsheetIcon className="size-3 text-amber-500 shrink-0" />
+                            <span className="font-medium truncate">{ds.name}</span>
+                            <span className="text-[10px] text-muted-foreground uppercase shrink-0">
+                              ({ds.type})
+                            </span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
                 </SelectContent>
               </Select>
             )}
@@ -291,6 +396,7 @@ export function RightPanel() {
 
               <AddOperationPopover
                 hasSource={hasSource}
+                supportedOperations={["filter", "join", "mutate", "summarize", "select", "order", "limit"]}
                 onSelectOperation={handleSelectOperation}
               />
             </div>
@@ -375,7 +481,7 @@ export function RightPanel() {
                         <button
                           type="button"
                           className="flex items-center gap-1.5 font-medium text-left truncate flex-1 hover:text-primary transition-colors"
-                          onClick={() => insertSqlText(`"${table.name}"`)}
+                          onClick={() => insertSqlText(activeDialect.quoteIdent(table.name))}
                           title={`Click to insert "${table.name}" at cursor`}
                         >
                           <TableIcon className="size-3 text-muted-foreground shrink-0" />
@@ -404,7 +510,7 @@ export function RightPanel() {
                             <button
                               key={col.name}
                               type="button"
-                              onClick={() => insertSqlText(`"${col.name}"`)}
+                              onClick={() => insertSqlText(activeDialect.quoteIdent(col.name))}
                               className="flex items-center justify-between w-full py-1 px-1.5 rounded hover:bg-muted/50 text-[11px] text-muted-foreground hover:text-foreground font-mono"
                               title={`Click to insert "${col.name}" at cursor`}
                             >
@@ -568,6 +674,34 @@ export function RightPanel() {
           </Button>
         )}
       </div>
+      {/* Switch Data Source Confirmation Guard */}
+      <AlertDialog open={switchGuardOpen} onOpenChange={setSwitchGuardOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Switch Data Source?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Raw queries are not portable across database types. Your current query may not run against the new data source. Switch anyway?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingSourceId(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingSourceId) {
+                  const target = pendingSourceId;
+                  setPendingSourceId(null);
+                  setSwitchGuardOpen(false);
+                  void executeDataSourceSwitch(target);
+                }
+              }}
+            >
+              Switch Data Source
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

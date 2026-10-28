@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import { nanoid } from 'nanoid';
 import { compile, CompileError } from '@src/lib/query-engine/compiler';
+import { compileToPipeline } from '@src/lib/query-engine/mongo/compiler';
 import { inlineParams } from '@src/lib/query-engine/inline-params';
+import { getDialect } from '@src/lib/connectors/dialects';
 import type { QueryStep, QueryDefinition, FilterOp, AggFn } from '@src/lib/query-engine/definition';
 import type { SchemaInfo } from '@src/lib/connectors/types';
 import type { DataSourcePublic } from '@src/lib/data-sources/service';
@@ -33,7 +35,7 @@ export interface QueryEditorState {
     workbookId: string;
     queryName: string;
     dataSourceId: string;
-    mode: 'builder' | 'sql';
+    mode: 'builder' | 'sql' | 'pipeline';
     definition: ClientQueryDefinition;
     sql: string;
     compiledSql: string | null;
@@ -63,7 +65,7 @@ export interface QueryEditorState {
     loadSchema: (dataSourceId: string) => Promise<void>;
     setQueryName: (name: string) => void;
     setDataSourceId: (id: string) => Promise<void>;
-    setMode: (mode: 'builder' | 'sql') => void;
+    setMode: (mode: 'builder' | 'sql' | 'pipeline') => void;
     setSql: (sql: string) => void;
     setSourceTable: (table: string) => void;
     addStep: (type: QueryStep['type'] | 'convert') => void;
@@ -71,7 +73,9 @@ export interface QueryEditorState {
     removeStep: (index: number) => void;
     reorderSteps: (oldIndex: number, newIndex: number) => void;
     convertToSql: () => void;
+    convertToPipeline: () => void;
     switchToSqlMode: () => Promise<void>;
+    switchToPipelineMode: () => Promise<void>;
     switchToBuilderMode: () => Promise<void>;
     registerSqlInsertHandler: (fn: ((text: string) => void) | null) => void;
     insertSqlText: (text: string) => void;
@@ -86,7 +90,6 @@ export interface QueryEditorState {
 export function cleanDefinitionForCompile(def: ClientQueryDefinition): QueryDefinition {
     return {
         source: def.source,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         steps: def.steps.map(({ _id, ...rest }) => rest as QueryStep),
     };
 }
@@ -203,7 +206,7 @@ export const useQueryEditorStore = create<QueryEditorState>((set, get) => ({
         await get().loadSchema(id);
     },
 
-    setMode: (mode: 'builder' | 'sql') => {
+    setMode: (mode: 'builder' | 'sql' | 'pipeline') => {
         set({ mode, isDirty: true });
     },
 
@@ -404,15 +407,30 @@ export const useQueryEditorStore = create<QueryEditorState>((set, get) => ({
     },
 
     recompile: () => {
-        const { definition, schema } = get();
+        const { definition, schema, dataSources, dataSourceId } = get();
         if (!definition.source.table || !schema) {
             set({ compiledSql: null, compileError: null });
             return;
         }
 
+        const activeDs = dataSources.find((d) => d.id === dataSourceId);
+        if (activeDs?.type === 'mongodb') {
+            try {
+                const cleanDef = cleanDefinitionForCompile(definition);
+                const res = compileToPipeline(cleanDef, { schema }, activeDs?.serverVersion || undefined);
+                set({ compiledSql: JSON.stringify(res.pipeline, null, 2), compileError: null });
+            } catch (err) {
+                const message =
+                    err instanceof CompileError ? err.message : err instanceof Error ? err.message : 'Compilation failed';
+                set({ compiledSql: null, compileError: message });
+            }
+            return;
+        }
+
         try {
             const cleanDef = cleanDefinitionForCompile(definition);
-            const res = compile(cleanDef, { schema });
+            const dialect = getDialect(activeDs?.type);
+            const res = compile(cleanDef, { schema, dialect });
             set({ compiledSql: res.sql, compileError: null });
         } catch (err) {
             const message =
@@ -422,13 +440,15 @@ export const useQueryEditorStore = create<QueryEditorState>((set, get) => ({
     },
 
     convertToSql: () => {
-        const { definition, schema, compiledSql, sql } = get();
+        const { definition, schema, compiledSql, sql, dataSources, dataSourceId } = get();
         let targetSql = compiledSql || sql;
         try {
             if (definition.source.table && schema) {
                 const cleanDef = cleanDefinitionForCompile(definition);
-                const res = compile(cleanDef, { schema });
-                if (res.sql) targetSql = inlineParams(res.sql, res.params);
+                const activeDs = dataSources.find((d) => d.id === dataSourceId);
+                const dialect = getDialect(activeDs?.type);
+                const res = compile(cleanDef, { schema, dialect });
+                if (res.sql) targetSql = inlineParams(res.sql, res.params, dialect);
             }
         } catch {
             // fallback
@@ -440,20 +460,42 @@ export const useQueryEditorStore = create<QueryEditorState>((set, get) => ({
         });
     },
 
-    switchToSqlMode: async () => {
-        const { definition, schema, queryId, queryName, dataSourceId, sql } = get();
-        let targetSql = sql;
+    convertToPipeline: () => {
+        const { definition, schema, compiledSql, sql, dataSources, dataSourceId } = get();
+        let targetPipeline = compiledSql || sql;
         try {
             if (definition.source.table && schema) {
                 const cleanDef = cleanDefinitionForCompile(definition);
-                const res = compile(cleanDef, { schema });
-                if (res.sql) targetSql = inlineParams(res.sql, res.params);
+                const activeDs = dataSources.find((d) => d.id === dataSourceId);
+                const res = compileToPipeline(cleanDef, { schema }, activeDs?.serverVersion || undefined);
+                if (res.pipeline) targetPipeline = JSON.stringify(res.pipeline, null, 2);
+            }
+        } catch {
+            // fallback
+        }
+        set({
+            mode: 'pipeline',
+            sql: targetPipeline || '[]',
+            isDirty: true,
+        });
+    },
+
+    switchToSqlMode: async () => {
+        const { definition, schema, queryId, queryName, dataSourceId, sql, dataSources } = get();
+        let targetSql = sql;
+        const activeDs = dataSources.find((d) => d.id === dataSourceId);
+        const dialect = getDialect(activeDs?.type);
+        try {
+            if (definition.source.table && schema) {
+                const cleanDef = cleanDefinitionForCompile(definition);
+                const res = compile(cleanDef, { schema, dialect });
+                if (res.sql) targetSql = inlineParams(res.sql, res.params, dialect);
             }
         } catch {
             // fallback to existing sql
         }
         if (!targetSql.trim() && definition.source.table) {
-            targetSql = `SELECT * FROM "${definition.source.table}" LIMIT 100;`;
+            targetSql = dialect.paginate(`SELECT * FROM ${dialect.quoteIdent(definition.source.table)}`, 100, 0);
         }
         set({
             mode: 'sql',
@@ -472,6 +514,48 @@ export const useQueryEditorStore = create<QueryEditorState>((set, get) => ({
                         mode: 'sql',
                         definition: JSON.stringify(cleanDefinitionForCompile(definition)),
                         sql: targetSql,
+                    }),
+                });
+            } catch {
+                // ignore
+            }
+        }
+        void get().runQuery();
+    },
+
+    switchToPipelineMode: async () => {
+        const { definition, schema, queryId, queryName, dataSourceId, sql, dataSources } = get();
+        let targetPipeline = sql;
+        const activeDs = dataSources.find((d) => d.id === dataSourceId);
+        try {
+            if (definition.source.table && schema) {
+                const cleanDef = cleanDefinitionForCompile(definition);
+                const res = compileToPipeline(cleanDef, { schema }, activeDs?.serverVersion || undefined);
+                if (res.pipeline) targetPipeline = JSON.stringify(res.pipeline, null, 2);
+            }
+        } catch {
+            // fallback to existing sql
+        }
+        if (!targetPipeline.trim()) {
+            targetPipeline = '[\n  {\n    "$limit": 100\n  }\n]';
+        }
+        set({
+            mode: 'pipeline',
+            sql: targetPipeline,
+            isDirty: false,
+        });
+
+        if (queryId) {
+            try {
+                await fetch(`/api/queries/${queryId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: queryName,
+                        dataSourceId,
+                        mode: 'pipeline',
+                        definition: JSON.stringify(cleanDefinitionForCompile(definition)),
+                        sql: targetPipeline,
                     }),
                 });
             } catch {
@@ -546,7 +630,7 @@ export const useQueryEditorStore = create<QueryEditorState>((set, get) => ({
         }
 
         if (mode === 'builder' && !definition.source.table) {
-            const message = 'Please select a source table in the query builder.';
+            const message = 'Please select a source table or collection in the query builder.';
             if (isAutoRun) {
                 set({ isRunning: false });
             } else {
@@ -566,6 +650,21 @@ export const useQueryEditorStore = create<QueryEditorState>((set, get) => ({
             return;
         }
 
+        if (mode === 'pipeline') {
+            if (!definition.source.table) {
+                const message = 'Please select a target collection for the pipeline.';
+                set({ isRunning: false, runError: message });
+                if (!isAutoRun) toast.error(message);
+                return;
+            }
+            if (!sql.trim()) {
+                const message = 'Please enter an aggregation pipeline JSON.';
+                set({ isRunning: false, runError: message });
+                if (!isAutoRun) toast.error(message);
+                return;
+            }
+        }
+
         set({ isRunning: true, runError: null });
 
         try {
@@ -576,6 +675,15 @@ export const useQueryEditorStore = create<QueryEditorState>((set, get) => ({
                     dataSourceId,
                     mode: 'builder',
                     definition: cleanDefinitionForCompile(definition),
+                    page,
+                    pageSize,
+                };
+            } else if (mode === 'pipeline') {
+                body = {
+                    dataSourceId,
+                    mode: 'pipeline',
+                    collection: definition.source.table,
+                    pipeline: sql,
                     page,
                     pageSize,
                 };
@@ -651,7 +759,7 @@ export const useQueryEditorStore = create<QueryEditorState>((set, get) => ({
                     dataSourceId: dataSourceId || null,
                     mode,
                     definition: JSON.stringify(cleanDef),
-                    sql: mode === 'sql' ? sql : compiledSql || sql,
+                    sql: mode === 'sql' || mode === 'pipeline' ? sql : compiledSql || sql,
                 }),
             });
 

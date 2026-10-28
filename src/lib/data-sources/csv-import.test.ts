@@ -32,7 +32,7 @@ describe('CSV import', () => {
             originalFileName: 'Sales report.csv',
             rowCount: 2,
         });
-        const databasePath = path.resolve(process.cwd(), first.dbPath);
+        const databasePath = path.resolve(process.cwd(), (first.dbPath || first.managedPath)!);
         const database = new Database(databasePath, { readonly: true });
         try {
             const columns = database.prepare(`PRAGMA table_info("${first.tableName}")`).all() as {
@@ -53,7 +53,7 @@ describe('CSV import', () => {
 
         const replacement = importCsvToDatabase('New Value\n7\n', sourceId, 'New file.csv', first.dbPath);
         expect(replacement).toMatchObject({ tableName: 'new_file', rowCount: 1 });
-        const replacedDatabase = new Database(path.resolve(process.cwd(), replacement.dbPath), { readonly: true });
+        const replacedDatabase = new Database(path.resolve(process.cwd(), (replacement.dbPath || replacement.managedPath)!), { readonly: true });
         try {
             expect(replacedDatabase.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all()).toEqual([
                 { name: 'new_file' },

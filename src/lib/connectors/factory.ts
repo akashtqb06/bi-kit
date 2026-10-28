@@ -1,43 +1,73 @@
 import 'server-only';
 import * as fs from 'fs';
 import * as path from 'path';
-import { parseDataSourceConfig } from '@src/lib/db/json-helpers';
 import { type DataSource } from '@src/lib/db/schema';
 import { DATA_DIR } from '@src/lib/db/paths';
 import { ConnectorError, type Connector } from './types';
-import { SqliteConnector } from './sqlite-connector';
+import { SqliteConnector } from './drivers/sqlite';
+import { CsvConnector } from './drivers/csv';
+import { getConnectorDefinition } from './registry';
+import { decryptSecretFields } from './secrets';
 
 /**
  * Instantiate the correct Connector for a DataSource row.
  * The caller is responsible for calling connector.close() when done.
  */
 export function createConnector(source: DataSource): Connector {
-    const config = parseDataSourceConfig(source.config, source.type);
-
-    if (source.type === 'sqlite' && 'path' in config) {
-        return new SqliteConnector(resolveSourcePath(config.path));
+    const definition = getConnectorDefinition(source.type);
+    if (!definition) {
+        throw new ConnectorError(`Unknown data source type: ${String(source.type)}`, 'UNKNOWN_TYPE');
     }
 
-    if (source.type === 'csv' && 'dbPath' in config) {
-        return new SqliteConnector(resolveSourcePath(config.dbPath));
+    let configJson: Record<string, unknown> = {};
+    try {
+        configJson = JSON.parse(source.config) as Record<string, unknown>;
+    } catch {
+        throw new ConnectorError('DataSource configuration is not valid JSON.', 'INVALID_CONFIG');
     }
 
-    throw new ConnectorError(`Unknown data source type: ${String(source.type)}`, 'UNKNOWN_TYPE');
+    if (source.type === 'sqlite') {
+        const rawPath = (configJson.managedPath || configJson.path) as string | undefined;
+        if (rawPath) {
+            return new SqliteConnector(resolveSourcePath(rawPath));
+        }
+    }
+
+    if (source.type === 'csv') {
+        const rawPath = (configJson.managedPath || configJson.dbPath || configJson.path) as string | undefined;
+        if (rawPath) {
+            return new CsvConnector(resolveSourcePath(rawPath));
+        }
+    }
+
+    const decrypted = decryptSecretFields(definition, configJson);
+    const validated = definition.configSchema.parse(decrypted);
+    return definition.create(validated, { dataSourceId: source.id });
 }
 
 export function resolveSourcePath(filePath: string): string {
-    const resolvedPath = path.resolve(process.cwd(), filePath);
-    if (!fs.existsSync(resolvedPath)) {
+    // If path is already inside DATA_DIR
+    const candidatePath = path.isAbsolute(filePath)
+        ? filePath
+        : path.resolve(DATA_DIR, filePath);
+
+    if (!fs.existsSync(candidatePath)) {
+        // Try resolving relative to process.cwd() as legacy fallback
+        const cwdCandidate = path.resolve(process.cwd(), filePath);
+        if (fs.existsSync(cwdCandidate)) {
+            return verifyWithinDataDir(cwdCandidate);
+        }
         throw new ConnectorError('Data source file was not found.', 'SOURCE_NOT_FOUND');
     }
 
+    return verifyWithinDataDir(candidatePath);
+}
+
+function verifyWithinDataDir(filePath: string): string {
     try {
         const allowedDirectory = fs.realpathSync(DATA_DIR);
-        if (!isWithinDirectory(allowedDirectory, resolvedPath)) {
-            throw new Error();
-        }
+        const canonicalPath = fs.realpathSync(filePath);
 
-        const canonicalPath = fs.realpathSync(resolvedPath);
         if (!isWithinDirectory(allowedDirectory, canonicalPath)) {
             throw new Error();
         }

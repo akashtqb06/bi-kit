@@ -1,7 +1,8 @@
 /**
  * Query Engine Compiler
  * ---------------------
- * Compiles a QueryDefinition (JSON) into a parameterized SQLite SELECT.
+ * Compiles a QueryDefinition (JSON) into a parameterized SQL SELECT query
+ * tailored to a specific SqlDialect (SQLite, PostgreSQL, MySQL, MSSQL).
  *
  * Architecture:
  *   Each step appends a CTE so the final query is:
@@ -10,11 +11,12 @@
  *          ...
  *     SELECT * FROM __sN
  *
- * All user-supplied identifiers (table/column names) are double-quote escaped.
- * All filter values are bound as parameters — never interpolated.
+ * All user-supplied identifiers (table/column names) are dialect-quoted.
+ * All filter values are bound as parameters — never interpolated into SQL text.
  */
 
 import type { SchemaInfo, ColumnInfo } from "@src/lib/connectors/types";
+import { sqliteDialect, type SqlDialect } from "@src/lib/connectors/dialects";
 import {
   queryDefinitionSchema,
   type QueryDefinition,
@@ -27,7 +29,6 @@ import {
   type SelectStep,
   type OrderStep,
   type LimitStep,
-  type DateGrain,
   type AggFn,
 } from "./definition";
 
@@ -43,6 +44,7 @@ export interface CompileResult {
 export interface SchemaContext {
   /** Full schema from the connector */
   schema: SchemaInfo;
+  dialect?: SqlDialect;
 }
 
 export class CompileError extends Error {
@@ -50,14 +52,6 @@ export class CompileError extends Error {
     super(message);
     this.name = "CompileError";
   }
-}
-
-// ---------------------------------------------------------------------------
-// Identifier quoting (SQLite: double-quote, escape embedded double-quotes)
-// ---------------------------------------------------------------------------
-
-function q(name: string): string {
-  return '"' + name.replace(/"/g, '""') + '"';
 }
 
 // ---------------------------------------------------------------------------
@@ -100,51 +94,16 @@ interface CompilerState {
   stepIndex: number;
   /** The full data-source schema (for identifier validation) */
   schema: SchemaInfo;
+  /** The target SQL dialect */
+  dialect: SqlDialect;
 }
 
 function nextCteName(state: CompilerState): string {
   return `__s${state.stepIndex}`;
 }
 
-// ---------------------------------------------------------------------------
-// Date grain expression
-// ---------------------------------------------------------------------------
-
-function dateGrainExpr(col: string, grain: DateGrain): string {
-  // SQLite date functions
-  switch (grain) {
-    case "year":
-      return `strftime('%Y', ${col})`;
-    case "month":
-      return `strftime('%Y-%m', ${col})`;
-    case "week":
-      return `strftime('%Y-W%W', ${col})`;
-    case "day":
-      return `strftime('%Y-%m-%d', ${col})`;
-    case "hour":
-      return `strftime('%Y-%m-%d %H', ${col})`;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Aggregate function expression
-// ---------------------------------------------------------------------------
-
-function aggExpr(fn: AggFn, colExpr: string): string {
-  switch (fn) {
-    case "count":
-      return `COUNT(${colExpr})`;
-    case "sum":
-      return `SUM(${colExpr})`;
-    case "avg":
-      return `AVG(${colExpr})`;
-    case "min":
-      return `MIN(${colExpr})`;
-    case "max":
-      return `MAX(${colExpr})`;
-    case "count_distinct":
-      return `COUNT(DISTINCT ${colExpr})`;
-  }
+function q(name: string, state: CompilerState): string {
+  return state.dialect.quoteIdent(name);
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +123,7 @@ function compileFilterItem(
     );
   }
 
-  const colExpr = q(column);
+  const colExpr = q(column, state);
 
   switch (op) {
     case "is null":
@@ -180,7 +139,8 @@ function compileFilterItem(
     case "<":
     case "<=": {
       state.params.push(value);
-      return `${colExpr} ${op} ?`;
+      const ph = state.dialect.placeholder(state.params.length);
+      return `${colExpr} ${op} ${ph}`;
     }
 
     case "in":
@@ -190,19 +150,23 @@ function compileFilterItem(
           `Operator "${op}" requires a non-empty array value for column "${column}".`
         );
       }
-      const placeholders = (value as unknown[]).map(() => "?").join(", ");
-      state.params.push(...(value as unknown[]));
+      const placeholders = (value as unknown[]).map((v) => {
+        state.params.push(v);
+        return state.dialect.placeholder(state.params.length);
+      }).join(", ");
       return `${colExpr} ${op === "in" ? "IN" : "NOT IN"} (${placeholders})`;
     }
 
     case "contains": {
       state.params.push(`%${String(value)}%`);
-      return `${colExpr} LIKE ?`;
+      const ph = state.dialect.placeholder(state.params.length);
+      return state.dialect.containsExpr(colExpr, ph, true);
     }
 
     case "starts with": {
       state.params.push(`${String(value)}%`);
-      return `${colExpr} LIKE ?`;
+      const ph = state.dialect.placeholder(state.params.length);
+      return `${colExpr} LIKE ${ph}`;
     }
 
     case "between": {
@@ -211,8 +175,11 @@ function compileFilterItem(
           `Operator "between" requires [low, high] for column "${column}".`
         );
       }
-      state.params.push((value as unknown[])[0], (value as unknown[])[1]);
-      return `${colExpr} BETWEEN ? AND ?`;
+      state.params.push((value as unknown[])[0]);
+      const p1 = state.dialect.placeholder(state.params.length);
+      state.params.push((value as unknown[])[1]);
+      const p2 = state.dialect.placeholder(state.params.length);
+      return `${colExpr} BETWEEN ${p1} AND ${p2}`;
     }
   }
 }
@@ -225,7 +192,6 @@ function compileJoin(step: JoinStep, state: CompilerState): void {
   assertTableExists(step.table, state.schema);
   const joinCols = getTableColumns(step.table, state.schema);
 
-  // Validate join columns exist on both sides
   for (const cond of step.on) {
     if (!state.columns.includes(cond.left)) {
       throw new CompileError(
@@ -242,19 +208,18 @@ function compileJoin(step: JoinStep, state: CompilerState): void {
   const cteName = nextCteName(state);
   const joinKeyword = step.joinType === "inner" ? "INNER JOIN" : "LEFT JOIN";
   const onClause = step.on
-    .map((cond) => `${q(state.currentCte)}.${q(cond.left)} = ${q(step.table)}.${q(cond.right)}`)
+    .map((cond) => `${q(state.currentCte, state)}.${q(cond.left, state)} = ${q(step.table, state)}.${q(cond.right, state)}`)
     .join(" AND ");
 
-  // After join, available columns = existing + join table columns (unqualified)
   const newCols = joinCols.map((c) => c.name);
   const mergedCols = [...state.columns, ...newCols.filter((c) => !state.columns.includes(c))];
 
   const selectList = [
-    ...state.columns.map((c) => `${q(state.currentCte)}.${q(c)}`),
-    ...newCols.map((c) => `${q(step.table)}.${q(c)} AS ${q(c)}`),
+    ...state.columns.map((c) => `${q(state.currentCte, state)}.${q(c, state)}`),
+    ...newCols.map((c) => `${q(step.table, state)}.${q(c, state)} AS ${q(c, state)}`),
   ].join(", ");
 
-  const body = `SELECT ${selectList} FROM ${q(state.currentCte)} ${joinKeyword} ${q(step.table)} ON ${onClause}`;
+  const body = `SELECT ${selectList} FROM ${q(state.currentCte, state)} ${joinKeyword} ${q(step.table, state)} ON ${onClause}`;
 
   state.ctes.push({ name: cteName, body });
   state.currentCte = cteName;
@@ -270,22 +235,19 @@ function compileFilter(step: FilterStep, state: CompilerState): void {
   const whereClause = fragments.join(` ${logic.toUpperCase()} `);
 
   const cteName = nextCteName(state);
-  const body = `SELECT * FROM ${q(state.currentCte)} WHERE ${whereClause}`;
+  const body = `SELECT * FROM ${q(state.currentCte, state)} WHERE ${whereClause}`;
 
   state.ctes.push({ name: cteName, body });
   state.currentCte = cteName;
   state.stepIndex++;
-  // columns unchanged
 }
 
 function compileMutate(step: MutateStep, state: CompilerState): void {
   const cteName = nextCteName(state);
 
-  // expression may reference columns from the current CTE; we trust it's
-  // valid SQL since it's a freeform expression validated at parse-time by length
-  const otherCols = state.columns.filter((c) => c !== step.name).map((c) => q(c));
-  const selectList = [...otherCols, `(${step.expression}) AS ${q(step.name)}`].join(", ");
-  const body = `SELECT ${selectList} FROM ${q(state.currentCte)}`;
+  const otherCols = state.columns.filter((c) => c !== step.name).map((c) => q(c, state));
+  const selectList = [...otherCols, `(${step.expression}) AS ${q(step.name, state)}`].join(", ");
+  const body = `SELECT ${selectList} FROM ${q(state.currentCte, state)}`;
 
   state.ctes.push({ name: cteName, body });
   state.currentCte = cteName;
@@ -296,7 +258,6 @@ function compileMutate(step: MutateStep, state: CompilerState): void {
 }
 
 function compileSummarize(step: SummarizeStep, state: CompilerState): void {
-  // Validate groupBy columns
   for (const gb of step.groupBy) {
     if (!state.columns.includes(gb.column)) {
       throw new CompileError(
@@ -305,7 +266,6 @@ function compileSummarize(step: SummarizeStep, state: CompilerState): void {
     }
   }
 
-  // Validate aggregate columns
   for (const agg of step.aggregates) {
     if (agg.fn !== "count" && !state.columns.includes(agg.column)) {
       throw new CompileError(
@@ -314,32 +274,29 @@ function compileSummarize(step: SummarizeStep, state: CompilerState): void {
     }
   }
 
-  // Build SELECT list
   const groupByExprs = step.groupBy.map((gb) => {
-    const colExpr = q(gb.column);
+    const colExpr = q(gb.column, state);
     if (gb.dateGrain) {
-      return `${dateGrainExpr(colExpr, gb.dateGrain)} AS ${q(gb.column)}`;
+      return `${state.dialect.dateTruncExpr(colExpr, gb.dateGrain)} AS ${q(gb.column, state)}`;
     }
-    return `${colExpr} AS ${q(gb.column)}`;
+    return `${colExpr} AS ${q(gb.column, state)}`;
   });
 
   const aggExprs = step.aggregates.map((agg) => {
-    const colExpr = agg.fn === "count" && agg.column === "*" ? "*" : q(agg.column);
-    return `${aggExpr(agg.fn, colExpr)} AS ${q(agg.alias)}`;
+    const colExpr = agg.fn === "count" && agg.column === "*" ? "*" : q(agg.column, state);
+    return `${state.dialect.aggregateExpr(agg.fn as AggFn, colExpr)} AS ${q(agg.alias, state)}`;
   });
 
   const selectList = [...groupByExprs, ...aggExprs].join(", ");
 
-  // GROUP BY clause (use column position for grains to avoid re-quoting issues)
   const groupByClause =
     step.groupBy.length > 0
       ? ` GROUP BY ${step.groupBy.map((_, i) => i + 1).join(", ")}`
       : "";
 
   const cteName = nextCteName(state);
-  const body = `SELECT ${selectList} FROM ${q(state.currentCte)}${groupByClause}`;
+  const body = `SELECT ${selectList} FROM ${q(state.currentCte, state)}${groupByClause}`;
 
-  // New column set = groupBy aliases + aggregate aliases
   const newCols = [
     ...step.groupBy.map((gb) => gb.column),
     ...step.aggregates.map((agg) => agg.alias),
@@ -361,8 +318,8 @@ function compileSelect(step: SelectStep, state: CompilerState): void {
   }
 
   const cteName = nextCteName(state);
-  const selectList = step.columns.map((c) => q(c)).join(", ");
-  const body = `SELECT ${selectList} FROM ${q(state.currentCte)}`;
+  const selectList = step.columns.map((c) => q(c, state)).join(", ");
+  const body = `SELECT ${selectList} FROM ${q(state.currentCte, state)}`;
 
   state.ctes.push({ name: cteName, body });
   state.currentCte = cteName;
@@ -381,9 +338,13 @@ function compileOrder(step: OrderStep, state: CompilerState): void {
 
   const cteName = nextCteName(state);
   const orderClause = step.items
-    .map((item) => `${q(item.column)} ${item.dir.toUpperCase()}`)
+    .map((item) => `${q(item.column, state)} ${item.dir.toUpperCase()}`)
     .join(", ");
-  const body = `SELECT * FROM ${q(state.currentCte)} ORDER BY ${orderClause}`;
+
+  // If dialect forbids ORDER BY in intermediate CTEs (e.g. MSSQL), use TOP 100 PERCENT
+  const body = state.dialect.supportsOrderByInCte
+    ? `SELECT * FROM ${q(state.currentCte, state)} ORDER BY ${orderClause}`
+    : `SELECT TOP 100 PERCENT * FROM ${q(state.currentCte, state)} ORDER BY ${orderClause}`;
 
   state.ctes.push({ name: cteName, body });
   state.currentCte = cteName;
@@ -392,7 +353,9 @@ function compileOrder(step: OrderStep, state: CompilerState): void {
 
 function compileLimit(step: LimitStep, state: CompilerState): void {
   const cteName = nextCteName(state);
-  const body = `SELECT * FROM ${q(state.currentCte)} LIMIT ${step.value}`;
+  const body = state.dialect.name === 'mssql'
+    ? `SELECT TOP ${step.value} * FROM ${q(state.currentCte, state)}`
+    : `SELECT * FROM ${q(state.currentCte, state)} LIMIT ${step.value}`;
 
   state.ctes.push({ name: cteName, body });
   state.currentCte = cteName;
@@ -403,36 +366,26 @@ function compileLimit(step: LimitStep, state: CompilerState): void {
 // Main compile function
 // ---------------------------------------------------------------------------
 
-/**
- * Compile a raw (unknown) query definition object into parameterized SQL.
- *
- * @param rawDefinition - The definition object (will be Zod-validated internally)
- * @param schemaContext - Schema of the data source for identifier validation
- * @returns { sql, params } ready to execute via SqliteConnector.execute()
- * @throws CompileError on validation or structural errors
- * @throws ZodError on schema validation failures
- */
 export function compile(
   rawDefinition: unknown,
-  schemaContext: SchemaContext
+  schemaContext: SchemaContext,
+  explicitDialect?: SqlDialect
 ): CompileResult {
-  // Parse + validate the definition shape
   const definition: QueryDefinition = queryDefinitionSchema.parse(rawDefinition);
   const { schema } = schemaContext;
+  const dialect: SqlDialect = explicitDialect ?? schemaContext.dialect ?? sqliteDialect;
 
-  // Validate the source table exists
   assertTableExists(definition.source.table, schema);
   const sourceColumns = getTableColumns(definition.source.table, schema).map(
     (c) => c.name
   );
 
-  // Build initial state: CTE 0 = source table
   const initialCteName = "__s0";
   const state: CompilerState = {
     ctes: [
       {
         name: initialCteName,
-        body: `SELECT * FROM ${q(definition.source.table)}`,
+        body: `SELECT * FROM ${dialect.quoteIdent(definition.source.table)}`,
       },
     ],
     params: [],
@@ -440,19 +393,18 @@ export function compile(
     columns: sourceColumns,
     stepIndex: 1,
     schema,
+    dialect,
   };
 
-  // Compile each step in order
   for (const step of definition.steps) {
     compileStep(step, state);
   }
 
-  // Assemble final SQL
   const cteClause = state.ctes
-    .map(({ name, body }) => `${q(name)} AS (\n  ${body}\n)`)
+    .map(({ name, body }) => `${dialect.quoteIdent(name)} AS (\n  ${body}\n)`)
     .join(",\n");
 
-  const sql = `WITH ${cteClause}\nSELECT * FROM ${q(state.currentCte)}`;
+  const sql = `WITH ${cteClause}\nSELECT * FROM ${dialect.quoteIdent(state.currentCte)}`;
 
   return { sql, params: state.params };
 }
@@ -482,4 +434,3 @@ function compileStep(step: QueryStep, state: CompilerState): void {
       break;
   }
 }
-

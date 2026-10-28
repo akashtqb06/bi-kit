@@ -4,6 +4,7 @@ import * as runQueryApi from '@src/app/api/queries/run/route';
 import { db } from '@src/lib/db/client';
 import { dataSources } from '@src/lib/db/schema';
 import { createConnector } from '@src/lib/connectors/factory';
+import type { SqliteConnector } from '@src/lib/connectors/sqlite-connector';
 import { getDataSource } from '@src/lib/data-sources/service';
 
 vi.mock('@src/lib/auth/session', async (importOriginal) => {
@@ -47,9 +48,9 @@ describe('Frappe Insights Query View flow verification', () => {
         const sampleDs = allDs.find((d) => d.name.toLowerCase().includes('demo') || d.name.toLowerCase().includes('sample'));
         expect(sampleDs).toBeDefined();
 
-        const connector = createConnector(getDataSource(sampleDs!.id));
+        const connector = createConnector(getDataSource(sampleDs!.id)) as SqliteConnector;
         const schema = connector.getSchema();
-        connector.close();
+        await connector.close();
 
         expect(schema.tables.some((t) => t.name === 'orders')).toBe(true);
 

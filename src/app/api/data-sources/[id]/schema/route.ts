@@ -1,29 +1,62 @@
-import { NextResponse } from "next/server";
-import { getDataSource } from "@src/lib/data-sources/service";
-import { createConnector } from "@src/lib/connectors/factory";
-import { handleApiError } from "@src/app/api/utils";
-import { requireUserApi, assertCan } from "@src/lib/auth/dal";
+import { NextResponse } from 'next/server';
+import { getDataSource, getCachedSchemaWithMeta, setCachedSchema } from '@src/lib/data-sources/service';
+import { getConnector } from '@src/lib/connectors/manager';
+import { handleApiError } from '@src/app/api/utils';
+import { requireUserApi, assertCan } from '@src/lib/auth/dal';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
 export async function GET(
-  _req: Request,
-  { params }: RouteParams
+    req: Request,
+    { params }: RouteParams
 ): Promise<NextResponse> {
-  try {
-    const user = await requireUserApi();
-    const { id } = await params;
-    const source = getDataSource(id);
-    assertCan(user, "edit", { type: "data_source", id, ownerId: source.ownerId });
-    const connector = createConnector(source);
     try {
-      const schema = connector.getSchema();
-      return NextResponse.json({ data: schema });
-    } finally {
-      connector.close();
-    }
-  } catch (err) {
-    return handleApiError(err);
-  }
-}
+        const user = await requireUserApi();
+        const { id } = await params;
+        const source = getDataSource(id);
+        assertCan(user, 'view', { type: 'data_source', id, ownerId: source.ownerId });
 
+        const url = new URL(req.url);
+        const refresh = url.searchParams.get('refresh') === '1' || url.searchParams.get('refresh') === 'true';
+        const sampleSizeParam = url.searchParams.get('sampleSize');
+        const sampleSize = sampleSizeParam ? parseInt(sampleSizeParam, 10) : undefined;
+
+        if (refresh) {
+            assertCan(user, 'edit', { type: 'data_source', id, ownerId: source.ownerId });
+        }
+
+        // 1. Check cached schema if refresh is not requested
+        if (!refresh) {
+            const cached = getCachedSchemaWithMeta(id);
+            if (cached) {
+                return NextResponse.json({
+                    data: {
+                        ...cached.snapshot,
+                        fetchedAt: cached.fetchedAt.toISOString(),
+                    },
+                    meta: {
+                        fetchedAt: cached.fetchedAt.toISOString(),
+                    },
+                });
+            }
+        }
+
+        // 2. Introspect via connector
+        const connector = await getConnector(source);
+        const snapshot = await connector.introspect({ sampleSize });
+        setCachedSchema(id, snapshot);
+
+        const fetchedAt = new Date().toISOString();
+        return NextResponse.json({
+            data: {
+                ...snapshot,
+                fetchedAt,
+            },
+            meta: {
+                fetchedAt,
+            },
+        });
+    } catch (err) {
+        return handleApiError(err);
+    }
+}

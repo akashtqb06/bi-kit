@@ -28,6 +28,7 @@ export function SourceForm({
   const [selectedTable, setSelectedTable] = useState(currentTable);
 
   const tables = schema?.tables || [];
+  const isCollection = tables.some((t) => t.kind === "collection");
 
   const handleSave = () => {
     if (selectedTable) {
@@ -40,7 +41,7 @@ export function SourceForm({
     <div className="space-y-4">
       <div className="space-y-2">
         <label className="text-xs font-medium text-muted-foreground">
-          Source Table
+          {isCollection ? "Source Collection" : "Source Table"}
         </label>
         <Select
           value={selectedTable}
@@ -53,7 +54,7 @@ export function SourceForm({
           }}
         >
           <SelectTrigger className="h-9 w-full text-xs">
-            <SelectValue placeholder="Select a table..." />
+            <SelectValue placeholder={isCollection ? "Select a collection..." : "Select a table..."} />
           </SelectTrigger>
           <SelectContent>
             {tables.map((table) => (
@@ -62,7 +63,7 @@ export function SourceForm({
                   <DatabaseIcon className="size-3.5 text-muted-foreground" />
                   <span className="font-medium">{table.name}</span>
                   <span className="text-[10px] text-muted-foreground">
-                    ({table.columns.length} columns)
+                    ({table.columns.length} {isCollection ? "fields" : "columns"})
                   </span>
                 </span>
               </SelectItem>

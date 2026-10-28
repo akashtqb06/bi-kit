@@ -5,34 +5,36 @@ import { z } from 'zod';
 // ---------------------------------------------------------------------------
 
 export const sqliteSourceConfigSchema = z.object({
-    path: z.string().min(1, 'File path is required'),
+    path: z.string().min(1, 'File path is required').optional(),
+    managedPath: z.string().optional(),
+    serverPath: z.string().optional(),
+    fileName: z.string().optional(),
+    size: z.number().optional(),
+    importedAt: z.string().optional(),
 });
 
 export const csvSourceConfigSchema = z.object({
-    dbPath: z.string().min(1),
-    tableName: z.string().min(1),
-    originalFileName: z.string().min(1),
-    rowCount: z.number().int().nonnegative(),
+    dbPath: z.string().optional(),
+    managedPath: z.string().optional(),
+    tableName: z.string().optional(),
+    originalFileName: z.string().optional(),
+    fileName: z.string().optional(),
+    rowCount: z.number().int().nonnegative().optional(),
 });
 
-export const dataSourceTypeSchema = z.enum(['sqlite', 'csv']);
+export const dataSourceTypeSchema = z.string().min(1);
 
-export const createDataSourceSchema = z.discriminatedUnion('type', [
-    z.object({
-        name: z.string().min(1).max(255),
-        type: z.literal('sqlite'),
-        config: sqliteSourceConfigSchema,
-    }),
-    z.object({
-        name: z.string().min(1).max(255),
-        type: z.literal('csv'),
-        config: csvSourceConfigSchema,
-    }),
-]);
+export const createDataSourceSchema = z.object({
+    name: z.string().min(1).max(255),
+    type: z.string().min(1),
+    config: z.union([z.record(z.string(), z.unknown()), z.string()]).optional(),
+    previewToken: z.string().optional(),
+    options: z.record(z.string(), z.unknown()).optional(),
+});
 
 export const updateDataSourceSchema = z.object({
     name: z.string().min(1).max(255).optional(),
-    config: sqliteSourceConfigSchema.optional(),
+    config: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const bulkDeleteDataSourcesSchema = z.object({
@@ -104,7 +106,7 @@ export type DeleteFolderMode = z.infer<typeof deleteFolderModeSchema>;
 // Query
 // ---------------------------------------------------------------------------
 
-const queryModeSchema = z.enum(['builder', 'sql']);
+const queryModeSchema = z.enum(['builder', 'sql', 'pipeline']);
 
 export const createQuerySchema = z.object({
     workbookId: z.string().min(1),

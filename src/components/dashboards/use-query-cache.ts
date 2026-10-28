@@ -27,7 +27,7 @@ const STALE_TIME_MS = 60_000;
 interface QueryDefinition {
   id: string;
   dataSourceId: string | null;
-  mode: "builder" | "sql";
+  mode: "builder" | "sql" | "pipeline";
   definition: string;
   sql: string;
 }

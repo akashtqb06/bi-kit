@@ -61,9 +61,29 @@ export function StatusBar() {
     runQuery,
     clearResults,
     dataSourceId,
+    dataSources,
+    definition,
     switchToSqlMode,
+    switchToPipelineMode,
     switchToBuilderMode,
+    convertToSql,
+    convertToPipeline,
   } = useQueryEditorStore();
+
+  const activeDs = useMemo(() => {
+    return dataSources.find((d) => d.id === dataSourceId);
+  }, [dataSources, dataSourceId]);
+
+  const isMongo = activeDs?.type === "mongodb";
+
+  const dialectLabel = useMemo(() => {
+    if (!activeDs) return "SQL";
+    if (activeDs.type === "mongodb") return "Pipeline";
+    if (activeDs.type === "postgres" || activeDs.type === "postgresql") return "SQL (PostgreSQL)";
+    if (activeDs.type === "mysql") return "SQL (MySQL)";
+    if (activeDs.type === "mssql") return "SQL (SQL Server)";
+    return "SQL (SQLite)";
+  }, [activeDs]);
 
   const [tick, setTick] = useState(0);
   const [sqlDialogOpen, setSqlDialogOpen] = useState(false);
@@ -95,14 +115,19 @@ export function StatusBar() {
   }, [lastRunAt, tick]);
 
   const displaySql = useMemo(() => {
+    if (isMongo) {
+      const coll = definition.source.table || "collection";
+      const pipe = (mode === "builder" ? compiledSql : sql) || "[]";
+      return `db.${coll}.aggregate(${pipe})`;
+    }
     return (mode === "builder" ? compiledSql : sql) || "-- No SQL generated";
-  }, [mode, compiledSql, sql]);
+  }, [isMongo, mode, compiledSql, sql, definition.source.table]);
 
   const handleCopySql = () => {
     if (!displaySql) return;
     navigator.clipboard.writeText(displaySql);
     setSqlCopied(true);
-    toast.success("SQL copied to clipboard");
+    toast.success(isMongo ? "Pipeline copied to clipboard" : "SQL copied to clipboard");
     setTimeout(() => setSqlCopied(false), 2000);
   };
 
@@ -152,6 +177,8 @@ export function StatusBar() {
 
     if (selected === "builder") {
       setConfirmBuilderOpen(true);
+    } else if (selected === "pipeline") {
+      void switchToPipelineMode();
     } else if (selected === "sql") {
       void switchToSqlMode();
     }
@@ -192,7 +219,7 @@ export function StatusBar() {
           )}
         </div>
 
-        {/* Center: Mode ToggleGroup "Builder | SQL" */}
+        {/* Center: Mode ToggleGroup "Builder | SQL/Pipeline" */}
         <div className="flex items-center justify-center shrink-0">
           <ToggleGroup
             value={[mode]}
@@ -208,11 +235,11 @@ export function StatusBar() {
               Builder
             </ToggleGroupItem>
             <ToggleGroupItem
-              value="sql"
+              value={isMongo ? "pipeline" : "sql"}
               className="h-6 px-2.5 text-xs font-medium gap-1.5 data-pressed:bg-background data-pressed:text-foreground data-pressed:shadow-xs"
             >
               <Code2Icon className="size-3" />
-              SQL
+              {dialectLabel}
             </ToggleGroupItem>
           </ToggleGroup>
         </div>
@@ -269,10 +296,16 @@ export function StatusBar() {
               </DropdownMenuItem>
 
               {mode === "builder" ? (
-                <DropdownMenuItem onClick={() => void switchToSqlMode()}>
-                  <Code2Icon className="mr-2 size-3.5 text-muted-foreground" />
-                  Switch to SQL Mode
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem onClick={() => void (isMongo ? switchToPipelineMode() : switchToSqlMode())}>
+                    <Code2Icon className="mr-2 size-3.5 text-muted-foreground" />
+                    {isMongo ? "Switch to Pipeline Mode" : "Switch to SQL Mode"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => void (isMongo ? convertToPipeline() : convertToSql())}>
+                    <Code2Icon className="mr-2 size-3.5 text-muted-foreground" />
+                    {isMongo ? "Convert to Pipeline" : "Convert to SQL"}
+                  </DropdownMenuItem>
+                </>
               ) : (
                 <DropdownMenuItem onClick={() => setConfirmBuilderOpen(true)}>
                   <SlidersHorizontalIcon className="mr-2 size-3.5 text-muted-foreground" />
@@ -284,11 +317,11 @@ export function StatusBar() {
 
               <DropdownMenuItem onClick={() => setSqlDialogOpen(true)}>
                 <Code2Icon className="mr-2 size-3.5 text-muted-foreground" />
-                View SQL
+                {isMongo ? "View Pipeline" : "View SQL"}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleCopySql}>
                 <CopyIcon className="mr-2 size-3.5 text-muted-foreground" />
-                Copy SQL
+                {isMongo ? "Copy Pipeline" : "Copy SQL"}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleExportCsv} disabled={!results}>
                 <DownloadIcon className="mr-2 size-3.5 text-muted-foreground" />
@@ -308,13 +341,15 @@ export function StatusBar() {
         </div>
       </div>
 
-      {/* SQL Confirmation Dialog when switching from SQL to Builder */}
+      {/* Confirmation Dialog when switching to Builder */}
       <AlertDialog open={confirmBuilderOpen} onOpenChange={setConfirmBuilderOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Return to Builder Mode</AlertDialogTitle>
             <AlertDialogDescription>
-              SQL changes will be lost, return to the last builder definition?
+              {isMongo
+                ? "Pipeline changes will be lost, return to the last builder definition?"
+                : "SQL changes will be lost, return to the last builder definition?"}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -337,13 +372,15 @@ export function StatusBar() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* SQL View Dialog */}
+      {/* SQL / Pipeline View Dialog */}
       <Dialog open={sqlDialogOpen} onOpenChange={setSqlDialogOpen}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Generated SQL</DialogTitle>
+            <DialogTitle>{isMongo ? "Generated MongoDB Pipeline" : "Generated SQL"}</DialogTitle>
             <DialogDescription>
-              The parameterized SQL query compiled from your operations.
+              {isMongo
+                ? "The MongoDB aggregation pipeline compiled from your operations."
+                : "The parameterized SQL query compiled from your operations."}
             </DialogDescription>
           </DialogHeader>
 
@@ -365,7 +402,7 @@ export function StatusBar() {
               ) : (
                 <CopyIcon className="size-3.5" />
               )}
-              {sqlCopied ? "Copied" : "Copy SQL"}
+              {sqlCopied ? "Copied" : isMongo ? "Copy Pipeline" : "Copy SQL"}
             </Button>
             <Button
               size="sm"

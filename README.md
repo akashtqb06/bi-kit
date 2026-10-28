@@ -7,6 +7,7 @@ A modern, local-first Business Intelligence (BI) and analytics platform inspired
 ## Highlights
 
 - **Visual Query Builder & Direct SQL**: Build multi-step analytical pipelines (*Join*, *Filter*, *Mutate*, *Summarize*, *Order*, *Limit*) or write raw `SELECT` queries with read-only security guards.
+- **Pluggable Connectors**: Connect to PostgreSQL, MySQL/MariaDB, Microsoft SQL Server, MongoDB, CSV, Excel, and SQLite files with automated schema introspection and connection pooling.
 - **Rich Visualizations**: Interactive Bar, Line, Area, Pie, KPI Number Cards, and Data Tables backed by shadcn charts and Recharts.
 - **Drag-and-Drop Dashboards**: 12-column grid powered by `react-grid-layout` with date range and categorical cross-filtering.
 - **Local-First & Safe**: Zero SQL string interpolation, strict read-only execution boundaries, and isolated SQLite storage.
@@ -79,6 +80,7 @@ pnpm user:reset-password  # CLI script to reset any account's password and revok
 For comprehensive documentation, including detailed architecture diagrams, database workflows, troubleshooting, and project structure:
 
 📖 **[Full Setup & Developer Guide (docs/SETUP.md)](docs/SETUP.md)**  
+🔌 **[Connectors Guide & Development Reference (docs/CONNECTORS.md)](docs/CONNECTORS.md)**  
 📋 **[Product Specification & Acceptance Criteria (docs/SPEC.md)](docs/SPEC.md)**  
 🧹 **[Code Cleanup & Audit Report (docs/cleanup-report.md)](docs/cleanup-report.md)**
 

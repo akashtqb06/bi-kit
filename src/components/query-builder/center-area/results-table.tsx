@@ -36,6 +36,7 @@ import {
   FileTextIcon,
   DatabaseIcon,
   PlayIcon,
+  AlertTriangleIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryEditorStore } from "../store";
@@ -188,6 +189,16 @@ export function ResultsTable() {
     <div className="flex-1 min-h-0 p-3 flex flex-col overflow-hidden bg-muted/10">
       {/* Rounded border card containing table with horizontal & vertical scroll */}
       <div className="flex-1 min-h-0 rounded-lg border bg-card overflow-hidden flex flex-col relative shadow-xs">
+        {/* Truncation notice banner */}
+        {!isRunning && results && results.truncated && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-800 dark:text-amber-400 text-xs shrink-0 select-none">
+            <AlertTriangleIcon className="size-3.5 shrink-0" />
+            <span className="font-medium">
+              Result set truncated to {results.rowCount.toLocaleString()} rows (maximum query limit reached).
+            </span>
+          </div>
+        )}
+
         {/* Loading state */}
         {isRunning && (
           <div className="p-4 space-y-3">

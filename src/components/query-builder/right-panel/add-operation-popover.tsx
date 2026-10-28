@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   PlusIcon,
   DatabaseIcon,
@@ -21,7 +22,7 @@ import {
   CodeIcon,
   RefreshCwIcon,
 } from "lucide-react";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 
 export type OperationType =
   | "source"
@@ -41,49 +42,61 @@ interface OperationOption {
   description: string;
   icon: React.ComponentType<{ className?: string }>;
   disabled?: boolean;
+  disabledReason?: string;
   comingSoon?: boolean;
 }
 
 interface AddOperationPopoverProps {
   hasSource: boolean;
+  supportedOperations?: string[];
   onSelectOperation: (type: OperationType) => void;
 }
 
 export function AddOperationPopover({
   hasSource,
+  supportedOperations,
   onSelectOperation,
 }: AddOperationPopoverProps) {
   const [open, setOpen] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
 
+  const isOpSupported = (opName: string): boolean => {
+    if (!supportedOperations) return true;
+    return supportedOperations.includes(opName);
+  };
+
   const options: OperationOption[] = [
     {
       type: "source",
       title: "Select Source",
-      description: "Select a table or query to start building your query",
+      description: "Select a table or collection to start your query",
       icon: DatabaseIcon,
-      disabled: hasSource, // Only enabled when query has no operations
+      disabled: hasSource,
+      disabledReason: hasSource ? "Source is already selected" : undefined,
     },
     {
       type: "select",
       title: "Choose Columns",
       description: "Show or hide columns from the table",
       icon: CheckSquareIcon,
-      disabled: !hasSource,
+      disabled: !hasSource || !isOpSupported("select"),
+      disabledReason: !hasSource ? "Select a source first" : !isOpSupported("select") ? "Not supported by this data source" : undefined,
     },
     {
       type: "filter",
       title: "Filter Rows",
       description: "Filter rows based on columns or expressions",
       icon: FilterIcon,
-      disabled: !hasSource,
+      disabled: !hasSource || !isOpSupported("filter"),
+      disabledReason: !hasSource ? "Select a source first" : !isOpSupported("filter") ? "Not supported by this data source" : undefined,
     },
     {
       type: "join",
       title: "Join Table",
       description: "Join this table with another table or query",
       icon: GitMergeIcon,
-      disabled: !hasSource,
+      disabled: !hasSource || !isOpSupported("join"),
+      disabledReason: !hasSource ? "Select a source first" : !isOpSupported("join") ? "Not supported by this data source" : undefined,
     },
     {
       type: "append",
@@ -91,6 +104,7 @@ export function AddOperationPopover({
       description: "Append this table with another table or query",
       icon: RowsIcon,
       disabled: true,
+      disabledReason: "Coming soon",
       comingSoon: true,
     },
     {
@@ -98,21 +112,24 @@ export function AddOperationPopover({
       title: "Add New Column",
       description: "Add a new column based on existing columns",
       icon: CalculatorIcon,
-      disabled: !hasSource,
+      disabled: !hasSource || !isOpSupported("mutate"),
+      disabledReason: !hasSource ? "Select a source first" : !isOpSupported("mutate") ? "Not supported by this data source" : undefined,
     },
     {
       type: "convert",
       title: "Convert Type",
       description: "Cast column to Datetime, Integer, Decimal, or Text",
       icon: RefreshCwIcon,
-      disabled: !hasSource,
+      disabled: !hasSource || !isOpSupported("mutate"),
+      disabledReason: !hasSource ? "Select a source first" : !isOpSupported("mutate") ? "Not supported by this data source" : undefined,
     },
     {
       type: "summarize",
       title: "Group & Summarize",
       description: "Group rows by columns and summarize the data",
       icon: SigmaIcon,
-      disabled: !hasSource,
+      disabled: !hasSource || !isOpSupported("summarize"),
+      disabledReason: !hasSource ? "Select a source first" : !isOpSupported("summarize") ? "Not supported by this data source" : undefined,
     },
     {
       type: "pivot",
@@ -120,15 +137,15 @@ export function AddOperationPopover({
       description: "Spreading column values into separate columns",
       icon: Grid3X3Icon,
       disabled: true,
+      disabledReason: "Coming soon",
       comingSoon: true,
     },
     {
       type: "custom",
-      title: "Custom Operation",
-      description: "Apply a custom operation using python script",
+      title: "Custom SQL / Pipeline",
+      description: "Switch to raw query editor mode",
       icon: CodeIcon,
-      disabled: true,
-      comingSoon: true,
+      disabled: false,
     },
   ];
 
@@ -200,14 +217,13 @@ export function AddOperationPopover({
           >
             {options.map((op) => {
               const Icon = op.icon;
-              return (
+              const buttonNode = (
                 <button
-                  key={op.type}
                   type="button"
                   disabled={op.disabled}
                   onClick={() => handleSelect(op)}
                   className={cn(
-                    "flex flex-col text-left p-2.5 rounded-lg border transition-all select-none group",
+                    "flex flex-col text-left p-2.5 rounded-lg border transition-all select-none group w-full",
                     op.disabled
                       ? "opacity-45 bg-muted/20 border-border cursor-not-allowed"
                       : "bg-card hover:bg-accent/60 hover:border-foreground/20 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -245,6 +261,19 @@ export function AddOperationPopover({
                   </p>
                 </button>
               );
+
+              if (op.disabled && op.disabledReason) {
+                return (
+                  <Tooltip key={op.type}>
+                    <TooltipTrigger render={<div className="w-full cursor-not-allowed">{buttonNode}</div>} />
+                    <TooltipContent side="top" className="text-xs">
+                      {op.disabledReason}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              }
+
+              return <React.Fragment key={op.type}>{buttonNode}</React.Fragment>;
             })}
           </div>
         </div>
@@ -252,4 +281,3 @@ export function AddOperationPopover({
     </Popover>
   );
 }
-

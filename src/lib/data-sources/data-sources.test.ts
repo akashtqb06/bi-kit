@@ -44,6 +44,7 @@ import {
 } from './service';
 import { ensureSampleDataSource } from './sample';
 import { createConnector } from '@src/lib/connectors/factory';
+import type { SqliteConnector } from '@src/lib/connectors/sqlite-connector';
 import { ConflictError } from '@src/lib/connectors/types';
 import * as testApi from '@src/app/api/data-sources/[id]/test/route';
 import * as detailApi from '@src/app/api/data-sources/[id]/route';
@@ -66,7 +67,7 @@ describe('Data Sources Service & Table Integration', () => {
         expect(found?.tableCount).toBeGreaterThanOrEqual(1);
     });
 
-    it('creates a CSV data source, tests connection, and lists table count', () => {
+    it('creates a CSV data source, tests connection, and lists table count', async () => {
         const csvContent = `id,name,value\n1,alpha,100\n2,beta,200\n3,gamma,300`;
         const { source, rowCount } = createCsvDataSource({
             name: 'Test Sales CSV',
@@ -81,11 +82,11 @@ describe('Data Sources Service & Table Integration', () => {
         // Test connection
         const fullSource = db.select().from(dataSources).where(eq(dataSources.id, source.id)).get();
         expect(fullSource).toBeDefined();
-        const connector = createConnector(fullSource!);
+        const connector = createConnector(fullSource!) as SqliteConnector;
         expect(() => connector.testConnection()).not.toThrow();
         const tables = connector.getTables();
         expect(tables.length).toBe(1);
-        connector.close();
+        await connector.close();
 
         // Check listDataSources reflects tableCount
         const list = listDataSources();

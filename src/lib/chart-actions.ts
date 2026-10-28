@@ -74,6 +74,7 @@ export async function refreshChart(chartId: string, customRefetch?: RefetchFn): 
                 mode: q.mode,
                 definition: q.definition,
                 sql: q.sql,
+                refresh: true,
             }),
         });
 
