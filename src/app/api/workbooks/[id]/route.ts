@@ -15,9 +15,9 @@ export async function GET(_req: Request, { params }: RouteParams): Promise<NextR
   try {
     const user = await requireUserApi();
     const { id } = await params;
-    const wb = getWorkbook(id);
+    const wb = await getWorkbook(id);
     assertCan(user, "view", { type: "workbook", id, ownerId: wb.ownerId });
-    return NextResponse.json({ data: getWorkbookPublic(id) });
+    return NextResponse.json({ data: await getWorkbookPublic(id) });
   } catch (err) {
     return handleApiError(err);
   }
@@ -27,11 +27,11 @@ export async function PUT(req: Request, { params }: RouteParams): Promise<NextRe
   try {
     const user = await requireUserApi();
     const { id } = await params;
-    const wb = getWorkbook(id);
+    const wb = await getWorkbook(id);
     assertCan(user, "edit", { type: "workbook", id, ownerId: wb.ownerId });
     const body: unknown = await req.json();
     const input = updateWorkbookSchema.parse(body);
-    return NextResponse.json({ data: updateWorkbook(id, input) });
+    return NextResponse.json({ data: await updateWorkbook(id, input) });
   } catch (err) {
     return handleApiError(err);
   }
@@ -41,12 +41,11 @@ export async function DELETE(_req: Request, { params }: RouteParams): Promise<Ne
   try {
     const user = await requireUserApi();
     const { id } = await params;
-    const wb = getWorkbook(id);
+    const wb = await getWorkbook(id);
     assertCan(user, "delete", { type: "workbook", id, ownerId: wb.ownerId });
-    deleteWorkbook(id);
+    await deleteWorkbook(id);
     return NextResponse.json({ data: { ok: true } });
   } catch (err) {
     return handleApiError(err);
   }
 }
-

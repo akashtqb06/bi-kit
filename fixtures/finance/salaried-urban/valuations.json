@@ -1,0 +1,222 @@
+[
+  {
+    "id": "val_mf_krtbbq363ndtwekc",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2024-10-28",
+    "value": 6700000,
+    "costBasis": 6500000,
+    "note": "Monthly NAV valuation update 2024-10",
+    "createdAt": "2024-10-28T18:00:00Z",
+    "updatedAt": "2024-10-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_k6rdm6vawj555nc3",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2024-11-28",
+    "value": 8468000,
+    "costBasis": 8000000,
+    "note": "Monthly NAV valuation update 2024-11",
+    "createdAt": "2024-11-28T18:00:00Z",
+    "updatedAt": "2024-11-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_m72bu4uxoxr70iq0",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2024-12-28",
+    "value": 10095020,
+    "costBasis": 9500000,
+    "note": "Monthly NAV valuation update 2024-12",
+    "createdAt": "2024-12-28T18:00:00Z",
+    "updatedAt": "2024-12-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_af3369xi9g1d3hg4",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2025-01-28",
+    "value": 11746445,
+    "costBasis": 11000000,
+    "note": "Monthly NAV valuation update 2025-01",
+    "createdAt": "2025-01-28T18:00:00Z",
+    "updatedAt": "2025-01-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_880wwqgbyaiustj1",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2025-02-28",
+    "value": 13422641,
+    "costBasis": 12500000,
+    "note": "Monthly NAV valuation update 2025-02",
+    "createdAt": "2025-02-28T18:00:00Z",
+    "updatedAt": "2025-02-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_dxragk6mbgn2wpua",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2025-03-28",
+    "value": 15123980,
+    "costBasis": 14000000,
+    "note": "Monthly NAV valuation update 2025-03",
+    "createdAt": "2025-03-28T18:00:00Z",
+    "updatedAt": "2025-03-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_kwb9d6y3hnb3ci8r",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2025-04-28",
+    "value": 16850839,
+    "costBasis": 15500000,
+    "note": "Monthly NAV valuation update 2025-04",
+    "createdAt": "2025-04-28T18:00:00Z",
+    "updatedAt": "2025-04-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_iaieingknf9kbhe5",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2025-06-28",
+    "value": 19955064,
+    "costBasis": 18500000,
+    "note": "Monthly NAV valuation update 2025-06",
+    "createdAt": "2025-06-28T18:00:00Z",
+    "updatedAt": "2025-06-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_3x2nay90hwmy1lef",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2025-07-28",
+    "value": 21754389,
+    "costBasis": 20000000,
+    "note": "Monthly NAV valuation update 2025-07",
+    "createdAt": "2025-07-28T18:00:00Z",
+    "updatedAt": "2025-07-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fq6vag1sah0wykk7",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2025-08-28",
+    "value": 23580704,
+    "costBasis": 21500000,
+    "note": "Monthly NAV valuation update 2025-08",
+    "createdAt": "2025-08-28T18:00:00Z",
+    "updatedAt": "2025-08-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_mcovpdolb2xyyeuh",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2025-09-28",
+    "value": 25434414,
+    "costBasis": 23000000,
+    "note": "Monthly NAV valuation update 2025-09",
+    "createdAt": "2025-09-28T18:00:00Z",
+    "updatedAt": "2025-09-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_vw2ekv7o7w427n9d",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2025-10-28",
+    "value": 27951790,
+    "costBasis": 24500000,
+    "note": "Monthly NAV valuation update 2025-10",
+    "createdAt": "2025-10-28T18:00:00Z",
+    "updatedAt": "2025-10-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_ka6omw14zmccm69n",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2025-11-28",
+    "value": 30569861,
+    "costBasis": 26000000,
+    "note": "Monthly NAV valuation update 2025-11",
+    "createdAt": "2025-11-28T18:00:00Z",
+    "updatedAt": "2025-11-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_qsh5hvaotdkou77c",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2025-12-28",
+    "value": 32528408,
+    "costBasis": 27500000,
+    "note": "Monthly NAV valuation update 2025-12",
+    "createdAt": "2025-12-28T18:00:00Z",
+    "updatedAt": "2025-12-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_huw99ogb8jrgx6ta",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2026-02-28",
+    "value": 36534079,
+    "costBasis": 30500000,
+    "note": "Monthly NAV valuation update 2026-02",
+    "createdAt": "2026-02-28T18:00:00Z",
+    "updatedAt": "2026-02-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_wai26da5ehhyxl92",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2026-03-28",
+    "value": 38582090,
+    "costBasis": 32000000,
+    "note": "Monthly NAV valuation update 2026-03",
+    "createdAt": "2026-03-28T18:00:00Z",
+    "updatedAt": "2026-03-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_remdoxfe1fekpaeg",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2026-04-28",
+    "value": 40660821,
+    "costBasis": 33500000,
+    "note": "Monthly NAV valuation update 2026-04",
+    "createdAt": "2026-04-28T18:00:00Z",
+    "updatedAt": "2026-04-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_95ueibza27u7imor",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2026-05-28",
+    "value": 41754212,
+    "costBasis": 35000000,
+    "note": "Monthly NAV valuation update 2026-05",
+    "createdAt": "2026-05-28T18:00:00Z",
+    "updatedAt": "2026-05-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_9wshrhl8532msbpv",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2026-06-28",
+    "value": 43880525,
+    "costBasis": 36500000,
+    "note": "Monthly NAV valuation update 2026-06",
+    "createdAt": "2026-06-28T18:00:00Z",
+    "updatedAt": "2026-06-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_du0rx8wld8483vmp",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2026-07-28",
+    "value": 46038732,
+    "costBasis": 38000000,
+    "note": "Monthly NAV valuation update 2026-07",
+    "createdAt": "2026-07-28T18:00:00Z",
+    "updatedAt": "2026-07-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_wddk59c7suctb0xq",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2026-08-28",
+    "value": 48229312,
+    "costBasis": 39500000,
+    "note": "Monthly NAV valuation update 2026-08",
+    "createdAt": "2026-08-28T18:00:00Z",
+    "updatedAt": "2026-08-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_zcaq8uzzgzzou516",
+    "accountId": "acc_mf_sip_o0sl4uocpd624a95",
+    "date": "2026-09-28",
+    "value": 50452751,
+    "costBasis": 41000000,
+    "note": "Monthly NAV valuation update 2026-09",
+    "createdAt": "2026-09-28T18:00:00Z",
+    "updatedAt": "2026-09-28T18:00:00Z"
+  }
+]

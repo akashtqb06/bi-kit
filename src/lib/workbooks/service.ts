@@ -32,10 +32,10 @@ export interface WorkbookWithCounts extends WorkbookPublic {
   dashboardCount: number;
 }
 
-function getDefaultOwnerId(): string | null {
-  const admin = db.select({ id: users.id }).from(users).where(eq(users.role, "admin")).limit(1).get();
+async function getDefaultOwnerId(): Promise<string | null> {
+  const [admin] = await db.select({ id: users.id }).from(users).where(eq(users.role, "admin")).limit(1);
   if (admin) return admin.id;
-  const anyUser = db.select({ id: users.id }).from(users).limit(1).get();
+  const [anyUser] = await db.select({ id: users.id }).from(users).limit(1);
   if (anyUser) return anyUser.id;
   return null;
 }
@@ -78,7 +78,7 @@ function toPublicWithCounts(
 // Service functions
 // ---------------------------------------------------------------------------
 
-export function listWorkbooks(user?: PolicyUser): WorkbookWithCounts[] {
+export async function listWorkbooks(user?: PolicyUser): Promise<WorkbookWithCounts[]> {
   let queryBuilder = db
     .select({
       id: workbooks.id,
@@ -104,10 +104,9 @@ export function listWorkbooks(user?: PolicyUser): WorkbookWithCounts[] {
     queryBuilder = queryBuilder.where(eq(workbooks.ownerId, user.id)) as typeof queryBuilder;
   }
 
-  const rows = queryBuilder
+  const rows = await queryBuilder
     .groupBy(workbooks.id, users.id)
-    .orderBy(workbooks.createdAt)
-    .all();
+    .orderBy(workbooks.createdAt);
 
   return rows.map((row) => ({
     id: row.id,
@@ -133,106 +132,98 @@ export function listWorkbooks(user?: PolicyUser): WorkbookWithCounts[] {
   }));
 }
 
-export function getWorkbook(id: string): Workbook {
-  const row = db.select().from(workbooks).where(eq(workbooks.id, id)).get();
+export async function getWorkbook(id: string): Promise<Workbook> {
+  const [row] = await db.select().from(workbooks).where(eq(workbooks.id, id)).limit(1);
   if (!row) throw new NotFoundError(`Workbook "${id}" not found.`);
   return row;
 }
 
-export function getWorkbookPublic(id: string): WorkbookPublic {
-  const wb = getWorkbook(id);
-  const fList = listFolders(id);
+export async function getWorkbookPublic(id: string): Promise<WorkbookPublic> {
+  const wb = await getWorkbook(id);
+  const fList = await listFolders(id);
   return toPublic(wb, fList);
 }
 
-export function createWorkbook(
+export async function createWorkbook(
   input: CreateWorkbookInput & { ownerId?: string | null; slug?: string },
   ownerId?: string | null
-): WorkbookPublic {
-  const finalOwnerId = ownerId ?? input.ownerId ?? getDefaultOwnerId();
+): Promise<WorkbookPublic> {
+  const finalOwnerId = ownerId ?? input.ownerId ?? (await getDefaultOwnerId());
   const insertedId = newId();
 
-  db.insert(workbooks)
-    .values({
-      id: insertedId,
-      ownerId: finalOwnerId!,
-      name: input.name,
-      slug: input.slug,
-      description: input.description ?? "",
-    })
-    .run();
+  await db.insert(workbooks).values({
+    id: insertedId,
+    ownerId: finalOwnerId!,
+    name: input.name,
+    slug: input.slug,
+    description: input.description ?? "",
+  });
 
-  const row = getWorkbook(insertedId);
+  const row = await getWorkbook(insertedId);
   return toPublic(row);
 }
 
-export function updateWorkbook(
+export async function updateWorkbook(
   id: string,
   input: Partial<CreateWorkbookInput>
-): WorkbookPublic {
-  getWorkbook(id); // throws if missing
-  const updates: Partial<Workbook> = { updatedAt: new Date() };
+): Promise<WorkbookPublic> {
+  await getWorkbook(id); // throws if missing
+  const updates: Partial<typeof workbooks.$inferInsert> = { updatedAt: new Date() };
   if (input.name !== undefined) updates.name = input.name;
   if (input.description !== undefined) updates.description = input.description;
-  db.update(workbooks).set(updates).where(eq(workbooks.id, id)).run();
-  return getWorkbookPublic(id);
+  await db.update(workbooks).set(updates).where(eq(workbooks.id, id));
+  return await getWorkbookPublic(id);
 }
 
-export function duplicateWorkbook(id: string, customName?: string, ownerId?: string): WorkbookWithCounts {
-  const source = getWorkbook(id);
-  const sourceFolders = db.select().from(folders).where(eq(folders.workbookId, id)).all();
-  const sourceQueries = db.select().from(queries).where(eq(queries.workbookId, id)).all();
-  const sourceCharts = db.select().from(charts).where(eq(charts.workbookId, id)).all();
-  const sourceDashboards = db.select().from(dashboards).where(eq(dashboards.workbookId, id)).all();
+export async function duplicateWorkbook(id: string, customName?: string, ownerId?: string): Promise<WorkbookWithCounts> {
+  const source = await getWorkbook(id);
+  const sourceFolders = await db.select().from(folders).where(eq(folders.workbookId, id));
+  const sourceQueries = await db.select().from(queries).where(eq(queries.workbookId, id));
+  const sourceCharts = await db.select().from(charts).where(eq(charts.workbookId, id));
+  const sourceDashboards = await db.select().from(dashboards).where(eq(dashboards.workbookId, id));
 
   const newWorkbookId = newId();
   const newName = customName?.trim() || `${source.name} (Copy)`;
   const finalOwnerId = ownerId ?? source.ownerId;
 
-  db.transaction((tx) => {
-    tx.insert(workbooks)
-      .values({
-        id: newWorkbookId,
-        ownerId: finalOwnerId,
-        name: newName,
-        description: source.description,
-      })
-      .run();
+  await db.transaction(async (tx) => {
+    await tx.insert(workbooks).values({
+      id: newWorkbookId,
+      ownerId: finalOwnerId,
+      name: newName,
+      description: source.description,
+    });
 
     const folderIdMap = new Map<string, string>();
     for (const f of sourceFolders) {
       const newFolderId = newId();
       folderIdMap.set(f.id, newFolderId);
-      tx.insert(folders)
-        .values({
-          id: newFolderId,
-          workbookId: newWorkbookId,
-          kind: f.kind,
-          name: f.name,
-          parentId: f.parentId ? (folderIdMap.get(f.parentId) ?? null) : null,
-          position: f.position,
-        })
-        .run();
+      await tx.insert(folders).values({
+        id: newFolderId,
+        workbookId: newWorkbookId,
+        kind: f.kind,
+        name: f.name,
+        parentId: f.parentId ? (folderIdMap.get(f.parentId) ?? null) : null,
+        position: f.position,
+      });
     }
 
     const queryIdMap = new Map<string, string>();
     for (const q of sourceQueries) {
       const newQueryId = newId();
       queryIdMap.set(q.id, newQueryId);
-      tx.insert(queries)
-        .values({
-          id: newQueryId,
-          workbookId: newWorkbookId,
-          name: q.name,
-          dataSourceId: q.dataSourceId,
-          mode: q.mode,
-          definition: q.definition,
-          sql: q.sql,
-          folderId: q.folderId ? (folderIdMap.get(q.folderId) ?? null) : null,
-          position: q.position,
-          createdBy: finalOwnerId,
-        })
-        .run();
+      await tx.insert(queries).values({
+        id: newQueryId,
+        workbookId: newWorkbookId,
+        name: q.name,
+        dataSourceId: q.dataSourceId,
+        mode: q.mode,
+        definition: q.definition,
+        sql: q.sql,
+        folderId: q.folderId ? (folderIdMap.get(q.folderId) ?? null) : null,
+        position: q.position,
+        createdBy: finalOwnerId,
+      });
     }
 
     const chartIdMap = new Map<string, string>();
@@ -240,57 +231,62 @@ export function duplicateWorkbook(id: string, customName?: string, ownerId?: str
       const newChartId = newId();
       chartIdMap.set(c.id, newChartId);
       const mappedQueryId = queryIdMap.get(c.queryId) ?? c.queryId;
-      tx.insert(charts)
-        .values({
-          id: newChartId,
-          workbookId: newWorkbookId,
-          queryId: mappedQueryId,
-          name: c.name,
-          type: c.type,
-          config: c.config,
-          folderId: c.folderId ? (folderIdMap.get(c.folderId) ?? null) : null,
-          position: c.position,
-          createdBy: finalOwnerId,
-        })
-        .run();
+      await tx.insert(charts).values({
+        id: newChartId,
+        workbookId: newWorkbookId,
+        queryId: mappedQueryId,
+        name: c.name,
+        type: c.type,
+        config: c.config,
+        folderId: c.folderId ? (folderIdMap.get(c.folderId) ?? null) : null,
+        position: c.position,
+        createdBy: finalOwnerId,
+      });
     }
 
     for (const d of sourceDashboards) {
       const newDashboardId = newId();
       let updatedLayout = d.layout;
-      try {
-        const layoutItems = JSON.parse(d.layout);
-        if (Array.isArray(layoutItems)) {
-          const remapped = layoutItems.map((item: Record<string, unknown>) => {
-            if (item && typeof item.chartId === "string" && chartIdMap.has(item.chartId)) {
-              return { ...item, chartId: chartIdMap.get(item.chartId) };
-            }
-            return item;
-          });
-          updatedLayout = JSON.stringify(remapped);
+      if (Array.isArray(d.layout)) {
+        updatedLayout = d.layout.map((item: Record<string, unknown>) => {
+          if (item && typeof item.chartId === "string" && chartIdMap.has(item.chartId)) {
+            return { ...item, chartId: chartIdMap.get(item.chartId) };
+          }
+          return item;
+        });
+      } else if (typeof d.layout === 'string') {
+        try {
+          const layoutItems = JSON.parse(d.layout);
+          if (Array.isArray(layoutItems)) {
+            const remapped = layoutItems.map((item: Record<string, unknown>) => {
+              if (item && typeof item.chartId === "string" && chartIdMap.has(item.chartId)) {
+                return { ...item, chartId: chartIdMap.get(item.chartId) };
+              }
+              return item;
+            });
+            updatedLayout = remapped;
+          }
+        } catch {
+          // preserve layout
         }
-      } catch {
-        // preserve layout string if parse fails
       }
 
-      tx.insert(dashboards)
-        .values({
-          id: newDashboardId,
-          workbookId: newWorkbookId,
-          ownerId: finalOwnerId,
-          name: d.name,
-          layout: updatedLayout,
-          filters: d.filters,
-          autoRefresh: d.autoRefresh,
-          folderId: d.folderId ? (folderIdMap.get(d.folderId) ?? null) : null,
-          position: d.position,
-          createdBy: finalOwnerId,
-        })
-        .run();
+      await tx.insert(dashboards).values({
+        id: newDashboardId,
+        workbookId: newWorkbookId,
+        ownerId: finalOwnerId,
+        name: d.name,
+        layout: updatedLayout,
+        filters: d.filters,
+        autoRefresh: d.autoRefresh,
+        folderId: d.folderId ? (folderIdMap.get(d.folderId) ?? null) : null,
+        position: d.position,
+        createdBy: finalOwnerId,
+      });
     }
   });
 
-  const created = getWorkbook(newWorkbookId);
+  const created = await getWorkbook(newWorkbookId);
   return toPublicWithCounts(created, {
     queriesCount: sourceQueries.length,
     chartsCount: sourceCharts.length,
@@ -298,37 +294,40 @@ export function duplicateWorkbook(id: string, customName?: string, ownerId?: str
   });
 }
 
-export function bulkDeleteWorkbooks(ids: string[], user?: PolicyUser): void {
+export async function bulkDeleteWorkbooks(ids: string[], user?: PolicyUser): Promise<void> {
   if (ids.length === 0) return;
 
   const targetIds = user && user.role !== "admin"
-    ? db.select({ id: workbooks.id }).from(workbooks).where(and(inArray(workbooks.id, ids), eq(workbooks.ownerId, user.id))).all().map(r => r.id)
+    ? (await db.select({ id: workbooks.id }).from(workbooks).where(and(inArray(workbooks.id, ids), eq(workbooks.ownerId, user.id)))).map(r => r.id)
     : ids;
   if (targetIds.length === 0) return;
 
-  db.transaction((tx) => {
-    tx.delete(dashboards).where(inArray(dashboards.workbookId, targetIds)).run();
-    tx.delete(charts).where(inArray(charts.workbookId, targetIds)).run();
-    tx.delete(queries).where(inArray(queries.workbookId, targetIds)).run();
-    tx.delete(folders).where(inArray(folders.workbookId, targetIds)).run();
-    tx.delete(workbooks).where(inArray(workbooks.id, targetIds)).run();
+  await db.transaction(async (tx) => {
+    await tx.delete(dashboards).where(inArray(dashboards.workbookId, targetIds));
+    await tx.delete(charts).where(inArray(charts.workbookId, targetIds));
+    await tx.delete(queries).where(inArray(queries.workbookId, targetIds));
+    await tx.delete(folders).where(inArray(folders.workbookId, targetIds));
+    await tx.delete(workbooks).where(inArray(workbooks.id, targetIds));
   });
 }
 
-export function deleteWorkbook(id: string): void {
-  getWorkbook(id); // throws if missing
+export async function deleteWorkbook(id: string): Promise<void> {
+  await getWorkbook(id); // throws if missing
 
   // Reject if child records exist
-  if (db.select().from(queries).where(eq(queries.workbookId, id)).get()) {
+  const [hasQueries] = await db.select().from(queries).where(eq(queries.workbookId, id)).limit(1);
+  if (hasQueries) {
     throw new ConflictError("Cannot delete: workbook has queries. Delete them first.");
   }
-  if (db.select().from(charts).where(eq(charts.workbookId, id)).get()) {
+  const [hasCharts] = await db.select().from(charts).where(eq(charts.workbookId, id)).limit(1);
+  if (hasCharts) {
     throw new ConflictError("Cannot delete: workbook has charts. Delete them first.");
   }
-  if (db.select().from(dashboards).where(eq(dashboards.workbookId, id)).get()) {
+  const [hasDashboards] = await db.select().from(dashboards).where(eq(dashboards.workbookId, id)).limit(1);
+  if (hasDashboards) {
     throw new ConflictError("Cannot delete: workbook has dashboards. Delete them first.");
   }
 
-  db.delete(folders).where(eq(folders.workbookId, id)).run();
-  db.delete(workbooks).where(eq(workbooks.id, id)).run();
+  await db.delete(folders).where(eq(folders.workbookId, id));
+  await db.delete(workbooks).where(eq(workbooks.id, id));
 }

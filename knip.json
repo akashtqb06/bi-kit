@@ -2,12 +2,8 @@
   "$schema": "https://unpkg.com/knip@5/overview.json",
   "entry": [
     "src/app/**/{page,layout,route,loading,error,not-found,template,default}.{ts,tsx,js,jsx}",
-    "drizzle.config.ts",
-    "vitest.config.ts",
-    "vitest.setup.ts",
-    "vitest.empty.js",
     "scripts/**/*.{ts,js,mjs}",
-    "src/lib/db/migrate.ts"
+    "vitest.empty.js"
   ],
   "project": [
     "src/**/*.{ts,tsx,js,jsx}",
@@ -19,13 +15,22 @@
   ],
   "ignore": [
     "src/components/ui/**",
-    "components/ui/**"
+    "components/ui/**",
+    "src/lib/db/migrations/**"
   ],
   "ignoreDependencies": [
     "tailwindcss",
+    "@tailwindcss/postcss",
     "tw-animate-css",
     "shadcn",
+    "postcss",
+    "drizzle-kit",
+    "tsx",
+    "better-sqlite3",
     "react-day-picker"
+  ],
+  "ignoreBinaries": [
+    "esbuild"
   ]
 }
 

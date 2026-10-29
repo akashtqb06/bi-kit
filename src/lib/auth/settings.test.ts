@@ -216,7 +216,7 @@ describe('Settings module & user service', () => {
             await db.insert(dataSources).values({
                 name: 'User Data Source',
                 type: 'sqlite',
-                config: '{}',
+                config: {},
                 ownerId: user.id,
             });
 

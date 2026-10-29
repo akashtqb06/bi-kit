@@ -50,6 +50,15 @@ This repository is an MVP BI tool using Next.js App Router, TypeScript, shadcn/u
 - Run the relevant lint, typecheck, test, or build command for the changed code and report any check that could not be run.
 - Do not add feature code when a task asks only for documentation or planning.
 
+## Finance Module Rules & Parallel Worktrees
+
+- All work on the Personal Finance module must adhere to the single source of truth in [docs/finance/CONTRACT.md](docs/finance/CONTRACT.md).
+- Parallel AI sessions and developers must observe file boundaries, ownership, and merge order documented in [docs/finance/PARALLEL_RULES.md](docs/finance/PARALLEL_RULES.md).
+- Never modify another session's owned files or edit the frozen schema/contract directly. Log proposed changes in [docs/finance/CONTRACT_REQUESTS.md](docs/finance/CONTRACT_REQUESTS.md).
+- Personal Finance persistence runs on PostgreSQL via Drizzle (`drizzle-orm/pg-core`). Always run isolated worktrees with independent databases (`DATABASE_URL=postgres://.../bikit_<name>`).
+- Finance resources are strictly OWNER-ONLY: neither regular members nor administrators may view, edit, or delete another user's financial data.
+
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 ## This is NOT the Next.js you know

@@ -9,12 +9,10 @@ export async function POST(_req: Request, { params }: RouteParams): Promise<Next
   try {
     const user = await requireUserApi();
     const { id } = await params;
-    const dashboard = getDashboard(id);
+    const dashboard = await getDashboard(id);
     assertCan(user, 'view', { type: 'dashboard', id, ownerId: dashboard.ownerId, workbookId: dashboard.workbookId });
-    return NextResponse.json({ data: recordDashboardView(id, user.id) });
+    return NextResponse.json({ data: await recordDashboardView(id, user.id) });
   } catch (err) {
     return handleApiError(err);
   }
 }
-
-

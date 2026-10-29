@@ -37,9 +37,10 @@ export async function seedUsers(): Promise<{ admin: User; member: User }> {
     const now = new Date();
 
     // Upsert admin
-    const existingAdmin = db.select().from(users).where(eq(users.email, adminEmail)).get();
+    const existingAdminList = await db.select().from(users).where(eq(users.email, adminEmail));
+    const existingAdmin = existingAdminList[0];
     if (existingAdmin) {
-        db.update(users)
+        await db.update(users)
             .set({
                 name: 'Admin',
                 passwordHash: adminHash,
@@ -47,10 +48,9 @@ export async function seedUsers(): Promise<{ admin: User; member: User }> {
                 status: 'active',
                 updatedAt: now,
             })
-            .where(eq(users.email, adminEmail))
-            .run();
+            .where(eq(users.email, adminEmail));
     } else {
-        db.insert(users)
+        await db.insert(users)
             .values({
                 id: newId(),
                 email: adminEmail,
@@ -58,14 +58,14 @@ export async function seedUsers(): Promise<{ admin: User; member: User }> {
                 passwordHash: adminHash,
                 role: 'admin',
                 status: 'active',
-            })
-            .run();
+            });
     }
 
     // Upsert demo member
-    const existingMember = db.select().from(users).where(eq(users.email, memberEmail)).get();
+    const existingMemberList = await db.select().from(users).where(eq(users.email, memberEmail));
+    const existingMember = existingMemberList[0];
     if (existingMember) {
-        db.update(users)
+        await db.update(users)
             .set({
                 name: 'Demo Member',
                 passwordHash: memberHash,
@@ -73,10 +73,9 @@ export async function seedUsers(): Promise<{ admin: User; member: User }> {
                 status: 'active',
                 updatedAt: now,
             })
-            .where(eq(users.email, memberEmail))
-            .run();
+            .where(eq(users.email, memberEmail));
     } else {
-        db.insert(users)
+        await db.insert(users)
             .values({
                 id: newId(),
                 email: memberEmail,
@@ -84,28 +83,26 @@ export async function seedUsers(): Promise<{ admin: User; member: User }> {
                 passwordHash: memberHash,
                 role: 'member',
                 status: 'active',
-            })
-            .run();
+            });
     }
 
     // Make sure app_settings has allowRegistration=true
-    const existingSetting = db.select().from(appSettings).where(eq(appSettings.key, 'allowRegistration')).get();
+    const existingSettingList = await db.select().from(appSettings).where(eq(appSettings.key, 'allowRegistration'));
+    const existingSetting = existingSettingList[0];
     if (existingSetting) {
-        db.update(appSettings)
+        await db.update(appSettings)
             .set({ value: true })
-            .where(eq(appSettings.key, 'allowRegistration'))
-            .run();
+            .where(eq(appSettings.key, 'allowRegistration'));
     } else {
-        db.insert(appSettings)
+        await db.insert(appSettings)
             .values({
                 key: 'allowRegistration',
                 value: true,
-            })
-            .run();
+            });
     }
 
-    const admin = db.select().from(users).where(eq(users.email, adminEmail)).get();
-    const member = db.select().from(users).where(eq(users.email, memberEmail)).get();
+    const [admin] = await db.select().from(users).where(eq(users.email, adminEmail));
+    const [member] = await db.select().from(users).where(eq(users.email, memberEmail));
 
     if (!admin || !member) {
         throw new Error('Failed to seed users: could not retrieve seeded users from database.');

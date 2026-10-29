@@ -10,6 +10,7 @@ import {
     SettingsIcon,
     BarChart3Icon,
     PanelLeftIcon,
+    WalletIcon,
 } from 'lucide-react';
 import {
     Sidebar,
@@ -37,6 +38,11 @@ const navItems = [
         icon: BookOpenIcon,
     },
     {
+        label: 'Finance',
+        href: '/finance',
+        icon: WalletIcon,
+    },
+    {
         label: 'Data Sources',
         href: '/data-sources',
         icon: DatabaseIcon,
@@ -53,10 +59,18 @@ const navItems = [
     },
 ] as const;
 import { UserMenu } from '@src/components/auth/user-menu';
+import { isAnyFinanceFeatureEnabled } from '@src/lib/finance/flags';
 
 export function AppSidebar() {
     const pathname = usePathname();
     const { toggleSidebar, state } = useSidebar();
+
+    const visibleNavItems = navItems.filter((item) => {
+        if (item.href === '/finance') {
+            return isAnyFinanceFeatureEnabled();
+        }
+        return true;
+    });
 
     return (
         <Sidebar collapsible="icon">
@@ -73,7 +87,7 @@ export function AppSidebar() {
                     <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">Navigation</SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
-                            {navItems.map((item) => {
+                            {visibleNavItems.map((item) => {
                                 const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
                                 return (
                                     <SidebarMenuItem key={item.href}>

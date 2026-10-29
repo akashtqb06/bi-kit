@@ -44,6 +44,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
+import { formatDistanceToNow } from "date-fns";
 import {
   DatabaseIcon,
   ChevronDownIcon,
@@ -57,6 +59,8 @@ import {
   Loader2Icon,
   LayersIcon,
   FileSpreadsheetIcon,
+  HardDriveIcon,
+  RefreshCwIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { defaultChartConfig } from "@src/lib/schemas";
@@ -115,6 +119,81 @@ export function RightPanel() {
   const [switchGuardOpen, setSwitchGuardOpen] = useState(false);
   const [pendingSourceId, setPendingSourceId] = useState<string | null>(null);
 
+  const [storeTable, setStoreTable] = useState<{
+    id: string;
+    status: string;
+    storeTable: string;
+    lastSyncedAt: string | null;
+  } | null>(null);
+  const [isTogglingStore, setIsTogglingStore] = useState(false);
+  const [disableStoreDialogOpen, setDisableStoreDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (!queryId) return;
+    let mounted = true;
+    fetch(`/api/data-store/query/${queryId}`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (mounted && json.data) {
+          setStoreTable(json.data);
+        } else if (mounted) {
+          setStoreTable(null);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [queryId]);
+
+  const handleEnableDataStore = async () => {
+    if (!queryId) return;
+    setIsTogglingStore(true);
+    try {
+      const res = await fetch(`/api/data-store/query/${queryId}`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || "Failed to enable Data Store");
+      setStoreTable(json.data);
+      toast.success("Data Store enabled. Query result materialized.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to enable Data Store");
+    } finally {
+      setIsTogglingStore(false);
+    }
+  };
+
+  const handleDisableDataStore = async () => {
+    if (!queryId) return;
+    setIsTogglingStore(true);
+    try {
+      const res = await fetch(`/api/data-store/query/${queryId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to disable Data Store");
+      setStoreTable(null);
+      setDisableStoreDialogOpen(false);
+      toast.success("Data Store disabled. Materialized table dropped.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to disable Data Store");
+    } finally {
+      setIsTogglingStore(false);
+    }
+  };
+
+  const handleRefreshDataStore = async () => {
+    if (!queryId) return;
+    setIsTogglingStore(true);
+    try {
+      const res = await fetch(`/api/data-store/query/${queryId}`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error?.message || "Failed to refresh Data Store");
+      setStoreTable(json.data);
+      toast.success("Data Store table refreshed.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to refresh Data Store");
+    } finally {
+      setIsTogglingStore(false);
+    }
+  };
+
   const activeDs = useMemo(() => {
     return dataSources.find((d) => d.id === dataSourceId);
   }, [dataSources, dataSourceId]);
@@ -131,7 +210,8 @@ export function RightPanel() {
     const files = dataSources.filter(
       (d) => d.type === "sqlite" || d.type === "csv" || d.type === "excel"
     );
-    return { databases, nosql, files };
+    const datastore = dataSources.filter((d) => d.type === "datastore");
+    return { databases, nosql, files, datastore };
   }, [dataSources]);
 
   const executeDataSourceSwitch = async (targetId: string) => {
@@ -372,10 +452,82 @@ export function RightPanel() {
                       ))}
                     </SelectGroup>
                   )}
+
+                  {groupedDataSources.datastore && groupedDataSources.datastore.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider px-2 py-1">
+                        Data Store
+                      </SelectLabel>
+                      {groupedDataSources.datastore.map((ds) => (
+                        <SelectItem key={ds.id} value={ds.id} className="text-xs">
+                          <span className="flex items-center gap-1.5 truncate">
+                            <HardDriveIcon className="size-3 text-purple-500 shrink-0" />
+                            <span className="font-medium truncate">{ds.name}</span>
+                            <span className="text-[10px] text-muted-foreground uppercase shrink-0">
+                              (store)
+                            </span>
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
                 </SelectContent>
               </Select>
             )}
           </div>
+
+          {/* 3. Enable Data Store Toggle */}
+          {queryId && (
+            <div className="pt-2.5 border-t space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5 pr-2">
+                  <label className="text-[11px] font-medium text-foreground flex items-center gap-1.5 cursor-pointer">
+                    <HardDriveIcon className="size-3 text-purple-500 shrink-0" />
+                    <span>Enable Data Store</span>
+                  </label>
+                  <p className="text-[10px] text-muted-foreground leading-tight">
+                    Materialize query results locally for fast dashboard path
+                  </p>
+                </div>
+                <Switch
+                  checked={Boolean(storeTable)}
+                  disabled={isTogglingStore}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      void handleEnableDataStore();
+                    } else {
+                      setDisableStoreDialogOpen(true);
+                    }
+                  }}
+                />
+              </div>
+
+              {storeTable && (
+                <div className="flex items-center justify-between bg-muted/40 rounded px-2 py-1 text-[11px] border">
+                  <span className="flex items-center gap-1.5 text-muted-foreground truncate">
+                    <span className="size-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                    <span className="truncate">
+                      {storeTable.status === "syncing"
+                        ? "Syncing..."
+                        : storeTable.lastSyncedAt
+                        ? `Stored · synced ${formatDistanceToNow(new Date(storeTable.lastSyncedAt), { addSuffix: true })}`
+                        : "Stored · pending sync"}
+                    </span>
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-1.5 text-[10px] gap-1 shrink-0 ml-1"
+                    disabled={isTogglingStore || storeTable.status === "syncing"}
+                    onClick={() => void handleRefreshDataStore()}
+                  >
+                    <RefreshCwIcon className={cn("size-2.5", isTogglingStore && "animate-spin")} />
+                    <span>Refresh</span>
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -698,6 +850,28 @@ export function RightPanel() {
               }}
             >
               Switch Data Source
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {/* Disable Data Store Confirmation Guard */}
+      <AlertDialog open={disableStoreDialogOpen} onOpenChange={setDisableStoreDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disable Data Store?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Disabling Data Store will drop the materialized table from local storage. Queries, charts, and dashboards will run directly against the original data source.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDisableStoreDialogOpen(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => void handleDisableDataStore()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Disable & Drop Table
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

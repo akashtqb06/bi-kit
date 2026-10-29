@@ -75,7 +75,7 @@ describe('Connector Manager', () => {
         const ds = {
             id: 'mock-ds-1',
             type: 'mock_test',
-            config: JSON.stringify({ host: 'mock.host' }),
+            config: { host: 'mock.host' },
         };
 
         const conn1 = await getConnector(ds);
@@ -89,7 +89,7 @@ describe('Connector Manager', () => {
         const ds = {
             id: 'mock-ds-1',
             type: 'mock_test',
-            config: JSON.stringify({ host: 'mock.host' }),
+            config: { host: 'mock.host' },
         };
 
         const conn1 = (await getConnector(ds)) as MockConnector;
@@ -106,7 +106,7 @@ describe('Connector Manager', () => {
         const ds = {
             id: 'mock-ds-2',
             type: 'mock_test',
-            config: JSON.stringify({ host: 'mock.host' }),
+            config: { host: 'mock.host' },
         };
 
         const queryReq = {

@@ -1,0 +1,40 @@
+[
+  {
+    "id": "rec_rent_er9v56orhbaym4oa",
+    "userId": "usr_finance_default",
+    "accountId": "acc_salary_s8z3nmqygh0btr1d",
+    "toAccountId": null,
+    "categoryId": "cat_11viro9bebmffwhf",
+    "type": "expense",
+    "amount": 3200000,
+    "payee": "House Owner Rent",
+    "note": "Monthly rental standing instruction",
+    "frequency": "monthly",
+    "interval": 1,
+    "startDate": "2026-01-02",
+    "endDate": null,
+    "nextOccurrence": "2026-11-02",
+    "isActive": true,
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "rec_rd_s84u684bwbvujrmr",
+    "userId": "usr_finance_default",
+    "accountId": "acc_salary_s8z3nmqygh0btr1d",
+    "toAccountId": "acc_rd_1_6oljo6kq5oclfr8d",
+    "categoryId": null,
+    "type": "transfer",
+    "amount": 500000,
+    "payee": "RD Auto Debit",
+    "note": "Recurring Deposit Monthly Auto Debit",
+    "frequency": "monthly",
+    "interval": 1,
+    "startDate": "2026-01-05",
+    "endDate": null,
+    "nextOccurrence": "2026-11-05",
+    "isActive": true,
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  }
+]

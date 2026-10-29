@@ -11,20 +11,25 @@ import {
   type LayoutItem,
   type DashboardFilter,
 } from "../schemas";
+import { queryDefinitionSchema, type QueryDefinition } from "@src/lib/query-engine/definition";
 
 // ---------------------------------------------------------------------------
 // DataSource config — validated per source type
 // ---------------------------------------------------------------------------
 
 export function parseDataSourceConfig(
-  raw: string,
+  raw: unknown,
   type: DataSourceType
 ): SqliteSourceConfig | CsvSourceConfig {
   let json: unknown;
-  try {
-    json = JSON.parse(raw);
-  } catch {
-    throw new Error(`DataSource config is not valid JSON`);
+  if (typeof raw === "string") {
+    try {
+      json = JSON.parse(raw);
+    } catch {
+      throw new Error(`DataSource config is not valid JSON`);
+    }
+  } else {
+    json = raw;
   }
   const schema =
     type === "sqlite" ? sqliteSourceConfigSchema : csvSourceConfigSchema;
@@ -34,18 +39,23 @@ export function parseDataSourceConfig(
 export function serializeDataSourceConfig(
   config: unknown
 ): string {
-  return JSON.stringify(config);
+  return typeof config === "string" ? config : JSON.stringify(config);
 }
 
 // ---------------------------------------------------------------------------
-import { queryDefinitionSchema, type QueryDefinition } from "@src/lib/query-engine/definition";
+// Query definition
+// ---------------------------------------------------------------------------
 
-export function parseQueryDefinition(raw: string): QueryDefinition {
+export function parseQueryDefinition(raw: unknown): QueryDefinition {
   let json: unknown;
-  try {
-    json = JSON.parse(raw);
-  } catch {
-    throw new Error(`Query definition is not valid JSON`);
+  if (typeof raw === "string") {
+    try {
+      json = JSON.parse(raw);
+    } catch {
+      throw new Error(`Query definition is not valid JSON`);
+    }
+  } else {
+    json = raw;
   }
   return queryDefinitionSchema.parse(json);
 }
@@ -60,12 +70,16 @@ export function serializeQueryDefinition(def: QueryDefinition): string {
 
 export type ChartConfig = z.infer<typeof chartConfigSchema>;
 
-export function parseChartConfig(raw: string): ChartConfig {
+export function parseChartConfig(raw: unknown): ChartConfig {
   let json: unknown;
-  try {
-    json = JSON.parse(raw);
-  } catch {
-    throw new Error(`Chart config is not valid JSON`);
+  if (typeof raw === "string") {
+    try {
+      json = JSON.parse(raw);
+    } catch {
+      throw new Error(`Chart config is not valid JSON`);
+    }
+  } else {
+    json = raw ?? {};
   }
   return chartConfigSchema.passthrough().parse(json);
 }
@@ -80,12 +94,16 @@ export function serializeChartConfig(config: ChartConfig | Record<string, unknow
 
 export type { LayoutItem };
 
-export function parseDashboardLayout(raw: string): LayoutItem[] {
+export function parseDashboardLayout(raw: unknown): LayoutItem[] {
   let json: unknown;
-  try {
-    json = JSON.parse(raw);
-  } catch {
-    throw new Error(`Dashboard layout is not valid JSON`);
+  if (typeof raw === "string") {
+    try {
+      json = JSON.parse(raw);
+    } catch {
+      throw new Error(`Dashboard layout is not valid JSON`);
+    }
+  } else {
+    json = raw;
   }
   return z.array(layoutItemSchema).parse(json);
 }
@@ -100,13 +118,17 @@ export function serializeDashboardLayout(layout: LayoutItem[]): string {
 
 export type { DashboardFilter };
 
-export function parseDashboardFilters(raw?: string | null): DashboardFilter[] {
+export function parseDashboardFilters(raw?: unknown): DashboardFilter[] {
   if (!raw) return [];
   let json: unknown;
-  try {
-    json = JSON.parse(raw);
-  } catch {
-    return [];
+  if (typeof raw === "string") {
+    try {
+      json = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  } else {
+    json = raw;
   }
   return z.array(dashboardFilterSchema).catch([]).parse(json);
 }
@@ -114,5 +136,3 @@ export function parseDashboardFilters(raw?: string | null): DashboardFilter[] {
 export function serializeDashboardFilters(filters: DashboardFilter[]): string {
   return JSON.stringify(filters);
 }
-
-

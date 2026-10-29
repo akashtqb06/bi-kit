@@ -49,7 +49,7 @@ import { dashboards } from "@src/lib/db/schema";
 
 async function DashboardPageContent({ params }: DashboardPageProps) {
   const { wid, did } = await params;
-  const dashboard = db.select().from(dashboards).where(eq(dashboards.id, did)).get();
+  const [dashboard] = await db.select().from(dashboards).where(eq(dashboards.id, did)).limit(1);
   if (!dashboard || dashboard.workbookId !== wid) {
     notFound();
   }

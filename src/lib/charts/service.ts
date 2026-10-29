@@ -4,7 +4,7 @@ import { db } from "@src/lib/db";
 import { charts, workbooks, type Chart } from "@src/lib/db/schema";
 import { NotFoundError } from "@src/lib/connectors/types";
 import { getQuery } from "@src/lib/queries/service";
-import { parseChartConfig, serializeChartConfig } from "@src/lib/db/json-helpers";
+import { parseChartConfig } from "@src/lib/db/json-helpers";
 import { validateFolderAssignment } from "@src/lib/folders/service";
 import { newId } from "@src/lib/db/id";
 import type { CreateChartInput } from "@src/lib/schemas";
@@ -47,95 +47,94 @@ function toPublic(row: Chart): ChartPublic {
 // Service functions
 // ---------------------------------------------------------------------------
 
-export function listCharts(workbookId?: string, user?: { id: string; role: string }): ChartPublic[] {
+export async function listCharts(
+  workbookId?: string,
+  user?: { id: string; role: string }
+): Promise<ChartPublic[]> {
   if (workbookId) {
     if (user && user.role !== "admin") {
-      const wb = db.select().from(workbooks).where(eq(workbooks.id, workbookId)).get();
+      const [wb] = await db.select().from(workbooks).where(eq(workbooks.id, workbookId)).limit(1);
       if (!wb || wb.ownerId !== user.id) return [];
     }
-    const rows = db.select().from(charts).where(eq(charts.workbookId, workbookId)).all();
+    const rows = await db.select().from(charts).where(eq(charts.workbookId, workbookId));
     return rows.map(toPublic);
   }
 
   if (user && user.role !== "admin") {
-    const rows = db
+    const rows = await db
       .select({ chart: charts })
       .from(charts)
       .innerJoin(workbooks, eq(charts.workbookId, workbooks.id))
-      .where(eq(workbooks.ownerId, user.id))
-      .all();
+      .where(eq(workbooks.ownerId, user.id));
     return rows.map((r) => toPublic(r.chart));
   }
 
-  const rows = db.select().from(charts).all();
+  const rows = await db.select().from(charts);
   return rows.map(toPublic);
 }
 
-export function getChart(id: string): Chart {
-  const row = db.select().from(charts).where(eq(charts.id, id)).get();
+export async function getChart(id: string): Promise<Chart> {
+  const [row] = await db.select().from(charts).where(eq(charts.id, id)).limit(1);
   if (!row) throw new NotFoundError(`Chart "${id}" not found.`);
   return row;
 }
 
-export function getChartPublic(id: string): ChartPublic {
-  return toPublic(getChart(id));
+export async function getChartPublic(id: string): Promise<ChartPublic> {
+  return toPublic(await getChart(id));
 }
 
-export function createChart(input: CreateChartInput, createdBy?: string): ChartPublic {
+export async function createChart(input: CreateChartInput, createdBy?: string): Promise<ChartPublic> {
   // Derive workbookId from query (enforces same-workbook relationship)
-  const query = getQuery(input.queryId);
+  const query = await getQuery(input.queryId);
   if (input.folderId) {
-    validateFolderAssignment(input.folderId, query.workbookId, 'chart');
+    await validateFolderAssignment(input.folderId, query.workbookId, 'chart');
   }
 
   const id = newId();
-  db.insert(charts)
-    .values({
-      id,
-      workbookId: query.workbookId,
-      queryId: input.queryId,
-      name: input.name,
-      type: input.type,
-      config: serializeChartConfig(input.config ?? {}),
-      folderId: input.folderId ?? null,
-      position: input.position ?? 0,
-      createdBy: createdBy ?? null,
-    })
-    .run();
+  await db.insert(charts).values({
+    id,
+    workbookId: query.workbookId,
+    queryId: input.queryId,
+    name: input.name,
+    type: input.type,
+    config: input.config ?? {},
+    folderId: input.folderId ?? null,
+    position: input.position ?? 0,
+    createdBy: createdBy ?? null,
+  });
 
-  return getChartPublic(id);
+  return await getChartPublic(id);
 }
 
-export function updateChart(
+export async function updateChart(
   id: string,
   input: Partial<CreateChartInput>
-): ChartPublic {
-  const existing = getChart(id); // throws if missing
-  const updates: Partial<Chart> = { updatedAt: new Date() };
+): Promise<ChartPublic> {
+  const existing = await getChart(id); // throws if missing
+  const updates: Partial<typeof charts.$inferInsert> = { updatedAt: new Date() };
   if (input.name !== undefined) updates.name = input.name;
   if (input.type !== undefined) updates.type = input.type;
-  if (input.config !== undefined) updates.config = serializeChartConfig(input.config);
+  if (input.config !== undefined) updates.config = input.config;
   if (input.folderId !== undefined) {
     if (input.folderId !== null) {
-      validateFolderAssignment(input.folderId, existing.workbookId, 'chart');
+      await validateFolderAssignment(input.folderId, existing.workbookId, 'chart');
     }
     updates.folderId = input.folderId ?? null;
   }
   if (input.position !== undefined) updates.position = input.position;
   if (input.queryId !== undefined) {
-    const q = getQuery(input.queryId);
+    const q = await getQuery(input.queryId);
     if (q.workbookId !== existing.workbookId) {
       throw new Error("Chart query must belong to the same workbook.");
     }
     updates.queryId = input.queryId;
   }
-  db.update(charts).set(updates).where(eq(charts.id, id)).run();
-  return getChartPublic(id);
+  await db.update(charts).set(updates).where(eq(charts.id, id));
+  return await getChartPublic(id);
 }
 
-export function deleteChart(id: string): void {
-  getChart(id); // throws if missing
+export async function deleteChart(id: string): Promise<void> {
+  await getChart(id); // throws if missing
   // Dashboards reference chartId in layout JSON (not a DB FK) — safe to delete
-  db.delete(charts).where(eq(charts.id, id)).run();
+  await db.delete(charts).where(eq(charts.id, id));
 }
-

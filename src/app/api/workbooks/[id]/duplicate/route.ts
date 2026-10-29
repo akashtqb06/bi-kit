@@ -10,7 +10,7 @@ export async function POST(req: Request, { params }: RouteParams): Promise<NextR
   try {
     const user = await requireUserApi();
     const { id } = await params;
-    const source = getWorkbook(id);
+    const source = await getWorkbook(id);
     assertCan(user, "view", { type: "workbook", id, ownerId: source.ownerId });
 
     let name: string | undefined;
@@ -21,10 +21,9 @@ export async function POST(req: Request, { params }: RouteParams): Promise<NextR
     } catch {
       // Body is optional
     }
-    const data = duplicateWorkbook(id, name, user.id);
+    const data = await duplicateWorkbook(id, name, user.id);
     return NextResponse.json({ data }, { status: 201 });
   } catch (err) {
     return handleApiError(err);
   }
 }
-

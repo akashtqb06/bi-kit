@@ -17,7 +17,9 @@ Comprehensive setup, architectural documentation, operational reference, and tro
 - **Framework**: Next.js 16 (App Router with Partial Prerendering & React 19)
 - **Language**: TypeScript 5 (Strict mode)
 - **UI & Components**: [shadcn/ui](https://ui.shadcn.com/) primitives styled with Tailwind CSS v4 and Base UI
-- **Application Database**: SQLite managed via `better-sqlite3` and [Drizzle ORM](https://orm.drizzle.team/)
+- **Application Database**: PostgreSQL managed via `pg` (node-postgres connection pool, Neon compatible) and [Drizzle ORM](https://orm.drizzle.team/) (`drizzle-orm/pg-core`)
+- **Testing Database Engine**: [PGlite](https://pglite.dev/) (`@electric-sql/pglite`) for fast, zero-dependency isolated in-memory test suites
+- **File & Analytical Connectors**: Pluggable drivers including SQLite (`better-sqlite3`), CSV, Excel, Postgres, MySQL, MSSQL, Mongo
 - **Charts & Data Display**: Recharts wrapped via shadcn charts, TanStack Table v9
 - **Dashboard Grid**: `react-grid-layout`
 - **Validation & State**: Zod schemas shared across API/client boundaries, Zustand for client interaction state
@@ -45,9 +47,9 @@ flowchart TD
         SqliteConn["SQLite Read-Only Connector (Isolated Thread/Worker)"]
     end
 
-    subgraph Storage["Persistence & Data Layer (./data)"]
-        AppDB[("Application DB: app.db\n(Users, Sessions, Workbooks,\nQueries, Charts, Dashboards)")]
-        SampleDB[("Sample DB: sample.db\n(E-Commerce Orders, Customers,\nProducts, Sellers, Reviews)")]
+    subgraph Storage["Persistence & Data Layer"]
+        AppDB[("Application DB: PostgreSQL / Neon\n(Users, Sessions, Workbooks,\nQueries, Charts, Dashboards)")]
+        SampleDB[("Sample DB: ./data/sample.db\n(E-Commerce Orders, Customers,\nProducts, Sellers, Reviews)")]
         CSVDir[("CSV Datasets: ./data/csv/*.db")]
         UploadsDir["Uploads & Avatars: ./data/avatars"]
     end
@@ -56,8 +58,9 @@ flowchart TD
     UI -->|Form POST| ServerActions
     APIRoutes --> AuthDAL
     ServerActions --> AuthDAL
-    AuthDAL -->|Drizzle ORM| AppDB
+    AuthDAL -->|Drizzle ORM (pg-core)| AppDB
     APIRoutes --> QueryEngine
+    QueryEngine --> ASTCompiler
     ASTCompiler --> SafetyValidator
     SafetyValidator --> SqliteConn
     SqliteConn -->|Read-Only Execution| SampleDB
@@ -88,13 +91,16 @@ Run the following commands in the root of the repository:
 # 1. Install dependencies
 pnpm install
 
-# 2. Configure environment variables (defaults work out of the box for local development)
+# 2. Start PostgreSQL service via Docker (port 5432)
+docker compose -f docker-compose.dev.yml up -d postgres
+
+# 3. Configure environment variables
 cp .env.example .env.local
 
-# 3. Run database migrations and seed demo data
+# 4. Run database migrations and seed demo data
 pnpm setup
 
-# 4. Start the Next.js development server
+# 5. Start the Next.js development server
 pnpm dev
 ```
 
@@ -108,14 +114,31 @@ All settings have safe defaults for local development. Configure them in `.env.l
 
 | Variable Name | Purpose | Default | Required in Production |
 | :--- | :--- | :--- | :--- |
-| `DATA_DIR` | Root directory for databases, CSV caches, avatars, and file uploads | `data` | No |
-| `APP_DB_PATH` | File path to the primary SQLite application database | `data/app.db` | No |
+| `DATABASE_URL` | PostgreSQL connection string (Docker, local, or Neon/Supabase) | `postgres://postgres:bi_password_123!@localhost:5432/bikit_dev` | **Yes** |
+| `DATABASE_URL_TEST`| Optional dedicated PostgreSQL connection string for tests | `postgres://postgres:bi_password_123!@localhost:5432/bikit_test` | No (PGlite used by default) |
+| `DB_POOL_MAX` | Maximum node-postgres connection pool size | `5` | No |
+| `DATA_DIR` | Root directory for CSV datasets, avatars, and file uploads | `data` | No |
 | `SEED_ADMIN_EMAIL` | Default email for seeded administrator account | `admin@example.com` | Optional (defaults apply) |
 | `SEED_ADMIN_PASSWORD` | Password for seeded administrator account | `ChangeMe123!` | **Yes** (seed aborts if default in prod) |
 | `SEED_DEMO_USER_EMAIL`| Default email for seeded regular member account | `member@example.com` | Optional (defaults apply) |
 | `SEED_DEMO_USER_PASSWORD` | Password for seeded regular member account | `ChangeMe123!` | **Yes** (seed aborts if default in prod) |
+| `FINANCE_FEATURES` | Comma-separated list of active finance features (`overview,transactions,accounts,setup,budgets,recurring,import`) | `overview,transactions,accounts,import` | No |
+| `FINANCE_BACKEND` | Finance persistence backend (`db` or `mock`). Enforced as `db` in production. | `db` | No |
 | `NODE_ENV` | Application environment mode (`development`, `production`, `test`) | `development` | Set by deployment host |
 | `PORT` | HTTP port on which the Next.js server listens | `3000` | No |
+
+### Finance Feature Flags (`FINANCE_FEATURES`)
+
+The Personal Finance module uses granular feature flags to gate components, routes, navigation tabs, and API endpoints:
+- **`overview`**: Net worth, monthly cash flow, and account summaries (`/finance/overview`).
+- **`transactions`**: Transaction list, filters, and manual entry (`/finance/transactions`).
+- **`accounts`**: Account list, credit card utilization, and creation dialogs (`/finance/accounts`).
+- **`setup`**: Guided onboarding wizard for first-time account setup (`/finance/setup`).
+- **`import`**: Bank statement CSV upload and mapping (`/finance/import`).
+- **`budgets`**: Category budget planning (currently under development; returns 404 / 501 when disabled).
+- **`recurring`**: Recurring transaction rules & schedule engine (under development; returns 404 / 501 when disabled).
+
+When a feature is disabled, its navigation tab is hidden, its route responds with Next.js `notFound()`, and its API route responds with HTTP `501 Not Implemented`. Default configuration enables all fully tested features: `overview,transactions,accounts,import`.
 
 ---
 
@@ -154,6 +177,17 @@ A realistic Indian e-commerce sample database populated with deterministically g
   - `Customers by Region` (Row / Bar Chart, root)
 - **Dashboard**: **"Sales Overview"** combining the above charts into a responsive 12-column grid layout with interactive filters.
 
+### 3. Personal Finance Demo Data & Personas
+- **Standard Categories**: Run `pnpm db:seed:categories` to seed a comprehensive two-level category tree (Income, Expenses, Transfers) with localized icons and color codes.
+- **Realistic Finance Personas**: Run `pnpm db:seed:finance` to populate rich multi-account, multi-month transaction histories for testing. Supported personas include:
+  - `salaried_single`: Single professional with salary, rent, subscriptions, dining, and investments.
+  - `freelancer_with_tax`: Freelance contractor with irregular invoices, business expenses, and advance tax payments.
+  - `family_with_home_loan`: Household with joint expenses, home loan EMI, schooling, groceries, and insurance.
+  - `retiree_drawdown`: Pensioner with fixed deposit interest, annuity, medical expenses, and utility payments.
+  - `hustler_multi_stream`: Multiple income streams (e-commerce, dividends, consulting) and high transaction velocity.
+  - `zero_state`: Clean slate with zero accounts, ideal for testing the `/finance/setup` onboarding journey.
+- **Interactive CLI Onboarding**: Run `pnpm finance:init` to run an interactive terminal wizard for creating custom accounts.
+
 ---
 
 ## 6. Demo Accounts
@@ -162,6 +196,13 @@ A realistic Indian e-commerce sample database populated with deterministically g
 | :--- | :--- | :--- | :--- |
 | **Admin** | `admin@example.com` | `ChangeMe123!` | Full system access. Can view, manage, and edit all workbooks, data sources, dashboards, queries, user accounts, and system settings. |
 | **Member** | `member@example.com` | `ChangeMe123!` | Standard member access. Can create own workbooks, queries, data sources, and dashboards; view shared team resources. Cannot access admin user management or global settings. |
+
+### Personal Finance Privacy Boundary
+> [!IMPORTANT]
+> **Owner-Only Security Boundary**:
+> All Personal Finance entities (accounts, transactions, valuations, budgets, recurring rules) are strictly scoped to the authenticated user's ID (`owner_id`).
+> - Neither regular members nor system administrators can inspect, query, edit, or delete another user's financial records.
+> - API route handlers enforce owner checks in the Data Access Layer (DAL); there is no administrative override for financial data.
 
 > [!CAUTION]
 > **Security Notice**:
@@ -178,13 +219,13 @@ A realistic Indian e-commerce sample database populated with deterministically g
 
 ## 7. Database Workflow
 
-BI Kit uses SQLite with Drizzle ORM. Database files live in the `./data` directory:
-- `data/app.db`: Application state (users, sessions, settings, workbooks, queries, charts, dashboards).
-- `data/sample.db`: Analytical sample store for demonstration queries.
-- `data/csv/*.db`: SQLite tables generated from imported CSV uploads.
+BI Kit uses PostgreSQL with Drizzle ORM (`drizzle-orm/pg-core`). Application state (users, sessions, settings, workbooks, queries, charts, dashboards) is persisted in PostgreSQL:
+- **Application DB**: PostgreSQL (managed via connection pool configured with `DATABASE_URL`).
+- **Sample Store**: `data/sample.db` (Analytical SQLite store for demonstration queries).
+- **CSV Datasets**: `data/csv/*.db` (SQLite tables generated from uploaded CSV files).
 
 ### Migration Lifecycle
-1. **Schema Modifications**: Edit table definitions in `src/lib/db/schema.ts`.
+1. **Schema Modifications**: Edit table definitions in `src/lib/db/schema.ts` (using `pg-core` types like `pgTable`, `text`, `varchar`, `boolean`, `jsonb`, `timestamp`).
 2. **Generate Migration**: Run Drizzle Kit to create a new SQL migration in `src/lib/db/migrations/`:
    ```bash
    pnpm db:generate
@@ -199,17 +240,17 @@ BI Kit uses SQLite with Drizzle ORM. Database files live in the `./data` directo
 
 | Command | Description |
 | :--- | :--- |
-| `pnpm db:migrate` | Applies all pending migrations from `src/lib/db/migrations` to `data/app.db`. |
-| `pnpm db:generate` | Inspects `schema.ts` and creates new migration SQL files. |
+| `pnpm db:migrate` | Applies all pending PostgreSQL migrations from `src/lib/db/migrations`. |
+| `pnpm db:generate` | Inspects `schema.ts` and creates new PostgreSQL migration SQL files. |
 | `pnpm db:seed` | Runs the full seed suite: users, sample e-commerce database, and sample workbook. |
 | `pnpm db:seed:users` | Seeds default admin and member accounts along with app settings. |
 | `pnpm db:seed:demo` | Seeds or regenerates `data/sample.db` with 12,000 orders. |
 | `pnpm db:seed:workbook`| Seeds the "Order Analysis" workbook and "Sales Overview" dashboard. |
-| `pnpm db:reset` | Fully wipes databases and local artifacts, runs migrations, and reseeds everything. |
+| `pnpm db:reset` | Drops and recreates the `public` schema in PostgreSQL, migrates, and reseeds everything. |
 | `pnpm db:studio` | Launches Drizzle Studio in the browser to browse and inspect database tables. |
-| `pnpm db:clean-tests` | Removes temporary test workbooks and demo artifacts from `app.db`. |
+| `pnpm db:clean-tests` | Removes temporary test workbooks and demo artifacts from the database. |
 
-### Database Reset & Lock Protection
+### Database Reset & Safety Protection
 To reset the database cleanly:
 ```bash
 # 1. Stop your development server (Ctrl + C)
@@ -217,15 +258,17 @@ To reset the database cleanly:
 pnpm db:reset
 ```
 > [!WARNING]
-> `pnpm db:reset` detects if the Next.js dev server is currently running on port 3000 and refuses to reset while SQLite file locks may be held. Always terminate the dev server before resetting, or pass `--force` if executing in automated pipelines.
+> **Safety Guards on `pnpm db:reset`**:
+> - **Production Guard**: Always refuses execution when `NODE_ENV=production`.
+> - **Remote Database Guard**: Refuses execution if `DATABASE_URL` is not a local host (`localhost`, `127.0.0.1`, `host.docker.internal`, or `postgres`). To reset a remote staging database, you must pass `--i-know-this-is-remote` AND interactively type the exact database name.
+> - **Active Dev Server Guard**: Detects if the Next.js dev server is currently running on port 3000 and refuses to reset unless `--force` is supplied.
 
-### Backing Up the Database
-Because SQLite runs in Write-Ahead Logging (WAL) mode:
-1. Stop the application server (`pnpm dev` or production process).
-2. Copy `data/app.db` along with `data/app.db-wal` and `data/app.db-shm` (if present) to your backup storage:
-   ```bash
-   cp data/app.db* /path/to/backups/
-   ```
+### Neon / Cloud PostgreSQL Setup
+When deploying to Vercel with Neon:
+1. Create a Neon PostgreSQL database and copy the connection string.
+2. In Vercel Project Settings, set `DATABASE_URL` to your Neon connection string. Ensure `?sslmode=require` is present in the URL.
+3. Set `DB_POOL_MAX` (e.g. `5` or `10` depending on your plan).
+4. Run migrations during deployment via `pnpm db:migrate` or as part of your CI/CD pipeline.
 
 ---
 
@@ -263,6 +306,15 @@ Because SQLite runs in Write-Ahead Logging (WAL) mode:
    - Visit `/settings/profile` to update your name, email, or avatar.
    - Visit `/settings/security` to change passwords and review active login sessions.
    - Visit `/settings/appearance` to select Light, Dark, or System theme.
+7. **Personal Finance Journey**:
+   - **First-Time Setup**: Navigate to `/finance`. If you have no accounts configured, the app redirects to `/finance/setup` to launch the multi-step onboarding wizard.
+   - **Define Accounts**: Enter your Bank Accounts, Cash in Hand, and Credit Cards (all balances represented in integer paise: ₹100.00 = `10000`).
+   - **Overview Dashboard (`/finance/overview`)**: Review total net worth, monthly cash flow breakdown, and asset/liability ratios.
+   - **Account Balances (`/finance/accounts`)**: Track bank accounts, credit card utilization, and cash reserves.
+   - **Transactions (`/finance/transactions`)**: View, search, and manually record income, expenses, and inter-account transfers.
+   - **Bank Statement Import (`/finance/import`)**: Upload CSV bank statements with interactive column mapping, transaction review, duplicate detection, and atomic rollback.
+   - **Feature Flag Gating**: Features like `budgets` and `recurring` rules are controlled by the `FINANCE_FEATURES` environment variable. Disabled modules are hidden from navigation and return 404 / 501.
+   - **Implementation Coverage**: Run `pnpm finance:coverage` to audit method implementation parity across `DbFinanceService` and `MockFinanceService`.
 
 ---
 
@@ -278,11 +330,15 @@ pnpm lint                 # Runs ESLint (must pass with 0 errors and 0 warnings)
 pnpm test                 # Executes all Vitest test suites once and cleanly terminates
 pnpm test:watch           # Runs Vitest in interactive file-watching mode
 pnpm db:generate          # Generates SQL migration scripts via drizzle-kit
-pnpm db:migrate           # Applies pending migrations to SQLite database
+pnpm db:migrate           # Applies pending migrations to PostgreSQL database
 pnpm db:seed              # Runs user, demo-data, and sample workbook seed scripts
 pnpm db:seed:users        # Seeds admin and member user accounts
 pnpm db:seed:demo         # Generates sample.db e-commerce database (12,000 orders)
 pnpm db:seed:workbook     # Seeds Order Analysis workbook and Sales Overview dashboard
+pnpm db:seed:finance      # Seeds realistic personal finance demo accounts & transactions
+pnpm db:seed:categories   # Seeds standard hierarchical personal finance categories
+pnpm finance:init         # Interactive CLI onboarding wizard for personal finance
+pnpm finance:coverage     # Reports FinanceService method coverage (Db vs Mock backends)
 pnpm db:reset             # Completely wipes and reseeds local databases (with dev server safety guard)
 pnpm db:studio            # Opens Drizzle Studio GUI on localhost:4983
 pnpm db:clean-tests       # Cleans test artifacts from database

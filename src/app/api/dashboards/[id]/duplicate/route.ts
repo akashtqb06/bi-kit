@@ -14,9 +14,9 @@ export async function POST(
   try {
     const user = await requireUserApi();
     const { id } = await params;
-    const original = getDashboard(id);
+    const original = await getDashboard(id);
     assertCan(user, 'view', { type: 'dashboard', id, ownerId: original.ownerId, workbookId: original.workbookId });
-    const wb = getWorkbook(original.workbookId);
+    const wb = await getWorkbook(original.workbookId);
     assertCan(user, 'edit', { type: 'workbook', id: original.workbookId, ownerId: wb.ownerId });
 
     let name: string | undefined;
@@ -27,11 +27,9 @@ export async function POST(
     } catch {
       // Body is optional
     }
-    const data = duplicateDashboard(id, name, user.id);
+    const data = await duplicateDashboard(id, name, user.id);
     return NextResponse.json({ data }, { status: 201 });
   } catch (err) {
     return handleApiError(err);
   }
 }
-
-

@@ -283,6 +283,7 @@ export function ChartEditor({ chartId, workbookId }: ChartEditorProps) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    queryId: q.id,
                     dataSourceId: q.dataSourceId,
                     mode: q.mode,
                     definition: def,

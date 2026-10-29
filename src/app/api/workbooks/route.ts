@@ -8,7 +8,7 @@ export async function GET(): Promise<NextResponse> {
   try {
     const user = await requireUserApi();
     return NextResponse.json({
-      data: listWorkbooks({ id: user.id, role: user.role }),
+      data: await listWorkbooks({ id: user.id, role: user.role }),
     });
   } catch (err) {
     return handleApiError(err);
@@ -21,7 +21,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     const body: unknown = await req.json();
     const input = createWorkbookSchema.parse(body);
     return NextResponse.json(
-      { data: createWorkbook(input, user.id) },
+      { data: await createWorkbook(input, user.id) },
       { status: 201 }
     );
   } catch (err) {
@@ -34,10 +34,9 @@ export async function DELETE(req: Request): Promise<NextResponse> {
     const user = await requireUserApi();
     const body: unknown = await req.json();
     const input = bulkDeleteWorkbooksSchema.parse(body);
-    bulkDeleteWorkbooks(input.ids, { id: user.id, role: user.role });
+    await bulkDeleteWorkbooks(input.ids, { id: user.id, role: user.role });
     return NextResponse.json({ data: { ok: true, count: input.ids.length } });
   } catch (err) {
     return handleApiError(err);
   }
 }
-

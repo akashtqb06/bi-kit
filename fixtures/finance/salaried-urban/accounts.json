@@ -1,0 +1,130 @@
+[
+  {
+    "id": "acc_salary_s8z3nmqygh0btr1d",
+    "userId": "usr_finance_default",
+    "name": "Salary Account",
+    "kind": "bank",
+    "class": "asset",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": true,
+    "metadata": {
+      "bank": "HDFC",
+      "accountNumber": "****1024"
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_savings_84t5vdzwm2myckec",
+    "userId": "usr_finance_default",
+    "name": "Savings Account",
+    "kind": "bank",
+    "class": "asset",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": true,
+    "metadata": {
+      "bank": "ICICI",
+      "accountNumber": "****5678"
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_cash_rodlxhk5uka95z2v",
+    "userId": "usr_finance_default",
+    "name": "Cash Wallet",
+    "kind": "cash",
+    "class": "asset",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": true,
+    "metadata": {},
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_cc_a_6q2xlusggzy0cryi",
+    "userId": "usr_finance_default",
+    "name": "Credit Card A",
+    "kind": "credit_card",
+    "class": "liability",
+    "currency": "INR",
+    "creditLimit": 15000000,
+    "isActive": true,
+    "metadata": {
+      "issuer": "HDFC Regalia",
+      "billingCycleDay": 20
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_fd_1_n40pbi5uncc9f8tk",
+    "userId": "usr_finance_default",
+    "name": "FD 1 Year",
+    "kind": "fixed_deposit",
+    "class": "asset",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": true,
+    "metadata": {
+      "principalPaise": 10000000,
+      "interestRate": 0.075,
+      "compounding": "quarterly",
+      "tenureYears": 1
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_rd_1_6oljo6kq5oclfr8d",
+    "userId": "usr_finance_default",
+    "name": "RD 5000 Monthly",
+    "kind": "recurring_deposit",
+    "class": "asset",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": true,
+    "metadata": {
+      "monthlyInstallmentPaise": 500000,
+      "interestRate": 0.07,
+      "compounding": "quarterly",
+      "tenureMonths": 12
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_mf_sip_o0sl4uocpd624a95",
+    "userId": "usr_finance_default",
+    "name": "Mutual Fund SIP",
+    "kind": "mutual_fund",
+    "class": "asset",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": true,
+    "metadata": {
+      "folio": "12345/67",
+      "scheme": "Nifty 50 Index Fund"
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_archived_1kmykgj4p8ixwgtw",
+    "userId": "usr_finance_default",
+    "name": "Archived Old Wallet",
+    "kind": "cash",
+    "class": "asset",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": false,
+    "metadata": {
+      "closedReason": "Migrated to Cash Wallet"
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  }
+]

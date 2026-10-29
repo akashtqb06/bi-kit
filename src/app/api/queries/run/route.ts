@@ -11,6 +11,9 @@ import { handleApiError, apiError } from '@src/app/api/utils';
 import { ConnectorError } from '@src/lib/connectors/types';
 import type { QueryDefinition } from '@src/lib/query-engine/definition';
 import { requireUserApi, assertCan } from '@src/lib/auth/dal';
+import { getMaterializedQueryInfo } from '@src/lib/data-store/service';
+import { syncTable, executeDbQuery } from '@src/lib/data-store/sync-engine';
+import { quoteIdent } from '@src/lib/data-store/types-mapping';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -24,6 +27,7 @@ const TIMEOUT_MS = 10_000;
 // ---------------------------------------------------------------------------
 
 const runQuerySchema = z.object({
+    queryId: z.string().optional(),
     dataSourceId: z.string().min(1),
     mode: z.enum(['builder', 'sql', 'pipeline']),
     definition: z.unknown().optional(),
@@ -51,6 +55,8 @@ interface RunQuerySuccess {
         truncated: boolean;
         durationMs: number;
         sql: string;
+        isStored?: boolean;
+        lastSyncedAt?: string | null;
     };
 }
 
@@ -60,8 +66,81 @@ export async function POST(req: Request): Promise<NextResponse> {
         const body: unknown = await req.json();
         const input = runQuerySchema.parse(body);
 
-        const source = getDataSource(input.dataSourceId);
+        const source = await getDataSource(input.dataSourceId);
         assertCan(user, 'view', { type: 'data_source', id: source.id, ownerId: source.ownerId });
+
+        // -------------------------------------------------------------------
+        // Data Store Materialized Fast-Path
+        // -------------------------------------------------------------------
+        if (input.queryId) {
+            const storeTable = await getMaterializedQueryInfo(input.queryId);
+            if (storeTable && (storeTable.status === 'synced' || input.refresh)) {
+                if (input.refresh) {
+                    await syncTable(storeTable.id, { triggeredBy: 'refresh_now', forceFull: true });
+                }
+
+                const start = Date.now();
+                const fullTable = `${quoteIdent(storeTable.storeSchema)}.${quoteIdent(storeTable.storeTable)}`;
+
+                let countSql = `SELECT COUNT(*)::bigint AS total FROM ${fullTable}`;
+                let selectSql = `SELECT * FROM ${fullTable}`;
+
+                if (input.sql && input.sql.includes('__dash_filter')) {
+                    const match = input.sql.match(/WHERE\s+(.+)$/i);
+                    if (match) {
+                        countSql = `SELECT COUNT(*)::bigint AS total FROM ${fullTable} WHERE ${match[1]}`;
+                        selectSql = `SELECT * FROM ${fullTable} WHERE ${match[1]}`;
+                    }
+                }
+
+                let totalRows: number;
+                let pageRows: Record<string, unknown>[];
+                let truncated = false;
+
+                if (input.page !== undefined) {
+                    const page = Math.max(1, input.page);
+                    const pageSize = Math.min(1000, Math.max(1, input.pageSize ?? 100));
+                    const offset = (page - 1) * pageSize;
+
+                    const countRes = await executeDbQuery(countSql);
+                    totalRows = Number(countRes.rows[0]?.total ?? 0);
+
+                    const dataRes = await executeDbQuery(`${selectSql} LIMIT ${pageSize} OFFSET ${offset}`);
+                    pageRows = dataRes.rows;
+                } else {
+                    const dataRes = await executeDbQuery(`${selectSql} LIMIT ${ROW_CAP}`);
+                    pageRows = dataRes.rows;
+                    totalRows = pageRows.length;
+                    truncated = pageRows.length >= ROW_CAP;
+                }
+
+                const durationMs = Date.now() - start;
+                const columns: ColumnMeta[] = storeTable.columns && storeTable.columns.length > 0
+                    ? storeTable.columns.map((c) => ({
+                          name: c.name,
+                          type: c.type,
+                      }))
+                    : Object.keys(pageRows[0] || {}).map((name) => ({ name, type: 'text' }));
+
+                const rows = pageRows.map((row) => columns.map((col) => row[col.name]));
+
+                return NextResponse.json({
+                    data: {
+                        columns,
+                        rows,
+                        rowCount: rows.length,
+                        totalRows,
+                        page: input.page,
+                        pageSize: input.pageSize,
+                        truncated,
+                        durationMs,
+                        sql: selectSql,
+                        isStored: true,
+                        lastSyncedAt: storeTable.lastSyncedAt?.toISOString() ?? null,
+                    },
+                });
+            }
+        }
 
         // -------------------------------------------------------------------
         // MongoDB Execution Branch
@@ -76,11 +155,11 @@ export async function POST(req: Request): Promise<NextResponse> {
                     return apiError('Builder mode requires a definition.', 400);
                 }
 
-                let schema = getCachedSchema(source.id);
+                let schema = await getCachedSchema(source.id);
                 if (!schema) {
                     const connector = await getConnector(source);
                     schema = await connector.introspect();
-                    setCachedSchema(source.id, schema);
+                    await setCachedSchema(source.id, schema);
                 }
 
                 const schemaInfo = {
@@ -234,11 +313,11 @@ export async function POST(req: Request): Promise<NextResponse> {
             }
 
             // Get or introspect schema
-            let schema = getCachedSchema(source.id);
+            let schema = await getCachedSchema(source.id);
             if (!schema) {
                 const connector = await getConnector(source);
                 schema = await connector.introspect();
-                setCachedSchema(source.id, schema);
+                await setCachedSchema(source.id, schema);
             }
 
             // Adapt SchemaSnapshot to SchemaInfo if needed

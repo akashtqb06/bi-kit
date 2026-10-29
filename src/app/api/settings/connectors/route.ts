@@ -14,7 +14,7 @@ export async function GET(): Promise<NextResponse> {
         if (user.role !== 'admin') {
             return apiError('Administrator access required.', 403);
         }
-        const allowedConnectorTypes = getAllowedConnectorTypes();
+        const allowedConnectorTypes = await getAllowedConnectorTypes();
         return NextResponse.json({ data: { allowedConnectorTypes } });
     } catch (err) {
         return handleApiError(err);
@@ -30,8 +30,8 @@ export async function PUT(req: Request): Promise<NextResponse> {
         const body: unknown = await req.json();
         const input = putSchema.parse(body);
 
-        setAllowedConnectorTypes(input.allowedConnectorTypes);
-        const updated = getAllowedConnectorTypes();
+        await setAllowedConnectorTypes(input.allowedConnectorTypes);
+        const updated = await getAllowedConnectorTypes();
         return NextResponse.json({ data: { allowedConnectorTypes: updated } });
     } catch (err) {
         return handleApiError(err);

@@ -1,5 +1,5 @@
 import readline from 'node:readline';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db } from '@src/lib/db';
 import { users, sessions } from '@src/lib/db/schema';
 import { hashPassword } from '@src/lib/auth/password';
@@ -26,7 +26,11 @@ export async function resetUserPassword(emailArg?: string, passwordArg?: string)
         process.exit(1);
     }
 
-    const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(sql`lower(${users.email})`, email))
+        .limit(1);
 
     if (!user) {
         console.error(`Error: User with email "${email}" not found.`);

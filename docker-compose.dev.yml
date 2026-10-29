@@ -1,13 +1,16 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16
     container_name: bi-kit-postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: bi_password_123!
       POSTGRES_DB: bikit_dev
     ports:
+      - "5432:5432"
       - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d bikit_dev"]
       interval: 3s
@@ -63,3 +66,7 @@ services:
       timeout: 3s
       retries: 10
     restart: unless-stopped
+
+volumes:
+  postgres_data:
+

@@ -241,7 +241,7 @@ const memberChartDefinitions: {
     },
 ];
 
-function seedWorkbookEntities(params: {
+async function seedWorkbookEntities(params: {
     owner: User;
     sourceName: string;
     sourceSlug: string;
@@ -257,7 +257,7 @@ function seedWorkbookEntities(params: {
         config: Partial<ChartConfigData>;
         layout: Omit<LayoutItem, 'i' | 'chartId'>;
     }[];
-}): { sourceId: string; workbookId: string; queryCount: number; chartCount: number; dashboardId: string } {
+}): Promise<{ sourceId: string; workbookId: string; queryCount: number; chartCount: number; dashboardId: string }> {
     const {
         owner,
         sourceName,
@@ -271,11 +271,11 @@ function seedWorkbookEntities(params: {
     } = params;
 
     // 1. Data Source (Upsert by stable slug)
-    const existingSource = db
+    const existingSourceList = await db
         .select()
         .from(dataSources)
-        .where(eq(dataSources.slug, sourceSlug))
-        .get();
+        .where(eq(dataSources.slug, sourceSlug));
+    const existingSource = existingSourceList[0];
 
     const sourceId = existingSource?.id ?? newId();
     const now = new Date();
@@ -286,15 +286,15 @@ function seedWorkbookEntities(params: {
     fs.mkdirSync(path.dirname(managedAbs), { recursive: true });
     fs.copyFileSync(SAMPLE_DB_PATH, managedAbs);
 
-    const sourceConfig = JSON.stringify({
+    const sourceConfig = {
         managedPath: managedRel,
         fileName: 'sample.db',
         importedAt: now.toISOString(),
         size: fs.statSync(managedAbs).size,
-    });
+    };
 
     if (existingSource) {
-        db.update(dataSources)
+        await db.update(dataSources)
             .set({
                 ownerId: owner.id,
                 name: sourceName,
@@ -305,10 +305,9 @@ function seedWorkbookEntities(params: {
                 config: sourceConfig,
                 updatedAt: now,
             })
-            .where(eq(dataSources.id, sourceId))
-            .run();
+            .where(eq(dataSources.id, sourceId));
     } else {
-        db.insert(dataSources)
+        await db.insert(dataSources)
             .values({
                 id: sourceId,
                 ownerId: owner.id,
@@ -320,21 +319,20 @@ function seedWorkbookEntities(params: {
                 config: sourceConfig,
                 createdAt: now,
                 updatedAt: now,
-            })
-            .run();
+            });
     }
 
     // 2. Workbook (Upsert by stable slug)
-    const existingWorkbook = db
+    const existingWorkbookList = await db
         .select()
         .from(workbooks)
-        .where(eq(workbooks.slug, workbookSlug))
-        .get();
+        .where(eq(workbooks.slug, workbookSlug));
+    const existingWorkbook = existingWorkbookList[0];
 
     const workbookId = existingWorkbook?.id ?? newId();
 
     if (existingWorkbook) {
-        db.update(workbooks)
+        await db.update(workbooks)
             .set({
                 ownerId: owner.id,
                 name: workbookName,
@@ -342,24 +340,22 @@ function seedWorkbookEntities(params: {
                 description: `${workbookName} - Seeded workbook for ${owner.name}`,
                 updatedAt: now,
             })
-            .where(eq(workbooks.id, workbookId))
-            .run();
+            .where(eq(workbooks.id, workbookId));
 
         // Clear existing children to prevent duplicates upon re-seeding
-        db.delete(charts).where(eq(charts.workbookId, workbookId)).run();
-        db.delete(queries).where(eq(queries.workbookId, workbookId)).run();
-        db.delete(dashboards).where(eq(dashboards.workbookId, workbookId)).run();
-        db.delete(folders).where(eq(folders.workbookId, workbookId)).run();
+        await db.delete(charts).where(eq(charts.workbookId, workbookId));
+        await db.delete(queries).where(eq(queries.workbookId, workbookId));
+        await db.delete(dashboards).where(eq(dashboards.workbookId, workbookId));
+        await db.delete(folders).where(eq(folders.workbookId, workbookId));
     } else {
-        db.insert(workbooks)
+        await db.insert(workbooks)
             .values({
                 id: workbookId,
                 ownerId: owner.id,
                 name: workbookName,
                 slug: workbookSlug,
                 description: `${workbookName} - Seeded workbook for ${owner.name}`,
-            })
-            .run();
+            });
     }
 
     // Folders (Order Analysis demo: "Revenue" folders for Queries and Charts)
@@ -368,26 +364,24 @@ function seedWorkbookEntities(params: {
 
     if (workbookSlug === adminWorkbookSlug) {
         queryRevenueFolderId = newId();
-        db.insert(folders)
+        await db.insert(folders)
             .values({
                 id: queryRevenueFolderId,
                 workbookId,
                 kind: 'query',
                 name: 'Revenue',
                 position: 0,
-            })
-            .run();
+            });
 
         chartRevenueFolderId = newId();
-        db.insert(folders)
+        await db.insert(folders)
             .values({
                 id: chartRevenueFolderId,
                 workbookId,
                 kind: 'chart',
                 name: 'Revenue',
                 position: 0,
-            })
-            .run();
+            });
     }
 
     // 3. Queries
@@ -400,19 +394,18 @@ function seedWorkbookEntities(params: {
                 ? queryRevenueFolderId
                 : null;
 
-        db.insert(queries)
+        await db.insert(queries)
             .values({
                 id,
                 workbookId,
                 name,
                 dataSourceId: sourceId,
                 mode: 'builder',
-                definition: JSON.stringify(definition),
+                definition,
                 sql: '',
                 folderId: queryFolderId,
                 position: 0,
-            })
-            .run();
+            });
     }
 
     // 4. Charts & Dashboard layout
@@ -427,35 +420,33 @@ function seedWorkbookEntities(params: {
                 ? chartRevenueFolderId
                 : null;
 
-        db.insert(charts)
+        await db.insert(charts)
             .values({
                 id,
                 workbookId,
                 queryId,
                 name: chart.name,
                 type: chart.type,
-                config: JSON.stringify(chartConfigSchema.parse(chart.config)),
+                config: chartConfigSchema.parse(chart.config) as Record<string, unknown>,
                 folderId: chartFolderId,
                 position: 0,
-            })
-            .run();
+            });
         layout.push({ i: id, chartId: id, ...chart.layout });
     }
 
     // 5. Dashboard
     const dashboardId = newId();
-    db.insert(dashboards)
+    await db.insert(dashboards)
         .values({
             id: dashboardId,
             ownerId: owner.id,
             workbookId,
             name: dashboardName,
             slug: dashboardSlug,
-            layout: JSON.stringify(layout),
-            filters: '[]',
+            layout,
+            filters: [],
             autoRefresh: 'off',
-        })
-        .run();
+        });
 
     return {
         sourceId,
@@ -477,7 +468,7 @@ export async function seedSampleWorkbook(targetUserId?: string): Promise<void> {
 
     // If specific target user requested (e.g. from UI 'Load sample data')
     if (targetUserId) {
-        let user = db.select().from(users).where(eq(users.id, targetUserId)).get();
+        let [user] = await db.select().from(users).where(eq(users.id, targetUserId));
         if (!user) {
             const seeded = await seedUsers();
             user = seeded.admin;
@@ -488,7 +479,7 @@ export async function seedSampleWorkbook(targetUserId?: string): Promise<void> {
         const workbookSlug = isUserAdmin ? adminWorkbookSlug : `${adminWorkbookSlug}-${user.id}`;
         const dashboardSlug = isUserAdmin ? adminDashboardSlug : `${adminDashboardSlug}-${user.id}`;
 
-        seedWorkbookEntities({
+        await seedWorkbookEntities({
             owner: user,
             sourceName: adminSourceName,
             sourceSlug,
@@ -505,8 +496,8 @@ export async function seedSampleWorkbook(targetUserId?: string): Promise<void> {
     }
 
     // Full seed mode: ensure users exist
-    let admin = db.select().from(users).where(eq(users.email, (process.env.SEED_ADMIN_EMAIL ?? 'admin@example.com').trim().toLowerCase())).get();
-    let member = db.select().from(users).where(eq(users.email, (process.env.SEED_DEMO_USER_EMAIL ?? 'member@example.com').trim().toLowerCase())).get();
+    let [admin] = await db.select().from(users).where(eq(users.email, (process.env.SEED_ADMIN_EMAIL ?? 'admin@example.com').trim().toLowerCase()));
+    let [member] = await db.select().from(users).where(eq(users.email, (process.env.SEED_DEMO_USER_EMAIL ?? 'member@example.com').trim().toLowerCase()));
 
     if (!admin || !member) {
         const seeded = await seedUsers();
@@ -515,7 +506,7 @@ export async function seedSampleWorkbook(targetUserId?: string): Promise<void> {
     }
 
     // Seed Admin Workbook & Entities
-    seedWorkbookEntities({
+    await seedWorkbookEntities({
         owner: admin,
         sourceName: adminSourceName,
         sourceSlug: adminSourceSlug,
@@ -528,7 +519,7 @@ export async function seedSampleWorkbook(targetUserId?: string): Promise<void> {
     });
 
     // Seed Member Workbook & Entities
-    seedWorkbookEntities({
+    await seedWorkbookEntities({
         owner: member,
         sourceName: memberSourceName,
         sourceSlug: memberSourceSlug,
@@ -562,21 +553,21 @@ export async function seedSampleWorkbook(targetUserId?: string): Promise<void> {
     }
 
     // Assert final counts
-    const adminSources = db.select().from(dataSources).where(eq(dataSources.ownerId, admin.id)).all();
-    const adminWorkbooks = db.select().from(workbooks).where(eq(workbooks.ownerId, admin.id)).all();
-    const adminDashboards = db.select().from(dashboards).where(eq(dashboards.ownerId, admin.id)).all();
+    const adminSources = await db.select().from(dataSources).where(eq(dataSources.ownerId, admin.id));
+    const adminWorkbooks = await db.select().from(workbooks).where(eq(workbooks.ownerId, admin.id));
+    const adminDashboards = await db.select().from(dashboards).where(eq(dashboards.ownerId, admin.id));
 
-    const memberSources = db.select().from(dataSources).where(eq(dataSources.ownerId, member.id)).all();
-    const memberWorkbooks = db.select().from(workbooks).where(eq(workbooks.ownerId, member.id)).all();
-    const memberDashboards = db.select().from(dashboards).where(eq(dashboards.ownerId, member.id)).all();
+    const memberSources = await db.select().from(dataSources).where(eq(dataSources.ownerId, member.id));
+    const memberWorkbooks = await db.select().from(workbooks).where(eq(workbooks.ownerId, member.id));
+    const memberDashboards = await db.select().from(dashboards).where(eq(dashboards.ownerId, member.id));
 
     const adminWbId = adminWorkbooks[0]?.id;
-    let adminQueries = adminWbId ? db.select().from(queries).where(eq(queries.workbookId, adminWbId)).all() : [];
-    const adminCharts = adminWbId ? db.select().from(charts).where(eq(charts.workbookId, adminWbId)).all() : [];
+    let adminQueries = adminWbId ? await db.select().from(queries).where(eq(queries.workbookId, adminWbId)) : [];
+    const adminCharts = adminWbId ? await db.select().from(charts).where(eq(charts.workbookId, adminWbId)) : [];
 
     const memberWbId = memberWorkbooks[0]?.id;
-    const memberQueries = memberWbId ? db.select().from(queries).where(eq(queries.workbookId, memberWbId)).all() : [];
-    const memberCharts = memberWbId ? db.select().from(charts).where(eq(charts.workbookId, memberWbId)).all() : [];
+    const memberQueries = memberWbId ? await db.select().from(queries).where(eq(queries.workbookId, memberWbId)) : [];
+    const memberCharts = memberWbId ? await db.select().from(charts).where(eq(charts.workbookId, memberWbId)) : [];
 
     // Optional external databases seeding
     if (process.env.SEED_EXTERNAL === 'true' && adminWbId) {
@@ -590,29 +581,27 @@ export async function seedSampleWorkbook(targetUserId?: string): Promise<void> {
             password: process.env.PG_PASSWORD || 'bi_password_123!',
             ssl: 'disable',
         };
-        db.insert(dataSources)
+        await db.insert(dataSources)
             .values({
                 id: pgId,
                 ownerId: admin.id,
                 name: 'PostgreSQL Demo',
                 slug: 'postgresql-demo',
                 type: 'postgres',
-                config: JSON.stringify(pgConfig),
+                config: pgConfig,
                 status: 'ok',
-            })
-            .run();
+            });
 
-        db.insert(queries)
+        await db.insert(queries)
             .values({
                 id: newId(),
                 workbookId: adminWbId,
                 dataSourceId: pgId,
                 name: 'PostgreSQL Customers',
                 mode: 'sql',
-                definition: JSON.stringify({ source: { table: 'customers' }, steps: [] }),
+                definition: { source: { table: 'customers' }, steps: [] },
                 sql: 'SELECT customer_id, name, city, state, region FROM "customers" LIMIT 50',
-            })
-            .run();
+            });
 
         const mysqlId = newId();
         const mysqlConfig = {
@@ -623,29 +612,27 @@ export async function seedSampleWorkbook(targetUserId?: string): Promise<void> {
             password: process.env.MYSQL_PASSWORD || 'bi_password_123!',
             ssl: 'disable',
         };
-        db.insert(dataSources)
+        await db.insert(dataSources)
             .values({
                 id: mysqlId,
                 ownerId: admin.id,
                 name: 'MySQL Demo',
                 slug: 'mysql-demo',
                 type: 'mysql',
-                config: JSON.stringify(mysqlConfig),
+                config: mysqlConfig,
                 status: 'ok',
-            })
-            .run();
+            });
 
-        db.insert(queries)
+        await db.insert(queries)
             .values({
                 id: newId(),
                 workbookId: adminWbId,
                 dataSourceId: mysqlId,
                 name: 'MySQL Products',
                 mode: 'sql',
-                definition: JSON.stringify({ source: { table: 'products' }, steps: [] }),
+                definition: { source: { table: 'products' }, steps: [] },
                 sql: 'SELECT product_id, name, category, price FROM `products` LIMIT 50',
-            })
-            .run();
+            });
 
         const mongoId = newId();
         const mongoConfig = {
@@ -657,31 +644,29 @@ export async function seedSampleWorkbook(targetUserId?: string): Promise<void> {
             password: process.env.MONGO_PASSWORD || 'bi_password_123!',
             authSource: 'admin',
         };
-        db.insert(dataSources)
+        await db.insert(dataSources)
             .values({
                 id: mongoId,
                 ownerId: admin.id,
                 name: 'MongoDB Demo',
                 slug: 'mongodb-demo',
                 type: 'mongodb',
-                config: JSON.stringify(mongoConfig),
+                config: mongoConfig,
                 status: 'ok',
-            })
-            .run();
+            });
 
-        db.insert(queries)
+        await db.insert(queries)
             .values({
                 id: newId(),
                 workbookId: adminWbId,
                 dataSourceId: mongoId,
                 name: 'MongoDB Reviews Pipeline',
                 mode: 'pipeline',
-                definition: JSON.stringify({ source: { table: 'reviews' }, steps: [] }),
+                definition: { source: { table: 'reviews' }, steps: [] },
                 sql: '[\n  {\n    "$match": { "score": { "$gte": 4 } }\n  },\n  {\n    "$limit": 50\n  }\n]',
-            })
-            .run();
+            });
 
-        adminQueries = db.select().from(queries).where(eq(queries.workbookId, adminWbId)).all();
+        adminQueries = await db.select().from(queries).where(eq(queries.workbookId, adminWbId));
     }
 
     const expectedAdminSources = process.env.SEED_EXTERNAL === 'true' ? 4 : 1;

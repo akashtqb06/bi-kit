@@ -1,0 +1,434 @@
+{
+  "persona": "family",
+  "anchorDate": "2026-10-31",
+  "accountBalances": {
+    "acc_fam_sal1_9qoiqyy1g32dxzur": 144000000,
+    "acc_fam_joint_b5al65ypzu7hx5hn": 337859000,
+    "acc_fam_cash_loqyisgaho5dc7aj": 0,
+    "acc_fam_cca_bpueek20vujx96y6": 0,
+    "acc_fam_ccb_q8ptt877dqbe52jq": 0,
+    "acc_fam_loan_0a13kwgcydsfcfzw": 550800000,
+    "acc_fam_fd1_eqwu56k7xcztssvt": -359000,
+    "acc_fam_fd2_jyk6gpc5ed800962": 0,
+    "acc_fam_mf_vl3jjjh6yp07fzc8": 0,
+    "acc_fam_stocks_2bwzu7r3aki6muu7": 0,
+    "acc_fam_arch_e1y1gh2xz6jyb1tt": 0
+  },
+  "monthEndNetWorth": [
+    {
+      "date": "2024-02-29",
+      "assets": 0,
+      "liabilities": 0,
+      "netWorth": 0
+    },
+    {
+      "date": "2024-10-31",
+      "assets": 92425022,
+      "liabilities": 454200000,
+      "netWorth": -361774978
+    },
+    {
+      "date": "2024-11-30",
+      "assets": 112160826,
+      "liabilities": 458400000,
+      "netWorth": -346239174
+    },
+    {
+      "date": "2024-12-31",
+      "assets": 128428543,
+      "liabilities": 462600000,
+      "netWorth": -334171457
+    },
+    {
+      "date": "2025-01-31",
+      "assets": 149202681,
+      "liabilities": 466800000,
+      "netWorth": -317597319
+    },
+    {
+      "date": "2025-02-28",
+      "assets": 168953651,
+      "liabilities": 471000000,
+      "netWorth": -302046349
+    },
+    {
+      "date": "2025-03-31",
+      "assets": 185324726,
+      "liabilities": 475200000,
+      "netWorth": -289875274
+    },
+    {
+      "date": "2025-04-30",
+      "assets": 206188853,
+      "liabilities": 479400000,
+      "netWorth": -273211147
+    },
+    {
+      "date": "2025-05-31",
+      "assets": 227044304,
+      "liabilities": 483600000,
+      "netWorth": -256555696
+    },
+    {
+      "date": "2025-06-30",
+      "assets": 242839416,
+      "liabilities": 487800000,
+      "netWorth": -244960584
+    },
+    {
+      "date": "2025-07-31",
+      "assets": 263928315,
+      "liabilities": 492000000,
+      "netWorth": -228071685
+    },
+    {
+      "date": "2025-08-31",
+      "assets": 284478292,
+      "liabilities": 496200000,
+      "netWorth": -211721708
+    },
+    {
+      "date": "2025-09-30",
+      "assets": 299398876,
+      "liabilities": 500400000,
+      "netWorth": -201001124
+    },
+    {
+      "date": "2025-10-31",
+      "assets": 319045256,
+      "liabilities": 504600000,
+      "netWorth": -185554744
+    },
+    {
+      "date": "2025-11-30",
+      "assets": 338942551,
+      "liabilities": 508800000,
+      "netWorth": -169857449
+    },
+    {
+      "date": "2025-12-31",
+      "assets": 355272393,
+      "liabilities": 513000000,
+      "netWorth": -157727607
+    },
+    {
+      "date": "2026-01-31",
+      "assets": 376914246,
+      "liabilities": 517200000,
+      "netWorth": -140285754
+    },
+    {
+      "date": "2026-02-28",
+      "assets": 396279937,
+      "liabilities": 521400000,
+      "netWorth": -125120063
+    },
+    {
+      "date": "2026-03-31",
+      "assets": 412075984,
+      "liabilities": 525600000,
+      "netWorth": -113524016
+    },
+    {
+      "date": "2026-04-30",
+      "assets": 432402802,
+      "liabilities": 529800000,
+      "netWorth": -97397198
+    },
+    {
+      "date": "2026-05-31",
+      "assets": 453595275,
+      "liabilities": 534000000,
+      "netWorth": -80404725
+    },
+    {
+      "date": "2026-06-30",
+      "assets": 469893386,
+      "liabilities": 538200000,
+      "netWorth": -68306614
+    },
+    {
+      "date": "2026-07-31",
+      "assets": 489837138,
+      "liabilities": 542400000,
+      "netWorth": -52562862
+    },
+    {
+      "date": "2026-08-31",
+      "assets": 510019747,
+      "liabilities": 546600000,
+      "netWorth": -36580253
+    },
+    {
+      "date": "2026-09-30",
+      "assets": 525892370,
+      "liabilities": 550800000,
+      "netWorth": -24907630
+    }
+  ],
+  "monthlyStats": [
+    {
+      "month": "2024-02",
+      "income": 0,
+      "expense": 2500000,
+      "savingsRate": 0,
+      "categories": {
+        "Education": 2500000
+      }
+    },
+    {
+      "month": "2024-10",
+      "income": 67000000,
+      "expense": 2800000,
+      "savingsRate": 0.9582,
+      "categories": {
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2024-11",
+      "income": 27000000,
+      "expense": 2800000,
+      "savingsRate": 0.8963,
+      "categories": {
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2024-12",
+      "income": 27000000,
+      "expense": 7300000,
+      "savingsRate": 0.7296,
+      "categories": {
+        "Education": 4500000,
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2025-01",
+      "income": 27000000,
+      "expense": 2800000,
+      "savingsRate": 0.8963,
+      "categories": {
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2025-02",
+      "income": 27000000,
+      "expense": 2800000,
+      "savingsRate": 0.8963,
+      "categories": {
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2025-03",
+      "income": 27000000,
+      "expense": 7300000,
+      "savingsRate": 0.7296,
+      "categories": {
+        "Education": 4500000,
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2025-04",
+      "income": 27000000,
+      "expense": 2800000,
+      "savingsRate": 0.8963,
+      "categories": {
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2025-05",
+      "income": 27000000,
+      "expense": 2800000,
+      "savingsRate": 0.8963,
+      "categories": {
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2025-06",
+      "income": 27000000,
+      "expense": 7300000,
+      "savingsRate": 0.7296,
+      "categories": {
+        "Education": 4500000,
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2025-07",
+      "income": 27000000,
+      "expense": 2800000,
+      "savingsRate": 0.8963,
+      "categories": {
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2025-08",
+      "income": 27000000,
+      "expense": 2800000,
+      "savingsRate": 0.8963,
+      "categories": {
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2025-09",
+      "income": 27000000,
+      "expense": 7300000,
+      "savingsRate": 0.7296,
+      "categories": {
+        "Education": 4500000,
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2025-10",
+      "income": 27000000,
+      "expense": 2800000,
+      "savingsRate": 0.8963,
+      "categories": {
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2025-11",
+      "income": 27000000,
+      "expense": 2800000,
+      "savingsRate": 0.8963,
+      "categories": {
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2025-12",
+      "income": 27000000,
+      "expense": 7300000,
+      "savingsRate": 0.7296,
+      "categories": {
+        "Education": 4500000,
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2026-01",
+      "income": 27000000,
+      "expense": 2800000,
+      "savingsRate": 0.8963,
+      "categories": {
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2026-02",
+      "income": 27000000,
+      "expense": 2800000,
+      "savingsRate": 0.8963,
+      "categories": {
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2026-03",
+      "income": 27000000,
+      "expense": 7300000,
+      "savingsRate": 0.7296,
+      "categories": {
+        "Education": 4500000,
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2026-04",
+      "income": 27000000,
+      "expense": 2800000,
+      "savingsRate": 0.8963,
+      "categories": {
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2026-05",
+      "income": 27000000,
+      "expense": 2800000,
+      "savingsRate": 0.8963,
+      "categories": {
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2026-06",
+      "income": 27000000,
+      "expense": 7300000,
+      "savingsRate": 0.7296,
+      "categories": {
+        "Education": 4500000,
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2026-07",
+      "income": 27000000,
+      "expense": 2800000,
+      "savingsRate": 0.8963,
+      "categories": {
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2026-08",
+      "income": 27000000,
+      "expense": 2800000,
+      "savingsRate": 0.8963,
+      "categories": {
+        "Groceries": 2800000
+      }
+    },
+    {
+      "month": "2026-09",
+      "income": 27000000,
+      "expense": 7300000,
+      "savingsRate": 0.7296,
+      "categories": {
+        "Education": 4500000,
+        "Groceries": 2800000
+      }
+    }
+  ],
+  "cardUtilization": {
+    "Credit Card A": {
+      "limit": 30000000,
+      "outstanding": 0,
+      "utilization": 0
+    },
+    "Credit Card B": {
+      "limit": 20000000,
+      "outstanding": 0,
+      "utilization": 0
+    }
+  },
+  "fdSimulation": {
+    "principalOrInstallment": 10000000,
+    "rate": 0.075,
+    "tenure": "1 Year (Quarterly Compounding)",
+    "closedFormMaturityPaise": 10771359,
+    "dayByDaySimulatedMaturityPaise": 10771359,
+    "differencePaise": 0,
+    "withinTolerance": true
+  },
+  "rdSimulation": {
+    "principalOrInstallment": 500000,
+    "rate": 0.07,
+    "tenure": "12 Months (Quarterly Compounding)",
+    "closedFormMaturityPaise": 6231066,
+    "dayByDaySimulatedMaturityPaise": 6231159,
+    "differencePaise": 93,
+    "withinTolerance": true
+  }
+}

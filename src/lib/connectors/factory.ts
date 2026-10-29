@@ -20,10 +20,14 @@ export function createConnector(source: DataSource): Connector {
     }
 
     let configJson: Record<string, unknown> = {};
-    try {
-        configJson = JSON.parse(source.config) as Record<string, unknown>;
-    } catch {
-        throw new ConnectorError('DataSource configuration is not valid JSON.', 'INVALID_CONFIG');
+    if (typeof source.config === 'string') {
+        try {
+            configJson = JSON.parse(source.config) as Record<string, unknown>;
+        } catch {
+            throw new ConnectorError('DataSource configuration is not valid JSON.', 'INVALID_CONFIG');
+        }
+    } else if (source.config && typeof source.config === 'object') {
+        configJson = source.config as Record<string, unknown>;
     }
 
     if (source.type === 'sqlite') {

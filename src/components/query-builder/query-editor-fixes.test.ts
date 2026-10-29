@@ -214,7 +214,7 @@ describe('Query Editor Fixes & SQL Mode Integration', () => {
 
     it('executes SQL mode query through API and validates read-only security with status 400', async () => {
         // Find sample data source
-        const allDs = db.select().from(dataSources).all();
+        const allDs = await db.select().from(dataSources);
         const sampleDs = allDs.find((d) => d.name.toLowerCase().includes('demo') || d.name.toLowerCase().includes('sample'));
         expect(sampleDs).toBeDefined();
 

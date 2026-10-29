@@ -31,7 +31,7 @@ export async function GET(req: Request): Promise<NextResponse> {
     const workbookId = searchParams.get("workbookId") ?? undefined;
     const filter = searchParams.get("filter") ?? undefined;
     return NextResponse.json({
-      data: listAllDashboards(
+      data: await listAllDashboards(
         q,
         workbookId,
         filter,
@@ -50,11 +50,11 @@ export async function POST(req: Request): Promise<NextResponse> {
     const parsed = createDashboardApiSchema.parse(body);
     const { workbookId, ...dashboardInput } = parsed;
     const title = (dashboardInput.title ?? dashboardInput.name)!.trim();
-    const wb = getWorkbook(workbookId);
+    const wb = await getWorkbook(workbookId);
     assertCan(user, 'edit', { type: 'workbook', id: workbookId, ownerId: wb.ownerId });
     return NextResponse.json(
       {
-        data: createDashboard(workbookId, {
+        data: await createDashboard(workbookId, {
           ...dashboardInput,
           name: title,
           ownerId: user.id,
@@ -72,10 +72,9 @@ export async function DELETE(req: Request): Promise<NextResponse> {
     const user = await requireUserApi();
     const body: unknown = await req.json();
     const { ids } = bulkDeleteDashboardsSchema.parse(body);
-    bulkDeleteDashboards(ids, { id: user.id, role: user.role });
+    await bulkDeleteDashboards(ids, { id: user.id, role: user.role });
     return NextResponse.json({ data: { ok: true, count: ids.length } });
   } catch (err) {
     return handleApiError(err);
   }
 }
-

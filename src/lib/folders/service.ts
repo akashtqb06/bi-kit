@@ -41,34 +41,33 @@ function toPublic(row: Folder, itemCount?: number): FolderPublic {
 // Service functions
 // ---------------------------------------------------------------------------
 
-export function listFolders(workbookId: string): FolderPublic[] {
-  const rows = db
+export async function listFolders(workbookId: string): Promise<FolderPublic[]> {
+  const rows = await db
     .select()
     .from(folders)
     .where(eq(folders.workbookId, workbookId))
-    .orderBy(folders.position, folders.name)
-    .all();
+    .orderBy(folders.position, folders.name);
 
   return rows.map((r) => toPublic(r));
 }
 
-export function getFolder(id: string): Folder {
-  const row = db.select().from(folders).where(eq(folders.id, id)).get();
+export async function getFolder(id: string): Promise<Folder> {
+  const [row] = await db.select().from(folders).where(eq(folders.id, id)).limit(1);
   if (!row) throw new NotFoundError(`Folder "${id}" not found.`);
   return row;
 }
 
-export function getFolderPublic(id: string): FolderPublic {
-  return toPublic(getFolder(id));
+export async function getFolderPublic(id: string): Promise<FolderPublic> {
+  return toPublic(await getFolder(id));
 }
 
-export function validateFolderAssignment(
+export async function validateFolderAssignment(
   folderId: string | null | undefined,
   workbookId: string,
   kind: 'query' | 'chart' | 'dashboard'
-): void {
+): Promise<void> {
   if (!folderId) return;
-  const folder = getFolder(folderId);
+  const folder = await getFolder(folderId);
   if (folder.workbookId !== workbookId) {
     throw new BadRequestError(`Folder "${folderId}" does not belong to workbook "${workbookId}".`);
   }
@@ -77,11 +76,11 @@ export function validateFolderAssignment(
   }
 }
 
-export function createFolder(input: CreateFolderInput): FolderPublic {
-  getWorkbook(input.workbookId);
+export async function createFolder(input: CreateFolderInput): Promise<FolderPublic> {
+  await getWorkbook(input.workbookId);
   const name = input.name.trim();
 
-  const existing = db
+  const [existing] = await db
     .select({ id: folders.id })
     .from(folders)
     .where(
@@ -91,14 +90,14 @@ export function createFolder(input: CreateFolderInput): FolderPublic {
         eq(folders.name, name)
       )
     )
-    .get();
+    .limit(1);
 
   if (existing) {
     throw new ConflictError(`A folder named "${name}" already exists in this section.`);
   }
 
   const id = newId();
-  db.insert(folders)
+  await db.insert(folders)
     .values({
       id,
       workbookId: input.workbookId,
@@ -106,19 +105,18 @@ export function createFolder(input: CreateFolderInput): FolderPublic {
       name,
       parentId: input.parentId ?? null,
       position: input.position ?? 0,
-    })
-    .run();
+    });
 
-  return getFolderPublic(id);
+  return await getFolderPublic(id);
 }
 
-export function updateFolder(id: string, input: UpdateFolderInput): FolderPublic {
-  const current = getFolder(id);
+export async function updateFolder(id: string, input: UpdateFolderInput): Promise<FolderPublic> {
+  const current = await getFolder(id);
   const updates: Partial<Folder> = { updatedAt: new Date() };
 
   if (input.name !== undefined) {
     const name = input.name.trim();
-    const existing = db
+    const [existing] = await db
       .select({ id: folders.id })
       .from(folders)
       .where(
@@ -129,7 +127,7 @@ export function updateFolder(id: string, input: UpdateFolderInput): FolderPublic
           sql`${folders.id} != ${id}`
         )
       )
-      .get();
+      .limit(1);
 
     if (existing) {
       throw new ConflictError(`A folder named "${name}" already exists in this section.`);
@@ -141,43 +139,42 @@ export function updateFolder(id: string, input: UpdateFolderInput): FolderPublic
     updates.position = input.position;
   }
 
-  db.update(folders).set(updates).where(eq(folders.id, id)).run();
-  return getFolderPublic(id);
+  await db.update(folders).set(updates).where(eq(folders.id, id));
+  return await getFolderPublic(id);
 }
 
-export function deleteFolder(id: string, mode: DeleteFolderMode = 'keep'): void {
-  const folder = getFolder(id);
+export async function deleteFolder(id: string, mode: DeleteFolderMode = 'keep'): Promise<void> {
+  const folder = await getFolder(id);
 
-  db.transaction((tx) => {
+  await db.transaction(async (tx) => {
     if (mode === 'delete') {
       if (folder.kind === 'query') {
-        const folderQueries = tx
+        const folderQueries = await tx
           .select({ id: queries.id })
           .from(queries)
-          .where(eq(queries.folderId, id))
-          .all();
+          .where(eq(queries.folderId, id));
         const queryIds = folderQueries.map((q) => q.id);
         if (queryIds.length > 0) {
-          tx.delete(charts).where(inArray(charts.queryId, queryIds)).run();
-          tx.delete(queries).where(eq(queries.folderId, id)).run();
+          await tx.delete(charts).where(inArray(charts.queryId, queryIds));
+          await tx.delete(queries).where(eq(queries.folderId, id));
         }
       } else if (folder.kind === 'chart') {
-        tx.delete(charts).where(eq(charts.folderId, id)).run();
+        await tx.delete(charts).where(eq(charts.folderId, id));
       } else if (folder.kind === 'dashboard') {
-        tx.delete(dashboards).where(eq(dashboards.folderId, id)).run();
+        await tx.delete(dashboards).where(eq(dashboards.folderId, id));
       }
     } else {
       // mode === 'keep': items move to section root (folderId set to null)
       if (folder.kind === 'query') {
-        tx.update(queries).set({ folderId: null }).where(eq(queries.folderId, id)).run();
+        await tx.update(queries).set({ folderId: null }).where(eq(queries.folderId, id));
       } else if (folder.kind === 'chart') {
-        tx.update(charts).set({ folderId: null }).where(eq(charts.folderId, id)).run();
+        await tx.update(charts).set({ folderId: null }).where(eq(charts.folderId, id));
       } else if (folder.kind === 'dashboard') {
-        tx.update(dashboards).set({ folderId: null }).where(eq(dashboards.folderId, id)).run();
+        await tx.update(dashboards).set({ folderId: null }).where(eq(dashboards.folderId, id));
       }
     }
 
-    tx.update(folders).set({ parentId: null }).where(eq(folders.parentId, id)).run();
-    tx.delete(folders).where(eq(folders.id, id)).run();
+    await tx.update(folders).set({ parentId: null }).where(eq(folders.parentId, id));
+    await tx.delete(folders).where(eq(folders.id, id));
   });
 }

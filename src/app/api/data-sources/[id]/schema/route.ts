@@ -13,7 +13,7 @@ export async function GET(
     try {
         const user = await requireUserApi();
         const { id } = await params;
-        const source = getDataSource(id);
+        const source = await getDataSource(id);
         assertCan(user, 'view', { type: 'data_source', id, ownerId: source.ownerId });
 
         const url = new URL(req.url);
@@ -27,7 +27,7 @@ export async function GET(
 
         // 1. Check cached schema if refresh is not requested
         if (!refresh) {
-            const cached = getCachedSchemaWithMeta(id);
+            const cached = await getCachedSchemaWithMeta(id);
             if (cached) {
                 return NextResponse.json({
                     data: {
@@ -44,7 +44,7 @@ export async function GET(
         // 2. Introspect via connector
         const connector = await getConnector(source);
         const snapshot = await connector.introspect({ sampleSize });
-        setCachedSchema(id, snapshot);
+        await setCachedSchema(id, snapshot);
 
         const fetchedAt = new Date().toISOString();
         return NextResponse.json({

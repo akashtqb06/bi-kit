@@ -8,11 +8,10 @@ export async function cleanTestData(): Promise<void> {
     console.log('--- Cleaning Test Data ---');
 
     // 1. Find all data sources named "Test SQLite Source" or "Test Sample Source"
-    const testSources = db
+    const testSources = await db
         .select()
         .from(dataSources)
-        .where(or(eq(dataSources.name, 'Test SQLite Source'), eq(dataSources.name, 'Test Sample Source')))
-        .all();
+        .where(or(eq(dataSources.name, 'Test SQLite Source'), eq(dataSources.name, 'Test Sample Source')));
 
     const testSourceIds = testSources.map((s) => s.id);
     let deletedSourcesCount = 0;
@@ -21,37 +20,35 @@ export async function cleanTestData(): Promise<void> {
 
     if (testSourceIds.length > 0) {
         // Find dependent queries
-        const depQueries = db
+        const depQueries = await db
             .select()
             .from(queries)
-            .where(inArray(queries.dataSourceId, testSourceIds))
-            .all();
+            .where(inArray(queries.dataSourceId, testSourceIds));
         const depQueryIds = depQueries.map((q) => q.id);
 
         if (depQueryIds.length > 0) {
             // Find dependent charts
-            const depCharts = db
+            const depCharts = await db
                 .select()
                 .from(charts)
-                .where(inArray(charts.queryId, depQueryIds))
-                .all();
+                .where(inArray(charts.queryId, depQueryIds));
             const depChartIds = depCharts.map((c) => c.id);
 
             if (depChartIds.length > 0) {
-                db.delete(charts).where(inArray(charts.id, depChartIds)).run();
+                await db.delete(charts).where(inArray(charts.id, depChartIds));
                 deletedChartsCount += depChartIds.length;
             }
 
-            db.delete(queries).where(inArray(queries.id, depQueryIds)).run();
+            await db.delete(queries).where(inArray(queries.id, depQueryIds));
             deletedQueriesCount += depQueryIds.length;
         }
 
-        db.delete(dataSources).where(inArray(dataSources.id, testSourceIds)).run();
+        await db.delete(dataSources).where(inArray(dataSources.id, testSourceIds));
         deletedSourcesCount += testSourceIds.length;
     }
 
     // 2. Find workbooks with test names: "Untitled*", "Test*", or known test workbook names
-    const allWorkbooks = db.select().from(workbooks).all();
+    const allWorkbooks = await db.select().from(workbooks);
     const testWorkbookNames = new Set([
         'Test Retail Workbook',
         'Alpha Finance',
@@ -86,30 +83,30 @@ export async function cleanTestData(): Promise<void> {
     let deletedDashboardsCount = 0;
 
     for (const wb of workbooksToDelete) {
-        const wbCharts = db.select().from(charts).where(eq(charts.workbookId, wb.id)).all();
+        const wbCharts = await db.select().from(charts).where(eq(charts.workbookId, wb.id));
         if (wbCharts.length > 0) {
-            db.delete(charts).where(eq(charts.workbookId, wb.id)).run();
+            await db.delete(charts).where(eq(charts.workbookId, wb.id));
             deletedChartsCount += wbCharts.length;
         }
 
-        const wbQueries = db.select().from(queries).where(eq(queries.workbookId, wb.id)).all();
+        const wbQueries = await db.select().from(queries).where(eq(queries.workbookId, wb.id));
         if (wbQueries.length > 0) {
-            db.delete(queries).where(eq(queries.workbookId, wb.id)).run();
+            await db.delete(queries).where(eq(queries.workbookId, wb.id));
             deletedQueriesCount += wbQueries.length;
         }
 
-        const wbDashboards = db.select().from(dashboards).where(eq(dashboards.workbookId, wb.id)).all();
+        const wbDashboards = await db.select().from(dashboards).where(eq(dashboards.workbookId, wb.id));
         if (wbDashboards.length > 0) {
-            db.delete(dashboards).where(eq(dashboards.workbookId, wb.id)).run();
+            await db.delete(dashboards).where(eq(dashboards.workbookId, wb.id));
             deletedDashboardsCount += wbDashboards.length;
         }
 
-        const wbFolders = db.select().from(folders).where(eq(folders.workbookId, wb.id)).all();
+        const wbFolders = await db.select().from(folders).where(eq(folders.workbookId, wb.id));
         if (wbFolders.length > 0) {
-            db.delete(folders).where(eq(folders.workbookId, wb.id)).run();
+            await db.delete(folders).where(eq(folders.workbookId, wb.id));
         }
 
-        db.delete(workbooks).where(eq(workbooks.id, wb.id)).run();
+        await db.delete(workbooks).where(eq(workbooks.id, wb.id));
         deletedWorkbooksCount++;
     }
 
@@ -120,19 +117,16 @@ export async function cleanTestData(): Promise<void> {
     console.log(`  - Charts:       ${deletedChartsCount}`);
     console.log(`  - Dashboards:   ${deletedDashboardsCount}`);
 
-    console.log('\n--- Active Data Sources (API output) ---');
-    const remainingSources = listDataSources();
-    console.log(JSON.stringify(remainingSources, null, 2));
-
-    console.log('\n--- Active Workbooks (API output) ---');
-    const remainingWorkbooks = listWorkbooks();
-    console.log(JSON.stringify(remainingWorkbooks, null, 2));
+    const remainingSources = await listDataSources();
+    const remainingWorkbooks = await listWorkbooks();
+    console.log(`Clean-up complete. Remaining: ${remainingSources.length} sources, ${remainingWorkbooks.length} workbooks.`);
 }
 
 if (process.argv[1] && process.argv[1].endsWith('clean-tests.ts')) {
-    cleanTestData().catch((err: unknown) => {
-        console.error('clean-tests failed:', err);
-        process.exitCode = 1;
-    });
+    cleanTestData()
+        .then(() => process.exit(0))
+        .catch((err) => {
+            console.error('Failed to clean test data:', err);
+            process.exit(1);
+        });
 }
-

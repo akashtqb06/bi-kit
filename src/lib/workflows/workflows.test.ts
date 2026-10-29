@@ -42,7 +42,7 @@ process.env.APP_DB_PATH = path.join(appDatabaseDirectory, 'app.db');
 const { DATA_DIR, CSV_DIR } = await import('@src/lib/db/paths');
 
 const { runMigrations, resetConnection } = await import('@src/lib/db');
-runMigrations();
+await runMigrations();
 const { seedUsers } = await import('../../../scripts/seed/users');
 const { admin } = await seedUsers();
 setTestSessionUser(admin);
@@ -122,6 +122,14 @@ afterAll(() => {
 
 describe('saved BI workflow', () => {
     it('creates a source, runs a filtered summary, saves charts, and persists dashboard layout', async () => {
+        const { db } = await import('@src/lib/db');
+        const { users } = await import('@src/lib/db/schema');
+        const { eq } = await import('drizzle-orm');
+        const [currentAdmin] = await db.select().from(users).where(eq(users.role, 'admin')).limit(1);
+        if (currentAdmin) {
+            setTestSessionUser(currentAdmin);
+        }
+
         const sourceDirectory = mkdtempSync(path.join(DATA_DIR, '.workflow-source-'));
         const sourcePath = path.join(sourceDirectory, 'orders.db');
         const sourceDatabase = new Database(sourcePath);

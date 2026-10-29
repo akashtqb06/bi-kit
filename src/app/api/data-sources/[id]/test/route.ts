@@ -1,8 +1,24 @@
 import { NextResponse } from 'next/server';
 import { getDataSource, updateDataSourceStatus } from '@src/lib/data-sources/service';
 import { getConnector } from '@src/lib/connectors/manager';
-import { handleApiError } from '@src/app/api/utils';
+import { handleApiError, apiError } from '@src/app/api/utils';
 import { requireUserApi, assertCan } from '@src/lib/auth/dal';
+
+const testRateLimits = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(key: string, maxRequests = 10, windowMs = 60_000): boolean {
+    const now = Date.now();
+    const current = testRateLimits.get(key);
+    if (!current || now > current.resetAt) {
+        testRateLimits.set(key, { count: 1, resetAt: now + windowMs });
+        return true;
+    }
+    if (current.count >= maxRequests) {
+        return false;
+    }
+    current.count++;
+    return true;
+}
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -12,8 +28,15 @@ export async function POST(
 ): Promise<NextResponse> {
     try {
         const user = await requireUserApi();
+
+        // Rate limit: 10 tests/min per user
+        const rateLimitKey = `ds-test:${user.id}`;
+        if (!checkRateLimit(rateLimitKey, 10, 60_000)) {
+            return apiError('Too many connection test requests. Please wait before trying again (rate limit: 10/min).', 429);
+        }
+
         const { id } = await params;
-        const source = getDataSource(id);
+        const source = await getDataSource(id);
         assertCan(user, 'edit', { type: 'data_source', id, ownerId: source.ownerId });
 
         const connector = await getConnector(source);
@@ -22,7 +45,7 @@ export async function POST(
             const snapshot = testResult.ok ? await connector.introspect().catch(() => null) : null;
             const tableCount = snapshot?.tables?.length ?? 0;
 
-            updateDataSourceStatus(id, {
+            await updateDataSourceStatus(id, {
                 status: testResult.ok ? 'ok' : 'error',
                 lastTestedAt: new Date(),
                 serverVersion: testResult.serverVersion,
@@ -40,7 +63,7 @@ export async function POST(
             });
         } catch (testErr) {
             const errMsg = testErr instanceof Error ? testErr.message : 'Connection test failed';
-            updateDataSourceStatus(id, {
+            await updateDataSourceStatus(id, {
                 status: 'error',
                 lastTestedAt: new Date(),
                 lastError: errMsg,

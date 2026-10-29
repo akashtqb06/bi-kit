@@ -29,13 +29,18 @@ export interface QueryPublic {
 }
 
 function toPublic(row: Query): QueryPublic {
+  const defStr =
+    typeof row.definition === "string"
+      ? row.definition
+      : JSON.stringify(row.definition ?? []);
+
   return {
     id: row.id,
     workbookId: row.workbookId,
     name: row.name,
     dataSourceId: row.dataSourceId,
     mode: row.mode as "builder" | "sql" | "pipeline",
-    definition: row.definition,
+    definition: defStr,
     sql: row.sql,
     folderId: row.folderId,
     position: row.position,
@@ -49,110 +54,116 @@ function toPublic(row: Query): QueryPublic {
 // Service functions
 // ---------------------------------------------------------------------------
 
-export function listQueries(workbookId?: string, user?: { id: string; role: string }): QueryPublic[] {
+export async function listQueries(
+  workbookId?: string,
+  user?: { id: string; role: string }
+): Promise<QueryPublic[]> {
   if (workbookId) {
     if (user && user.role !== "admin") {
-      const wb = db.select().from(workbooks).where(eq(workbooks.id, workbookId)).get();
+      const [wb] = await db.select().from(workbooks).where(eq(workbooks.id, workbookId)).limit(1);
       if (!wb || wb.ownerId !== user.id) return [];
     }
-    const rows = db.select().from(queries).where(eq(queries.workbookId, workbookId)).all();
+    const rows = await db.select().from(queries).where(eq(queries.workbookId, workbookId));
     return rows.map(toPublic);
   }
 
   if (user && user.role !== "admin") {
-    const rows = db
+    const rows = await db
       .select({ query: queries })
       .from(queries)
       .innerJoin(workbooks, eq(queries.workbookId, workbooks.id))
-      .where(eq(workbooks.ownerId, user.id))
-      .all();
+      .where(eq(workbooks.ownerId, user.id));
     return rows.map((r) => toPublic(r.query));
   }
 
-  const rows = db.select().from(queries).all();
+  const rows = await db.select().from(queries);
   return rows.map(toPublic);
 }
 
-export function getQuery(id: string): Query {
-  const row = db.select().from(queries).where(eq(queries.id, id)).get();
+export async function getQuery(id: string): Promise<Query> {
+  const [row] = await db.select().from(queries).where(eq(queries.id, id)).limit(1);
   if (!row) throw new NotFoundError(`Query "${id}" not found.`);
   return row;
 }
 
-export function getQueryPublic(id: string): QueryPublic {
-  return toPublic(getQuery(id));
+export async function getQueryPublic(id: string): Promise<QueryPublic> {
+  return toPublic(await getQuery(id));
 }
 
-export function createQuery(input: CreateQueryInput, createdBy?: string): QueryPublic {
+export async function createQuery(input: CreateQueryInput, createdBy?: string): Promise<QueryPublic> {
   // Verify FK relationships are valid
-  getWorkbook(input.workbookId);
-  getDataSource(input.dataSourceId);
+  await getWorkbook(input.workbookId);
+  await getDataSource(input.dataSourceId);
   if (input.folderId) {
-    validateFolderAssignment(input.folderId, input.workbookId, 'query');
+    await validateFolderAssignment(input.folderId, input.workbookId, 'query');
   }
 
-  const definitionStr =
-    typeof input.definition === 'string'
-      ? input.definition
-      : input.definition !== undefined
-      ? JSON.stringify(input.definition)
-      : "[]";
+  let definitionVal: unknown = input.definition ?? [];
+  if (typeof input.definition === 'string') {
+    try {
+      definitionVal = JSON.parse(input.definition);
+    } catch {
+      definitionVal = input.definition;
+    }
+  }
 
   const id = newId();
-  db.insert(queries)
-    .values({
-      id,
-      workbookId: input.workbookId,
-      name: input.name,
-      dataSourceId: input.dataSourceId,
-      mode: input.mode ?? "builder",
-      definition: definitionStr,
-      sql: input.sql ?? "",
-      folderId: input.folderId ?? null,
-      position: input.position ?? 0,
-      createdBy: createdBy ?? null,
-    })
-    .run();
+  await db.insert(queries).values({
+    id,
+    workbookId: input.workbookId,
+    name: input.name,
+    dataSourceId: input.dataSourceId,
+    mode: input.mode ?? "builder",
+    definition: definitionVal,
+    sql: input.sql ?? "",
+    folderId: input.folderId ?? null,
+    position: input.position ?? 0,
+    createdBy: createdBy ?? null,
+  });
 
-  return getQueryPublic(id);
+  return await getQueryPublic(id);
 }
 
-export function updateQuery(
+export async function updateQuery(
   id: string,
   input: Partial<CreateQueryInput>
-): QueryPublic {
-  const current = getQuery(id); // throws if missing
-  const updates: Partial<Query> = { updatedAt: new Date() };
+): Promise<QueryPublic> {
+  const current = await getQuery(id); // throws if missing
+  const updates: Partial<typeof queries.$inferInsert> = { updatedAt: new Date() };
   if (input.name !== undefined) updates.name = input.name;
   if (input.mode !== undefined) updates.mode = input.mode;
   if (input.definition !== undefined) {
-    updates.definition =
-      typeof input.definition === 'string'
-        ? input.definition
-        : JSON.stringify(input.definition);
+    if (typeof input.definition === 'string') {
+      try {
+        updates.definition = JSON.parse(input.definition);
+      } catch {
+        updates.definition = input.definition;
+      }
+    } else {
+      updates.definition = input.definition;
+    }
   }
   if (input.sql !== undefined) updates.sql = input.sql;
   if (input.folderId !== undefined) {
     if (input.folderId !== null) {
-      validateFolderAssignment(input.folderId, current.workbookId, 'query');
+      await validateFolderAssignment(input.folderId, current.workbookId, 'query');
     }
     updates.folderId = input.folderId ?? null;
   }
   if (input.position !== undefined) updates.position = input.position;
   if (input.dataSourceId !== undefined) {
-    getDataSource(input.dataSourceId);
+    await getDataSource(input.dataSourceId);
     updates.dataSourceId = input.dataSourceId;
   }
-  db.update(queries).set(updates).where(eq(queries.id, id)).run();
-  return getQueryPublic(id);
+  await db.update(queries).set(updates).where(eq(queries.id, id));
+  return await getQueryPublic(id);
 }
 
-export function deleteQuery(id: string): void {
-  getQuery(id); // throws if missing
-  const dep = db.select().from(charts).where(eq(charts.queryId, id)).get();
+export async function deleteQuery(id: string): Promise<void> {
+  await getQuery(id); // throws if missing
+  const [dep] = await db.select().from(charts).where(eq(charts.queryId, id)).limit(1);
   if (dep) {
     throw new Error("Cannot delete: this query is referenced by one or more charts.");
   }
-  db.delete(queries).where(eq(queries.id, id)).run();
+  await db.delete(queries).where(eq(queries.id, id));
 }
-

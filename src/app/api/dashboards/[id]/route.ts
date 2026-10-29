@@ -15,9 +15,9 @@ export async function GET(_req: Request, { params }: RouteParams): Promise<NextR
   try {
     const user = await requireUserApi();
     const { id } = await params;
-    const dashboard = getDashboard(id);
+    const dashboard = await getDashboard(id);
     assertCan(user, 'view', { type: 'dashboard', id, ownerId: dashboard.ownerId, workbookId: dashboard.workbookId });
-    return NextResponse.json({ data: getDashboardPublic(id, user.id) });
+    return NextResponse.json({ data: await getDashboardPublic(id, user.id) });
   } catch (err) {
     return handleApiError(err);
   }
@@ -27,7 +27,7 @@ export async function PUT(req: Request, { params }: RouteParams): Promise<NextRe
   try {
     const user = await requireUserApi();
     const { id } = await params;
-    const dashboard = getDashboard(id);
+    const dashboard = await getDashboard(id);
     const body: unknown = await req.json();
     const input = updateDashboardSchema.parse(body);
     const isOnlyFavorite =
@@ -48,7 +48,7 @@ export async function PUT(req: Request, { params }: RouteParams): Promise<NextRe
       ...input,
       name: input.name ?? input.title,
     };
-    return NextResponse.json({ data: updateDashboard(id, resolved, user.id) });
+    return NextResponse.json({ data: await updateDashboard(id, resolved, user.id) });
   } catch (err) {
     return handleApiError(err);
   }
@@ -62,12 +62,11 @@ export async function DELETE(_req: Request, { params }: RouteParams): Promise<Ne
   try {
     const user = await requireUserApi();
     const { id } = await params;
-    const dashboard = getDashboard(id);
+    const dashboard = await getDashboard(id);
     assertCan(user, 'delete', { type: 'dashboard', id, ownerId: dashboard.ownerId, workbookId: dashboard.workbookId });
-    deleteDashboard(id);
+    await deleteDashboard(id);
     return NextResponse.json({ data: { ok: true } });
   } catch (err) {
     return handleApiError(err);
   }
 }
-

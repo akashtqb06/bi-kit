@@ -1,0 +1,539 @@
+{
+  "persona": "salaried-urban",
+  "anchorDate": "2026-10-31",
+  "accountBalances": {
+    "acc_salary_s8z3nmqygh0btr1d": 112826361,
+    "acc_savings_84t5vdzwm2myckec": 14815000,
+    "acc_cash_rodlxhk5uka95z2v": 15360000,
+    "acc_cc_a_6q2xlusggzy0cryi": 0,
+    "acc_fd_1_n40pbi5uncc9f8tk": 10000000,
+    "acc_rd_1_6oljo6kq5oclfr8d": 12000000,
+    "acc_mf_sip_o0sl4uocpd624a95": 36000000,
+    "acc_archived_1kmykgj4p8ixwgtw": 0
+  },
+  "monthEndNetWorth": [
+    {
+      "date": "2024-02-29",
+      "assets": 142850,
+      "liabilities": 0,
+      "netWorth": 142850
+    },
+    {
+      "date": "2024-10-31",
+      "assets": 35518595,
+      "liabilities": 0,
+      "netWorth": 35518595
+    },
+    {
+      "date": "2024-11-30",
+      "assets": 41863546,
+      "liabilities": 0,
+      "netWorth": 41863546
+    },
+    {
+      "date": "2024-12-31",
+      "assets": 49419985,
+      "liabilities": 0,
+      "netWorth": 49419985
+    },
+    {
+      "date": "2025-01-31",
+      "assets": 56902718,
+      "liabilities": 0,
+      "netWorth": 56902718
+    },
+    {
+      "date": "2025-02-28",
+      "assets": 65030075,
+      "liabilities": 0,
+      "netWorth": 65030075
+    },
+    {
+      "date": "2025-03-31",
+      "assets": 72687150,
+      "liabilities": 0,
+      "netWorth": 72687150
+    },
+    {
+      "date": "2025-04-30",
+      "assets": 80483917,
+      "liabilities": 0,
+      "netWorth": 80483917
+    },
+    {
+      "date": "2025-05-31",
+      "assets": 86956646,
+      "liabilities": 0,
+      "netWorth": 86956646
+    },
+    {
+      "date": "2025-06-30",
+      "assets": 96251585,
+      "liabilities": 0,
+      "netWorth": 96251585
+    },
+    {
+      "date": "2025-07-31",
+      "assets": 104265967,
+      "liabilities": 0,
+      "netWorth": 104265967
+    },
+    {
+      "date": "2025-08-31",
+      "assets": 112112935,
+      "liabilities": 0,
+      "netWorth": 112112935
+    },
+    {
+      "date": "2025-09-30",
+      "assets": 120103128,
+      "liabilities": 0,
+      "netWorth": 120103128
+    },
+    {
+      "date": "2025-10-31",
+      "assets": 126755916,
+      "liabilities": 0,
+      "netWorth": 126755916
+    },
+    {
+      "date": "2025-11-30",
+      "assets": 133576453,
+      "liabilities": 0,
+      "netWorth": 133576453
+    },
+    {
+      "date": "2025-12-31",
+      "assets": 141818425,
+      "liabilities": 0,
+      "netWorth": 141818425
+    },
+    {
+      "date": "2026-01-31",
+      "assets": 148079062,
+      "liabilities": 0,
+      "netWorth": 148079062
+    },
+    {
+      "date": "2026-02-28",
+      "assets": 158223196,
+      "liabilities": 0,
+      "netWorth": 158223196
+    },
+    {
+      "date": "2026-03-31",
+      "assets": 166503871,
+      "liabilities": 0,
+      "netWorth": 166503871
+    },
+    {
+      "date": "2026-04-30",
+      "assets": 175077454,
+      "liabilities": 0,
+      "netWorth": 175077454
+    },
+    {
+      "date": "2026-05-31",
+      "assets": 182284387,
+      "liabilities": 0,
+      "netWorth": 182284387
+    },
+    {
+      "date": "2026-06-30",
+      "assets": 190456794,
+      "liabilities": 0,
+      "netWorth": 190456794
+    },
+    {
+      "date": "2026-07-31",
+      "assets": 198816206,
+      "liabilities": 0,
+      "netWorth": 198816206
+    },
+    {
+      "date": "2026-08-31",
+      "assets": 207176187,
+      "liabilities": 0,
+      "netWorth": 207176187
+    },
+    {
+      "date": "2026-09-30",
+      "assets": 215454112,
+      "liabilities": 0,
+      "netWorth": 215454112
+    }
+  ],
+  "monthlyStats": [
+    {
+      "month": "2024-02",
+      "income": 142850,
+      "expense": 0,
+      "savingsRate": 1,
+      "categories": {}
+    },
+    {
+      "month": "2024-10",
+      "income": 37500000,
+      "expense": 7324255,
+      "savingsRate": 0.8047,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 305726,
+        "Utilities": 354000,
+        "Shopping": 3269629,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2024-11",
+      "income": 12500000,
+      "expense": 6423049,
+      "savingsRate": 0.4862,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 248867,
+        "Utilities": 354000,
+        "Shopping": 2425282,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2024-12",
+      "income": 12500000,
+      "expense": 5070581,
+      "savingsRate": 0.5944,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 273035,
+        "Utilities": 354000,
+        "Shopping": 1048646,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2025-01",
+      "income": 12500000,
+      "expense": 5168692,
+      "savingsRate": 0.5865,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 330767,
+        "Utilities": 354000,
+        "Health": 185000,
+        "Shopping": 904025,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2025-02",
+      "income": 12500000,
+      "expense": 4548839,
+      "savingsRate": 0.6361,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 179009,
+        "Utilities": 354000,
+        "Shopping": 620930,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2025-03",
+      "income": 12500000,
+      "expense": 5044264,
+      "savingsRate": 0.5965,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 352978,
+        "Utilities": 354000,
+        "Shopping": 942386,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2025-04",
+      "income": 12500000,
+      "expense": 4930092,
+      "savingsRate": 0.6056,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 343815,
+        "Utilities": 354000,
+        "Shopping": 837377,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2025-05",
+      "income": 12500000,
+      "expense": 4527271,
+      "savingsRate": 0.6378,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 318725,
+        "Utilities": 354000,
+        "Shopping": 459646,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2025-06",
+      "income": 12500000,
+      "expense": 4809286,
+      "savingsRate": 0.6153,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 290438,
+        "Utilities": 354000,
+        "Shopping": 769948,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2025-07",
+      "income": 12500000,
+      "expense": 4784943,
+      "savingsRate": 0.6172,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 213555,
+        "Utilities": 354000,
+        "Shopping": 822488,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2025-08",
+      "income": 12500000,
+      "expense": 4979347,
+      "savingsRate": 0.6017,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 310407,
+        "Utilities": 354000,
+        "Shopping": 920040,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2025-09",
+      "income": 12500000,
+      "expense": 4863517,
+      "savingsRate": 0.6109,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 273321,
+        "Utilities": 354000,
+        "Shopping": 841296,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2025-10",
+      "income": 12500000,
+      "expense": 6864588,
+      "savingsRate": 0.4508,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 322108,
+        "Utilities": 354000,
+        "Shopping": 2793580,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2025-11",
+      "income": 12500000,
+      "expense": 6797534,
+      "savingsRate": 0.4562,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 270377,
+        "Utilities": 354000,
+        "Shopping": 2778257,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2025-12",
+      "income": 12500000,
+      "expense": 4716575,
+      "savingsRate": 0.6227,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 283910,
+        "Utilities": 354000,
+        "Shopping": 683765,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2026-01",
+      "income": 12500000,
+      "expense": 4739363,
+      "savingsRate": 0.6209,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 200662,
+        "Utilities": 354000,
+        "Shopping": 789801,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2026-02",
+      "income": 12500000,
+      "expense": 4861537,
+      "savingsRate": 0.6111,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 265264,
+        "Utilities": 354000,
+        "Shopping": 847373,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2026-03",
+      "income": 12500000,
+      "expense": 4767336,
+      "savingsRate": 0.6186,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 260409,
+        "Utilities": 354000,
+        "Shopping": 757997,
+        "Groceries": 145000,
+        "Others": 30,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2026-04",
+      "income": 12749900,
+      "expense": 4755048,
+      "savingsRate": 0.6271,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 146990,
+        "Utilities": 354000,
+        "Shopping": 859158,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2026-05",
+      "income": 12500000,
+      "expense": 4887958,
+      "savingsRate": 0.609,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 215056,
+        "Utilities": 354000,
+        "Shopping": 924002,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2026-06",
+      "income": 12500000,
+      "expense": 4953906,
+      "savingsRate": 0.6037,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 272903,
+        "Utilities": 354000,
+        "Shopping": 932103,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2026-07",
+      "income": 12500000,
+      "expense": 4798795,
+      "savingsRate": 0.6161,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 233577,
+        "Utilities": 354000,
+        "Shopping": 763318,
+        "Groceries": 145000,
+        "Transport": 53000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2026-08",
+      "income": 12500000,
+      "expense": 4830599,
+      "savingsRate": 0.6136,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 343084,
+        "Utilities": 354000,
+        "Shopping": 738615,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    },
+    {
+      "month": "2026-09",
+      "income": 12500000,
+      "expense": 4945514,
+      "savingsRate": 0.6044,
+      "categories": {
+        "Rent": 3200000,
+        "Food & Dining": 217977,
+        "Utilities": 354000,
+        "Shopping": 978637,
+        "Groceries": 145000,
+        "Subscriptions": 49900
+      }
+    }
+  ],
+  "cardUtilization": {
+    "Credit Card A": {
+      "limit": 15000000,
+      "outstanding": 0,
+      "utilization": 0
+    }
+  },
+  "fdSimulation": {
+    "principalOrInstallment": 10000000,
+    "rate": 0.075,
+    "tenure": "1 Year (Quarterly Compounding)",
+    "closedFormMaturityPaise": 10771359,
+    "dayByDaySimulatedMaturityPaise": 10771359,
+    "differencePaise": 0,
+    "withinTolerance": true
+  },
+  "rdSimulation": {
+    "principalOrInstallment": 500000,
+    "rate": 0.07,
+    "tenure": "12 Months (Quarterly Compounding)",
+    "closedFormMaturityPaise": 6231066,
+    "dayByDaySimulatedMaturityPaise": 6231159,
+    "differencePaise": 93,
+    "withinTolerance": true
+  }
+}

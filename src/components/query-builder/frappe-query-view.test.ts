@@ -44,11 +44,11 @@ function postJson(url: string, body: unknown): Request {
 describe('Frappe Insights Query View flow verification', () => {
     it('executes Select Source -> Filter Rows -> Group & Summarize with reverse ordering and execution time', async () => {
         // 1. Find the sample data source
-        const allDs = db.select().from(dataSources).all();
+        const allDs = await db.select().from(dataSources);
         const sampleDs = allDs.find((d) => d.name.toLowerCase().includes('demo') || d.name.toLowerCase().includes('sample'));
         expect(sampleDs).toBeDefined();
 
-        const connector = createConnector(getDataSource(sampleDs!.id)) as SqliteConnector;
+        const connector = createConnector(await getDataSource(sampleDs!.id)) as SqliteConnector;
         const schema = connector.getSchema();
         await connector.close();
 

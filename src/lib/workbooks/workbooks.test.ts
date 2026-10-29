@@ -36,7 +36,7 @@ const appDatabaseDirectory = mkdtempSync(path.join(tmpdir(), 'bi-kit-wb-test-'))
 process.env.APP_DB_PATH = path.join(appDatabaseDirectory, 'app.db');
 
 const { db, runMigrations, resetConnection } = await import('@src/lib/db');
-runMigrations();
+await runMigrations();
 const { seedUsers } = await import('../../../scripts/seed/users');
 await seedUsers();
 
@@ -60,27 +60,26 @@ afterAll(() => {
 });
 
 describe('workbooks backend services and endpoints', () => {
-    it('lists workbooks with counts per workbook', () => {
-        const wb1 = createWorkbook({ name: 'WB 1', description: 'First' });
-        const wb2 = createWorkbook({ name: 'WB 2', description: 'Second' });
+    it('lists workbooks with counts per workbook', async () => {
+        const wb1 = await createWorkbook({ name: 'WB 1', description: 'First' });
+        const wb2 = await createWorkbook({ name: 'WB 2', description: 'Second' });
 
-        const testUser = db.select().from(users).get()!;
+        const testUser = (await db.select().from(users).limit(1))[0]!;
 
         // Create a dummy datasource
         const dsId = newId();
-        db.insert(dataSources)
+        await db.insert(dataSources)
             .values({
                 id: dsId,
                 ownerId: testUser.id,
                 name: 'Test DS',
                 type: 'sqlite',
-                config: JSON.stringify({ path: ':memory:' }),
-            })
-            .run();
+                config: { path: ':memory:' },
+            });
 
         // Add query to wb1
         const q1Id = newId();
-        db.insert(queries)
+        await db.insert(queries)
             .values({
                 id: q1Id,
                 workbookId: wb1.id,
@@ -88,34 +87,31 @@ describe('workbooks backend services and endpoints', () => {
                 dataSourceId: dsId,
                 mode: 'sql',
                 sql: 'SELECT 1',
-            })
-            .run();
+            });
 
         // Add chart to wb1
         const c1Id = newId();
-        db.insert(charts)
+        await db.insert(charts)
             .values({
                 id: c1Id,
                 workbookId: wb1.id,
                 queryId: q1Id,
                 name: 'Chart 1',
                 type: 'bar',
-                config: '{}',
-            })
-            .run();
+                config: {},
+            });
 
         // Add dashboard to wb1
-        db.insert(dashboards)
+        await db.insert(dashboards)
             .values({
                 id: newId(),
                 ownerId: testUser.id,
                 workbookId: wb1.id,
                 name: 'Dashboard 1',
-                layout: JSON.stringify([{ i: '1', chartId: c1Id, x: 0, y: 0, w: 6, h: 4 }]),
-            })
-            .run();
+                layout: [{ i: '1', chartId: c1Id, x: 0, y: 0, w: 6, h: 4 }],
+            });
 
-        const list = listWorkbooks();
+        const list = await listWorkbooks();
         const found1 = list.find((w) => w.id === wb1.id);
         const found2 = list.find((w) => w.id === wb2.id);
 
@@ -130,22 +126,21 @@ describe('workbooks backend services and endpoints', () => {
         expect(found2?.dashboardsCount).toBe(0);
     });
 
-    it('duplicates a workbook with queries, charts, and dashboards', () => {
-        const original = createWorkbook({ name: 'Original', description: 'To duplicate' });
+    it('duplicates a workbook with queries, charts, and dashboards', async () => {
+        const original = await createWorkbook({ name: 'Original', description: 'To duplicate' });
         const dsId = newId();
-        const testUser = db.select().from(users).get()!;
-        db.insert(dataSources)
+        const testUser = (await db.select().from(users).limit(1))[0]!;
+        await db.insert(dataSources)
             .values({
                 id: dsId,
                 ownerId: testUser.id,
                 name: 'DS for dup',
                 type: 'sqlite',
-                config: JSON.stringify({ path: ':memory:' }),
-            })
-            .run();
+                config: { path: ':memory:' },
+            });
 
         const qId = newId();
-        db.insert(queries)
+        await db.insert(queries)
             .values({
                 id: qId,
                 workbookId: original.id,
@@ -153,32 +148,29 @@ describe('workbooks backend services and endpoints', () => {
                 dataSourceId: dsId,
                 mode: 'sql',
                 sql: 'SELECT 42',
-            })
-            .run();
+            });
 
         const cId = newId();
-        db.insert(charts)
+        await db.insert(charts)
             .values({
                 id: cId,
                 workbookId: original.id,
                 queryId: qId,
                 name: 'C',
                 type: 'line',
-                config: '{}',
-            })
-            .run();
+                config: {},
+            });
 
-        db.insert(dashboards)
+        await db.insert(dashboards)
             .values({
                 id: newId(),
                 ownerId: testUser.id,
                 workbookId: original.id,
                 name: 'D',
-                layout: JSON.stringify([{ i: 'tile-1', chartId: cId, x: 0, y: 0, w: 4, h: 4 }]),
-            })
-            .run();
+                layout: [{ i: 'tile-1', chartId: cId, x: 0, y: 0, w: 4, h: 4 }],
+            });
 
-        const duplicate = duplicateWorkbook(original.id);
+        const duplicate = await duplicateWorkbook(original.id);
         expect(duplicate.name).toBe('Original (Copy)');
         expect(duplicate.id).not.toBe(original.id);
         expect(duplicate.queriesCount).toBe(1);
@@ -186,92 +178,87 @@ describe('workbooks backend services and endpoints', () => {
         expect(duplicate.dashboardsCount).toBe(1);
 
         // Verify duplicated queries, charts, and dashboards exist
-        const dupQueries = db.select().from(queries).where(eq(queries.workbookId, duplicate.id)).all();
+        const dupQueries = await db.select().from(queries).where(eq(queries.workbookId, duplicate.id));
         expect(dupQueries).toHaveLength(1);
         expect(dupQueries[0].id).not.toBe(qId);
         expect(dupQueries[0].name).toBe('Q');
 
-        const dupCharts = db.select().from(charts).where(eq(charts.workbookId, duplicate.id)).all();
+        const dupCharts = await db.select().from(charts).where(eq(charts.workbookId, duplicate.id));
         expect(dupCharts).toHaveLength(1);
         expect(dupCharts[0].id).not.toBe(cId);
         expect(dupCharts[0].queryId).toBe(dupQueries[0].id);
 
-        const dupDashboards = db.select().from(dashboards).where(eq(dashboards.workbookId, duplicate.id)).all();
+        const dupDashboards = await db.select().from(dashboards).where(eq(dashboards.workbookId, duplicate.id));
         expect(dupDashboards).toHaveLength(1);
-        const layout = JSON.parse(dupDashboards[0].layout);
+        const layout = typeof dupDashboards[0].layout === 'string' ? JSON.parse(dupDashboards[0].layout) : dupDashboards[0].layout;
         expect(layout[0].chartId).toBe(dupCharts[0].id);
     });
 
-    it('rejects single delete when child records exist', () => {
-        const wb = createWorkbook({ name: 'Child test' });
+    it('rejects single delete when child records exist', async () => {
+        const wb = await createWorkbook({ name: 'Child test' });
         const dsId = newId();
-        const testUser = db.select().from(users).get()!;
-        db.insert(dataSources)
+        const testUser = (await db.select().from(users).limit(1))[0]!;
+        await db.insert(dataSources)
             .values({
                 id: dsId,
                 ownerId: testUser.id,
                 name: 'DS',
                 type: 'sqlite',
-                config: JSON.stringify({ path: ':memory:' }),
-            })
-            .run();
+                config: { path: ':memory:' },
+            });
 
-        db.insert(queries)
+        await db.insert(queries)
             .values({
                 id: newId(),
                 workbookId: wb.id,
                 name: 'Blocking Query',
                 dataSourceId: dsId,
                 mode: 'sql',
-            })
-            .run();
+            });
 
-        expect(() => deleteWorkbook(wb.id)).toThrow(ConflictError);
+        await expect(deleteWorkbook(wb.id)).rejects.toThrow(ConflictError);
     });
 
-    it('bulk deletes multiple workbooks cascading in a transaction', () => {
-        const wbA = createWorkbook({ name: 'Bulk A' });
-        const wbB = createWorkbook({ name: 'Bulk B' });
+    it('bulk deletes multiple workbooks cascading in a transaction', async () => {
+        const wbA = await createWorkbook({ name: 'Bulk A' });
+        const wbB = await createWorkbook({ name: 'Bulk B' });
 
-        const testUser = db.select().from(users).get()!;
+        const testUser = (await db.select().from(users).limit(1))[0]!;
         const dsId = newId();
-        db.insert(dataSources)
+        await db.insert(dataSources)
             .values({
                 id: dsId,
                 ownerId: testUser.id,
                 name: 'DS',
                 type: 'sqlite',
-                config: JSON.stringify({ path: ':memory:' }),
-            })
-            .run();
+                config: { path: ':memory:' },
+            });
 
-        db.insert(queries)
+        await db.insert(queries)
             .values({
                 id: newId(),
                 workbookId: wbA.id,
                 name: 'QA',
                 dataSourceId: dsId,
                 mode: 'sql',
-            })
-            .run();
+            });
 
-        db.insert(dashboards)
+        await db.insert(dashboards)
             .values({
                 id: newId(),
                 ownerId: testUser.id,
                 workbookId: wbB.id,
                 name: 'DB',
-            })
-            .run();
+            });
 
-        bulkDeleteWorkbooks([wbA.id, wbB.id]);
+        await bulkDeleteWorkbooks([wbA.id, wbB.id]);
 
-        expect(() => getWorkbook(wbA.id)).toThrow();
-        expect(() => getWorkbook(wbB.id)).toThrow();
+        await expect(getWorkbook(wbA.id)).rejects.toThrow();
+        await expect(getWorkbook(wbB.id)).rejects.toThrow();
     });
 
     it('POST /api/workbooks/[id]/duplicate and DELETE /api/workbooks HTTP handlers', async () => {
-        const wb = createWorkbook({ name: 'Route Test' });
+        const wb = await createWorkbook({ name: 'Route Test' });
 
         const dupRes = await duplicateApi.POST(
             new Request(`http://localhost/api/workbooks/${wb.id}/duplicate`, { method: 'POST' }),

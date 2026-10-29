@@ -1,0 +1,24 @@
+[
+  {
+    "id": "bgt_groceries_0m3unz1qanzllqag",
+    "userId": "usr_finance_default",
+    "categoryId": "cat_bv2vpv107ha42lp5",
+    "amount": 1500000,
+    "period": "monthly",
+    "startDate": "2026-01-01",
+    "endDate": null,
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "bgt_dining_pfdc506bzfbyem7u",
+    "userId": "usr_finance_default",
+    "categoryId": "cat_nzqiahtuu3bwki5s",
+    "amount": 1000000,
+    "period": "monthly",
+    "startDate": "2026-01-01",
+    "endDate": null,
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  }
+]

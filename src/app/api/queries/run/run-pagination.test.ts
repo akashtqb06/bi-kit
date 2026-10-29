@@ -41,23 +41,22 @@ function postJson(url: string, body: unknown): Request {
 describe('POST /api/queries/run pagination', () => {
     let sampleDataSourceId: string;
 
-    beforeAll(() => {
-        const existing = db.select().from(dataSources).all();
+    beforeAll(async () => {
+        const existing = await db.select().from(dataSources);
         const found = existing.find((d) => d.type === 'sqlite');
         if (found) {
             sampleDataSourceId = found.id;
         } else {
-            const user = db.select().from(users).get()!;
+            const user = (await db.select().from(users).limit(1))[0]!;
             const id = 'test-sample-ds';
-            db.insert(dataSources)
+            await db.insert(dataSources)
                 .values({
                     id,
                     ownerId: user.id,
                     name: 'Demo Store',
                     type: 'sqlite',
-                    config: JSON.stringify({ path: SAMPLE_DB_PATH }),
-                })
-                .run();
+                    config: { path: SAMPLE_DB_PATH },
+                });
             sampleDataSourceId = id;
         }
     });

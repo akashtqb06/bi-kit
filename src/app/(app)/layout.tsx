@@ -5,6 +5,10 @@ import { AppHeader } from '@src/components/layout/app-header';
 import { UserProvider } from '@src/components/auth/user-provider';
 import { requireUser } from '@src/lib/auth/dal';
 import { Skeleton } from '@/components/ui/skeleton';
+import { checkDatabaseHealth } from '@src/lib/db/health';
+import { DatabaseErrorPage } from '@src/components/db/database-error-page';
+import { isRedirectError } from 'next/dist/client/components/redirect-error';
+import type { SafeUser } from '@src/lib/auth/types';
 
 function AppShellSkeleton() {
     return (
@@ -52,7 +56,22 @@ function AppShellSkeleton() {
 }
 
 async function AuthenticatedShell({ children }: { children: React.ReactNode }) {
-    const user = await requireUser();
+    // Startup / health check: treat database failure as 503 error page, not as logged out
+    const health = await checkDatabaseHealth();
+    if (!health.ok) {
+        return <DatabaseErrorPage health={health} />;
+    }
+
+    let user: SafeUser;
+    try {
+        user = await requireUser();
+    } catch (err) {
+        if (isRedirectError(err)) {
+            throw err;
+        }
+        console.error('[AuthenticatedShell DB Error]', err);
+        return <DatabaseErrorPage error={err} />;
+    }
 
     return (
         <UserProvider user={user}>

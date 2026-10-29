@@ -3,11 +3,27 @@ import { ZodError } from 'zod';
 import { BadRequestError, ConflictError, ConnectorError, NotFoundError } from '@src/lib/connectors/types';
 import { UnauthorizedError, ForbiddenError } from '@src/lib/auth/policy';
 
+export { BadRequestError, NotFoundError };
+export { ForbiddenError };
+
+export class NotImplementedError extends Error {
+    constructor(message = 'Not implemented') {
+        super(message);
+        this.name = 'NotImplementedError';
+    }
+}
+
 export function apiError(message: string, status: number): NextResponse {
     return NextResponse.json({ error: message }, { status });
 }
 
 export function handleApiError(err: unknown): NextResponse {
+    if (err instanceof NotImplementedError || (err instanceof Error && err.name === 'NotImplementedError')) {
+        // Extract method name from message like "DbFinanceService: listRecurringRules not implemented"
+        const methodMatch = (err as Error).message.match(/:\s*(\w+)\s+not implemented/i);
+        const method = methodMatch ? methodMatch[1] : (err as Error).message;
+        return NextResponse.json({ error: 'not_implemented', method }, { status: 501 });
+    }
     if (err instanceof UnauthorizedError) {
         return apiError(err.message, 401);
     }

@@ -360,10 +360,12 @@ export function useDashboardQueryRunner(
             headers: { "Content-Type": "application/json" },
             signal: controller.signal,
             body: JSON.stringify({
+              queryId: q.id,
               dataSourceId: q.dataSourceId,
               mode: q.mode,
               definition: def,
               sql: sqlToRun,
+              refresh: force,
             }),
           });
 

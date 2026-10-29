@@ -15,9 +15,7 @@ import { NotFoundError } from "@src/lib/connectors/types";
 import { getWorkbook } from "@src/lib/workbooks/service";
 import {
   parseDashboardLayout,
-  serializeDashboardLayout,
   parseDashboardFilters,
-  serializeDashboardFilters,
   type LayoutItem,
   type DashboardFilter,
 } from "@src/lib/db/json-helpers";
@@ -73,33 +71,37 @@ export interface DashboardSummary {
   updatedAt: Date | null;
 }
 
-function getDefaultUserId(): string | null {
-  const admin = db.select({ id: users.id }).from(users).where(eq(users.role, "admin")).limit(1).get();
+async function getDefaultUserId(): Promise<string | null> {
+  const [admin] = await db.select({ id: users.id }).from(users).where(eq(users.role, "admin")).limit(1);
   if (admin) return admin.id;
-  const anyUser = db.select({ id: users.id }).from(users).limit(1).get();
+  const [anyUser] = await db.select({ id: users.id }).from(users).limit(1);
   if (anyUser) return anyUser.id;
   return null;
 }
 
-function toPublic(row: Dashboard, workbookName?: string, userId?: string): DashboardPublic {
+async function toPublic(row: Dashboard, workbookName?: string, userId?: string): Promise<DashboardPublic> {
   const layout = parseDashboardLayout(row.layout);
-  const targetUserId = userId ?? getDefaultUserId();
+  const targetUserId = userId ?? (await getDefaultUserId());
 
-  const fav = targetUserId
-    ? db
-        .select({ dashboardId: dashboardFavorites.dashboardId })
-        .from(dashboardFavorites)
-        .where(and(eq(dashboardFavorites.dashboardId, row.id), eq(dashboardFavorites.userId, targetUserId)))
-        .get()
-    : null;
+  let fav = null;
+  if (targetUserId) {
+    const [foundFav] = await db
+      .select({ dashboardId: dashboardFavorites.dashboardId })
+      .from(dashboardFavorites)
+      .where(and(eq(dashboardFavorites.dashboardId, row.id), eq(dashboardFavorites.userId, targetUserId)))
+      .limit(1);
+    fav = foundFav;
+  }
 
-  const view = targetUserId
-    ? db
-        .select({ viewCount: dashboardViews.viewCount, lastViewedAt: dashboardViews.lastViewedAt })
-        .from(dashboardViews)
-        .where(and(eq(dashboardViews.dashboardId, row.id), eq(dashboardViews.userId, targetUserId)))
-        .get()
-    : null;
+  let view = null;
+  if (targetUserId) {
+    const [foundView] = await db
+      .select({ viewCount: dashboardViews.viewCount, lastViewedAt: dashboardViews.lastViewedAt })
+      .from(dashboardViews)
+      .where(and(eq(dashboardViews.dashboardId, row.id), eq(dashboardViews.userId, targetUserId)))
+      .limit(1);
+    view = foundView;
+  }
 
   return {
     id: row.id,
@@ -127,20 +129,20 @@ function toPublic(row: Dashboard, workbookName?: string, userId?: string): Dashb
 // Service functions
 // ---------------------------------------------------------------------------
 
-export function listDashboards(workbookId?: string): DashboardSummary[] {
-  return listAllDashboards(undefined, workbookId);
+export async function listDashboards(workbookId?: string): Promise<DashboardSummary[]> {
+  return await listAllDashboards(undefined, workbookId);
 }
 
-export function listAllDashboards(
+export async function listAllDashboards(
   query?: string,
   workbookId?: string,
   filter?: string,
   user?: PolicyUser
-): DashboardSummary[] {
-  const allCharts = db.select({ id: charts.id, type: charts.type }).from(charts).all();
+): Promise<DashboardSummary[]> {
+  const allCharts = await db.select({ id: charts.id, type: charts.type }).from(charts);
   const chartTypeMap = new Map(allCharts.map((c) => [c.id, c.type]));
 
-  const targetUserId = user?.id ?? getDefaultUserId();
+  const targetUserId = user?.id ?? (await getDefaultUserId());
 
   let queryBuilder = db
     .select({
@@ -207,7 +209,7 @@ export function listAllDashboards(
     queryBuilder = queryBuilder.orderBy(desc(dashboards.updatedAt)) as typeof queryBuilder;
   }
 
-  const rows = queryBuilder.all();
+  const rows = await queryBuilder;
 
   const results: DashboardSummary[] = rows.map((row) => {
     const layout = parseDashboardLayout(row.layout);
@@ -260,62 +262,58 @@ export function listAllDashboards(
   return results;
 }
 
-export function getDashboard(id: string): Dashboard {
-  const row = db.select().from(dashboards).where(eq(dashboards.id, id)).get();
+export async function getDashboard(id: string): Promise<Dashboard> {
+  const [row] = await db.select().from(dashboards).where(eq(dashboards.id, id)).limit(1);
   if (!row) throw new NotFoundError(`Dashboard "${id}" not found.`);
   return row;
 }
 
-export function getDashboardPublic(id: string, userId?: string): DashboardPublic {
-  const row = getDashboard(id);
-  const wb = db
+export async function getDashboardPublic(id: string, userId?: string): Promise<DashboardPublic> {
+  const row = await getDashboard(id);
+  const [wb] = await db
     .select({ name: workbooks.name })
     .from(workbooks)
     .where(eq(workbooks.id, row.workbookId))
-    .get();
-  return toPublic(row, wb?.name, userId);
+    .limit(1);
+  return await toPublic(row, wb?.name, userId);
 }
 
-export function createDashboard(
+export async function createDashboard(
   workbookId: string,
   input: CreateDashboardInput & { ownerId?: string | null; slug?: string }
-): DashboardSummary {
-  getWorkbook(workbookId); // validates FK
+): Promise<DashboardSummary> {
+  await getWorkbook(workbookId); // validates FK
   if (input.folderId) {
-    validateFolderAssignment(input.folderId, workbookId, 'dashboard');
+    await validateFolderAssignment(input.folderId, workbookId, 'dashboard');
   }
 
   const insertedId = newId();
   const name = (input.name ?? input.title ?? "Untitled Dashboard").trim();
-  const ownerId = input.ownerId ?? getDefaultUserId();
+  const ownerId = input.ownerId ?? (await getDefaultUserId());
 
-  db.insert(dashboards)
-    .values({
-      id: insertedId,
-      workbookId,
-      ownerId: ownerId!,
-      name,
-      slug: input.slug,
-      layout: serializeDashboardLayout(input.layout ?? []),
-      filters: serializeDashboardFilters(input.filters ?? []),
-      autoRefresh: input.autoRefresh ?? "off",
-      folderId: input.folderId ?? null,
-      position: input.position ?? 0,
-    })
-    .run();
+  await db.insert(dashboards).values({
+    id: insertedId,
+    workbookId,
+    ownerId: ownerId!,
+    name,
+    slug: input.slug,
+    layout: input.layout ?? [],
+    filters: input.filters ?? [],
+    autoRefresh: input.autoRefresh ?? "off",
+    folderId: input.folderId ?? null,
+    position: input.position ?? 0,
+  });
 
   if (input.isFavorite && ownerId) {
-    db.insert(dashboardFavorites)
-      .values({ userId: ownerId, dashboardId: insertedId })
-      .run();
+    await db.insert(dashboardFavorites).values({ userId: ownerId, dashboardId: insertedId });
   }
 
-  const row = getDashboard(insertedId);
-  const wb = db
+  const row = await getDashboard(insertedId);
+  const [wb] = await db
     .select({ name: workbooks.name })
     .from(workbooks)
     .where(eq(workbooks.id, workbookId))
-    .get();
+    .limit(1);
   const layout = parseDashboardLayout(row.layout);
   const filters = parseDashboardFilters(row.filters);
   const workbookTitle = wb?.name ?? "Untitled Workbook";
@@ -342,117 +340,111 @@ export function createDashboard(
   };
 }
 
-export function updateDashboard(
+export async function updateDashboard(
   id: string,
   input: Partial<CreateDashboardInput>,
   userId?: string
-): DashboardPublic {
-  const current = getDashboard(id); // throws if missing
-  const targetUserId = userId ?? getDefaultUserId();
-  const updates: Partial<Dashboard> = { updatedAt: new Date() };
+): Promise<DashboardPublic> {
+  const current = await getDashboard(id); // throws if missing
+  const targetUserId = userId ?? (await getDefaultUserId());
+  const updates: Partial<typeof dashboards.$inferInsert> = { updatedAt: new Date() };
   const targetName = input.title ?? input.name;
   if (targetName !== undefined) updates.name = targetName.trim();
   if (input.layout !== undefined)
-    updates.layout = serializeDashboardLayout(input.layout);
+    updates.layout = input.layout;
   if (input.filters !== undefined)
-    updates.filters = serializeDashboardFilters(input.filters);
+    updates.filters = input.filters;
   if (input.autoRefresh !== undefined)
     updates.autoRefresh = input.autoRefresh;
   if (input.folderId !== undefined) {
     if (input.folderId !== null) {
-      validateFolderAssignment(input.folderId, current.workbookId, 'dashboard');
+      await validateFolderAssignment(input.folderId, current.workbookId, 'dashboard');
     }
     updates.folderId = input.folderId ?? null;
   }
   if (input.position !== undefined) updates.position = input.position;
 
-  db.update(dashboards).set(updates).where(eq(dashboards.id, id)).run();
+  await db.update(dashboards).set(updates).where(eq(dashboards.id, id));
 
   if (input.isFavorite !== undefined && targetUserId) {
     if (input.isFavorite) {
-      const existing = db
+      const [existing] = await db
         .select()
         .from(dashboardFavorites)
         .where(and(eq(dashboardFavorites.dashboardId, id), eq(dashboardFavorites.userId, targetUserId)))
-        .get();
+        .limit(1);
       if (!existing) {
-        db.insert(dashboardFavorites)
-          .values({ userId: targetUserId, dashboardId: id })
-          .run();
+        await db.insert(dashboardFavorites)
+          .values({ userId: targetUserId, dashboardId: id });
       }
     } else {
-      db.delete(dashboardFavorites)
-        .where(and(eq(dashboardFavorites.dashboardId, id), eq(dashboardFavorites.userId, targetUserId)))
-        .run();
+      await db.delete(dashboardFavorites)
+        .where(and(eq(dashboardFavorites.dashboardId, id), eq(dashboardFavorites.userId, targetUserId)));
     }
   }
 
-  return getDashboardPublic(id, targetUserId ?? undefined);
+  return await getDashboardPublic(id, targetUserId ?? undefined);
 }
 
-export function recordDashboardView(id: string, userId?: string): DashboardPublic {
-  getDashboard(id); // throws if missing
+export async function recordDashboardView(id: string, userId?: string): Promise<DashboardPublic> {
+  await getDashboard(id); // throws if missing
   const now = new Date();
-  const targetUserId = userId ?? getDefaultUserId();
+  const targetUserId = userId ?? (await getDefaultUserId());
 
   if (targetUserId) {
-    const existing = db
+    const [existing] = await db
       .select()
       .from(dashboardViews)
       .where(and(eq(dashboardViews.dashboardId, id), eq(dashboardViews.userId, targetUserId)))
-      .get();
+      .limit(1);
 
     if (existing) {
-      db.update(dashboardViews)
+      await db.update(dashboardViews)
         .set({
           viewCount: existing.viewCount + 1,
           lastViewedAt: now,
         })
-        .where(and(eq(dashboardViews.dashboardId, id), eq(dashboardViews.userId, targetUserId)))
-        .run();
+        .where(and(eq(dashboardViews.dashboardId, id), eq(dashboardViews.userId, targetUserId)));
     } else {
-      db.insert(dashboardViews)
+      await db.insert(dashboardViews)
         .values({
           userId: targetUserId,
           dashboardId: id,
           viewCount: 1,
           lastViewedAt: now,
-        })
-        .run();
+        });
     }
   }
 
-  return getDashboardPublic(id, targetUserId ?? undefined);
+  return await getDashboardPublic(id, targetUserId ?? undefined);
 }
 
-export function duplicateDashboard(
+export async function duplicateDashboard(
   id: string,
   newName?: string,
   userId?: string
-): DashboardSummary {
-  const original = getDashboard(id);
+): Promise<DashboardSummary> {
+  const original = await getDashboard(id);
   const targetName = (newName ?? `${original.name} (Copy)`).trim();
   const insertedId = newId();
   const ownerId = userId ?? original.ownerId;
 
-  db.insert(dashboards)
-    .values({
-      id: insertedId,
-      workbookId: original.workbookId,
-      ownerId,
-      name: targetName,
-      layout: original.layout,
-      filters: original.filters,
-      autoRefresh: original.autoRefresh,
-    })
-    .run();
+  await db.insert(dashboards).values({
+    id: insertedId,
+    workbookId: original.workbookId,
+    ownerId,
+    name: targetName,
+    layout: original.layout,
+    filters: original.filters,
+    autoRefresh: original.autoRefresh,
+  });
 
-  const created = getDashboard(insertedId);
-  const wb = db
+  const created = await getDashboard(insertedId);
+  const [wb] = await db
     .select({ name: workbooks.name })
     .from(workbooks)
     .where(eq(workbooks.id, original.workbookId))
-    .get();
+    .limit(1);
   const layout = parseDashboardLayout(created.layout);
   const filters = parseDashboardFilters(created.filters);
   const workbookTitle = wb?.name ?? "Untitled Workbook";
@@ -477,18 +469,17 @@ export function duplicateDashboard(
   };
 }
 
-export function deleteDashboard(id: string): void {
-  getDashboard(id); // throws if missing
-  db.delete(dashboards).where(eq(dashboards.id, id)).run();
+export async function deleteDashboard(id: string): Promise<void> {
+  await getDashboard(id); // throws if missing
+  await db.delete(dashboards).where(eq(dashboards.id, id));
 }
 
-export function bulkDeleteDashboards(ids: string[], user?: { id: string; role: string }): void {
+export async function bulkDeleteDashboards(ids: string[], user?: { id: string; role: string }): Promise<void> {
   if (ids.length === 0) return;
   if (user && user.role !== "admin") {
-    db.delete(dashboards)
-      .where(and(inArray(dashboards.id, ids), eq(dashboards.ownerId, user.id)))
-      .run();
+    await db.delete(dashboards)
+      .where(and(inArray(dashboards.id, ids), eq(dashboards.ownerId, user.id)));
     return;
   }
-  db.delete(dashboards).where(inArray(dashboards.id, ids)).run();
+  await db.delete(dashboards).where(inArray(dashboards.id, ids));
 }

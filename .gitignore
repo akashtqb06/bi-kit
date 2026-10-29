@@ -17,8 +17,10 @@
 /.next/
 /out/
 
-# production
+# build
 /build
+dist/
+.next/
 
 # misc
 .DS_Store
@@ -36,6 +38,12 @@ yarn-error.log*
 .env.local
 .env*.local
 !.env.example
+!.env.production.example
+.env.production
+
+# backups
+/backups/*
+!/backups/.gitkeep
 
 # vercel
 .vercel

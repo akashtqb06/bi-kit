@@ -1,0 +1,482 @@
+[
+  {
+    "id": "val_stocks_c6rbu2dje0xvazbd",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2024-10-28",
+    "value": 14714294,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2024-10",
+    "createdAt": "2024-10-28T18:00:00Z",
+    "updatedAt": "2024-10-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_e2wy0muja63b1o66",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2024-10-28",
+    "value": 20210728,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2024-10",
+    "createdAt": "2024-10-28T18:00:00Z",
+    "updatedAt": "2024-10-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_db0zj2a688zbeoog",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2024-11-28",
+    "value": 14662390,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2024-11",
+    "createdAt": "2024-11-28T18:00:00Z",
+    "updatedAt": "2024-11-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_8mgzgjczd5qwykgy",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2024-11-28",
+    "value": 19998436,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2024-11",
+    "createdAt": "2024-11-28T18:00:00Z",
+    "updatedAt": "2024-11-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_b1oh0dpsc3fh8b2v",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2024-12-28",
+    "value": 14917473,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2024-12",
+    "createdAt": "2024-12-28T18:00:00Z",
+    "updatedAt": "2024-12-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_4hobbqluju2d3ii1",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2024-12-28",
+    "value": 20511070,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2024-12",
+    "createdAt": "2024-12-28T18:00:00Z",
+    "updatedAt": "2024-12-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_78lxdbto6oy2a4ka",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2025-01-28",
+    "value": 15333937,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2025-01",
+    "createdAt": "2025-01-28T18:00:00Z",
+    "updatedAt": "2025-01-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_5mlnyga6du6u3qkm",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2025-01-28",
+    "value": 20868744,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2025-01",
+    "createdAt": "2025-01-28T18:00:00Z",
+    "updatedAt": "2025-01-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_s1xh4c70vf70nen5",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2025-02-28",
+    "value": 15127659,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2025-02",
+    "createdAt": "2025-02-28T18:00:00Z",
+    "updatedAt": "2025-02-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_o0gs68toi0jw7kot",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2025-02-28",
+    "value": 20825992,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2025-02",
+    "createdAt": "2025-02-28T18:00:00Z",
+    "updatedAt": "2025-02-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_wk8i1h82uck7ayni",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2025-03-28",
+    "value": 15184089,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2025-03",
+    "createdAt": "2025-03-28T18:00:00Z",
+    "updatedAt": "2025-03-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_hzq90cmro53fpjji",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2025-03-28",
+    "value": 21640637,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2025-03",
+    "createdAt": "2025-03-28T18:00:00Z",
+    "updatedAt": "2025-03-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_d3ok06f7nprk345c",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2025-04-28",
+    "value": 15746665,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2025-04",
+    "createdAt": "2025-04-28T18:00:00Z",
+    "updatedAt": "2025-04-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_5uhc3n490nafddsa",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2025-04-28",
+    "value": 21942188,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2025-04",
+    "createdAt": "2025-04-28T18:00:00Z",
+    "updatedAt": "2025-04-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_u8ekw9y5k6pc68xx",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2025-05-28",
+    "value": 16461517,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2025-05",
+    "createdAt": "2025-05-28T18:00:00Z",
+    "updatedAt": "2025-05-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_3ld2g88zywawvwt4",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2025-05-28",
+    "value": 22082787,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2025-05",
+    "createdAt": "2025-05-28T18:00:00Z",
+    "updatedAt": "2025-05-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_6w4qandvghtmitkw",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2025-06-28",
+    "value": 16499136,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2025-06",
+    "createdAt": "2025-06-28T18:00:00Z",
+    "updatedAt": "2025-06-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_g5ntfh9nyhr8r0or",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2025-06-28",
+    "value": 21981280,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2025-06",
+    "createdAt": "2025-06-28T18:00:00Z",
+    "updatedAt": "2025-06-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_m30ptdehwwnvnkn1",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2025-07-28",
+    "value": 17159541,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2025-07",
+    "createdAt": "2025-07-28T18:00:00Z",
+    "updatedAt": "2025-07-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_g8xrsj0nls23vzhn",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2025-07-28",
+    "value": 22409774,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2025-07",
+    "createdAt": "2025-07-28T18:00:00Z",
+    "updatedAt": "2025-07-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_fo20ocpm6ehzwwm8",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2025-08-28",
+    "value": 18004979,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2025-08",
+    "createdAt": "2025-08-28T18:00:00Z",
+    "updatedAt": "2025-08-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_gmd6sak8fclxas1g",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2025-08-28",
+    "value": 22114313,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2025-08",
+    "createdAt": "2025-08-28T18:00:00Z",
+    "updatedAt": "2025-08-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_f5a7f50eu0x6wk6u",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2025-09-28",
+    "value": 17474763,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2025-09",
+    "createdAt": "2025-09-28T18:00:00Z",
+    "updatedAt": "2025-09-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_c7y9nrdb1gofxqsg",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2025-09-28",
+    "value": 22065113,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2025-09",
+    "createdAt": "2025-09-28T18:00:00Z",
+    "updatedAt": "2025-09-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_wgdcocbsxlmor3vs",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2025-10-28",
+    "value": 17024593,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2025-10",
+    "createdAt": "2025-10-28T18:00:00Z",
+    "updatedAt": "2025-10-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_kfqppdt72t8t9qrf",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2025-10-28",
+    "value": 22161663,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2025-10",
+    "createdAt": "2025-10-28T18:00:00Z",
+    "updatedAt": "2025-10-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_qx9c2sqa89d0mcd8",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2025-11-28",
+    "value": 16937652,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2025-11",
+    "createdAt": "2025-11-28T18:00:00Z",
+    "updatedAt": "2025-11-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_gwzqx3tl7mn3ebj1",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2025-11-28",
+    "value": 22145899,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2025-11",
+    "createdAt": "2025-11-28T18:00:00Z",
+    "updatedAt": "2025-11-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_fln0tdtk1a0fzfwe",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2025-12-28",
+    "value": 17611930,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2025-12",
+    "createdAt": "2025-12-28T18:00:00Z",
+    "updatedAt": "2025-12-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_1e94plk7t9sap7xe",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2025-12-28",
+    "value": 22301463,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2025-12",
+    "createdAt": "2025-12-28T18:00:00Z",
+    "updatedAt": "2025-12-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_n0uhm5g841959i6x",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2026-01-28",
+    "value": 18413337,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2026-01",
+    "createdAt": "2026-01-28T18:00:00Z",
+    "updatedAt": "2026-01-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_rfqy9j6ben41lil8",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2026-01-28",
+    "value": 23141909,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2026-01",
+    "createdAt": "2026-01-28T18:00:00Z",
+    "updatedAt": "2026-01-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_reaa6xevdgnvwopx",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2026-02-28",
+    "value": 17980942,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2026-02",
+    "createdAt": "2026-02-28T18:00:00Z",
+    "updatedAt": "2026-02-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_36z100lsn1mybo4c",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2026-02-28",
+    "value": 22939995,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2026-02",
+    "createdAt": "2026-02-28T18:00:00Z",
+    "updatedAt": "2026-02-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_bky0smpb8ik59894",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2026-03-28",
+    "value": 17476677,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2026-03",
+    "createdAt": "2026-03-28T18:00:00Z",
+    "updatedAt": "2026-03-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_c8nzpv3avs41z1jh",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2026-03-28",
+    "value": 23740307,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2026-03",
+    "createdAt": "2026-03-28T18:00:00Z",
+    "updatedAt": "2026-03-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_87jezzdfee01yff2",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2026-04-28",
+    "value": 17561681,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2026-04",
+    "createdAt": "2026-04-28T18:00:00Z",
+    "updatedAt": "2026-04-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_jtvu7tugrsban0lc",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2026-04-28",
+    "value": 23982121,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2026-04",
+    "createdAt": "2026-04-28T18:00:00Z",
+    "updatedAt": "2026-04-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_cj768m213vl5pce2",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2026-05-28",
+    "value": 18206376,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2026-05",
+    "createdAt": "2026-05-28T18:00:00Z",
+    "updatedAt": "2026-05-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_dkmcw2glb3p732dc",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2026-05-28",
+    "value": 24529899,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2026-05",
+    "createdAt": "2026-05-28T18:00:00Z",
+    "updatedAt": "2026-05-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_qvisrnyhbumz3h1i",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2026-06-28",
+    "value": 18203426,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2026-06",
+    "createdAt": "2026-06-28T18:00:00Z",
+    "updatedAt": "2026-06-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_fassv291bj66u13g",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2026-06-28",
+    "value": 25330960,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2026-06",
+    "createdAt": "2026-06-28T18:00:00Z",
+    "updatedAt": "2026-06-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_ejqg2q7a8kaia9h8",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2026-07-28",
+    "value": 18507408,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2026-07",
+    "createdAt": "2026-07-28T18:00:00Z",
+    "updatedAt": "2026-07-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_fbrfkt5ainjwu3yq",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2026-07-28",
+    "value": 24970730,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2026-07",
+    "createdAt": "2026-07-28T18:00:00Z",
+    "updatedAt": "2026-07-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_dbnnlhtdti5ncblg",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2026-08-28",
+    "value": 17964611,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2026-08",
+    "createdAt": "2026-08-28T18:00:00Z",
+    "updatedAt": "2026-08-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_ohqcn5fu21dyr5hz",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2026-08-28",
+    "value": 25696136,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2026-08",
+    "createdAt": "2026-08-28T18:00:00Z",
+    "updatedAt": "2026-08-28T18:00:00Z"
+  },
+  {
+    "id": "val_stocks_lk6riahyrd1r2t8g",
+    "accountId": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "date": "2026-09-28",
+    "value": 18552393,
+    "costBasis": 14000000,
+    "note": "Monthly stocks demat valuation 2026-09",
+    "createdAt": "2026-09-28T18:00:00Z",
+    "updatedAt": "2026-09-28T18:00:00Z"
+  },
+  {
+    "id": "val_mf_fam_mvv17zvu6qvll7jx",
+    "accountId": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "date": "2026-09-28",
+    "value": 25480977,
+    "costBasis": 18000000,
+    "note": "Monthly mutual fund portfolio valuation 2026-09",
+    "createdAt": "2026-09-28T18:00:00Z",
+    "updatedAt": "2026-09-28T18:00:00Z"
+  }
+]

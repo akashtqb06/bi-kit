@@ -28,9 +28,9 @@ export function LoginForm({ next, allowRegistration }: { next: string; allowRegi
     });
     const email = useWatch({ control: form.control, name: 'email' });
     const password = useWatch({ control: form.control, name: 'password' });
-    const isRateLimited = state.formError?.startsWith('Too many login attempts') ?? false;
+    const isRateLimited = (state.formError?.includes('locked') || state.formError?.startsWith('Too many login attempts')) ?? false;
     const alertTitle = isRateLimited
-        ? 'Please wait before trying again'
+        ? 'Account Temporarily Locked'
         : state.formError === 'This account is disabled'
           ? 'Account disabled'
           : 'Sign in failed';

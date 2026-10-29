@@ -1,0 +1,12 @@
+# BI Kit Caddy Reverse Proxy for Local Area Network (LAN) & Mobile Access
+# Uses Caddy's internal automated TLS CA (no external port forwarding required)
+
+{
+    admin off
+}
+
+{$LAN_HOSTNAME:finance.local} {
+    tls internal
+    reverse_proxy app:3000
+}
+

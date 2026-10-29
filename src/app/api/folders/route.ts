@@ -10,12 +10,11 @@ export async function POST(req: Request): Promise<NextResponse> {
     const user = await requireUserApi();
     const body: unknown = await req.json();
     const input = createFolderSchema.parse(body);
-    const wb = getWorkbook(input.workbookId);
+    const wb = await getWorkbook(input.workbookId);
     assertCan(user, "edit", { type: "workbook", id: input.workbookId, ownerId: wb.ownerId });
-    const folder = createFolder(input);
+    const folder = await createFolder(input);
     return NextResponse.json({ data: folder }, { status: 201 });
   } catch (err) {
     return handleApiError(err);
   }
 }
-

@@ -1,0 +1,515 @@
+{
+  "persona": "freelancer",
+  "anchorDate": "2026-10-31",
+  "accountBalances": {
+    "acc_free_bank_8u1z7xsg08hcfaaz": 305860000,
+    "acc_free_cash_zhutaa6osf0wcnim": 34320000,
+    "acc_free_cca_8c7i529rs5mm4sro": -34680000,
+    "acc_free_ccb_4pdxxeqlefjv1muh": -12960000,
+    "acc_free_fd_kt2v0x0e7y7kvjpm": 0,
+    "acc_free_old_6mri79662cppofwp": 0
+  },
+  "monthEndNetWorth": [
+    {
+      "date": "2024-02-29",
+      "assets": 4500000,
+      "liabilities": 0,
+      "netWorth": 4500000
+    },
+    {
+      "date": "2024-10-31",
+      "assets": 53070000,
+      "liabilities": 1985000,
+      "netWorth": 51085000
+    },
+    {
+      "date": "2024-11-30",
+      "assets": 48640000,
+      "liabilities": 3970000,
+      "netWorth": 44670000
+    },
+    {
+      "date": "2024-12-31",
+      "assets": 76210000,
+      "liabilities": 5955000,
+      "netWorth": 70255000
+    },
+    {
+      "date": "2025-01-31",
+      "assets": 81280000,
+      "liabilities": 7940000,
+      "netWorth": 73340000
+    },
+    {
+      "date": "2025-02-28",
+      "assets": 76850000,
+      "liabilities": 9925000,
+      "netWorth": 66925000
+    },
+    {
+      "date": "2025-03-31",
+      "assets": 96420000,
+      "liabilities": 11910000,
+      "netWorth": 84510000
+    },
+    {
+      "date": "2025-04-30",
+      "assets": 132990000,
+      "liabilities": 13895000,
+      "netWorth": 119095000
+    },
+    {
+      "date": "2025-05-31",
+      "assets": 128560000,
+      "liabilities": 15880000,
+      "netWorth": 112680000
+    },
+    {
+      "date": "2025-06-30",
+      "assets": 140130000,
+      "liabilities": 17865000,
+      "netWorth": 122265000
+    },
+    {
+      "date": "2025-07-31",
+      "assets": 163700000,
+      "liabilities": 19850000,
+      "netWorth": 143850000
+    },
+    {
+      "date": "2025-08-31",
+      "assets": 159270000,
+      "liabilities": 21835000,
+      "netWorth": 137435000
+    },
+    {
+      "date": "2025-09-30",
+      "assets": 189840000,
+      "liabilities": 23820000,
+      "netWorth": 166020000
+    },
+    {
+      "date": "2025-10-31",
+      "assets": 203410000,
+      "liabilities": 25805000,
+      "netWorth": 177605000
+    },
+    {
+      "date": "2025-11-30",
+      "assets": 198980000,
+      "liabilities": 27790000,
+      "netWorth": 171190000
+    },
+    {
+      "date": "2025-12-31",
+      "assets": 226550000,
+      "liabilities": 29775000,
+      "netWorth": 196775000
+    },
+    {
+      "date": "2026-01-31",
+      "assets": 231620000,
+      "liabilities": 31760000,
+      "netWorth": 199860000
+    },
+    {
+      "date": "2026-02-28",
+      "assets": 227190000,
+      "liabilities": 33745000,
+      "netWorth": 193445000
+    },
+    {
+      "date": "2026-03-31",
+      "assets": 246760000,
+      "liabilities": 35730000,
+      "netWorth": 211030000
+    },
+    {
+      "date": "2026-04-30",
+      "assets": 283330000,
+      "liabilities": 37715000,
+      "netWorth": 245615000
+    },
+    {
+      "date": "2026-05-31",
+      "assets": 278900000,
+      "liabilities": 39700000,
+      "netWorth": 239200000
+    },
+    {
+      "date": "2026-06-30",
+      "assets": 290470000,
+      "liabilities": 41685000,
+      "netWorth": 248785000
+    },
+    {
+      "date": "2026-07-31",
+      "assets": 314040000,
+      "liabilities": 43670000,
+      "netWorth": 270370000
+    },
+    {
+      "date": "2026-08-31",
+      "assets": 309610000,
+      "liabilities": 45655000,
+      "netWorth": 263955000
+    },
+    {
+      "date": "2026-09-30",
+      "assets": 340180000,
+      "liabilities": 47640000,
+      "netWorth": 292540000
+    }
+  ],
+  "monthlyStats": [
+    {
+      "month": "2024-02",
+      "income": 4500000,
+      "expense": 0,
+      "savingsRate": 1,
+      "categories": {}
+    },
+    {
+      "month": "2024-10",
+      "income": 53000000,
+      "expense": 6415000,
+      "savingsRate": 0.879,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2024-11",
+      "income": 0,
+      "expense": 6415000,
+      "savingsRate": 0,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2024-12",
+      "income": 32000000,
+      "expense": 6415000,
+      "savingsRate": 0.7995,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2025-01",
+      "income": 9500000,
+      "expense": 6415000,
+      "savingsRate": 0.3247,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2025-02",
+      "income": 0,
+      "expense": 6415000,
+      "savingsRate": 0,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2025-03",
+      "income": 24000000,
+      "expense": 6415000,
+      "savingsRate": 0.7327,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2025-04",
+      "income": 41000000,
+      "expense": 6415000,
+      "savingsRate": 0.8435,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2025-05",
+      "income": 0,
+      "expense": 6415000,
+      "savingsRate": 0,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2025-06",
+      "income": 16000000,
+      "expense": 6415000,
+      "savingsRate": 0.5991,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2025-07",
+      "income": 28000000,
+      "expense": 6415000,
+      "savingsRate": 0.7709,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2025-08",
+      "income": 0,
+      "expense": 6415000,
+      "savingsRate": 0,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2025-09",
+      "income": 35000000,
+      "expense": 6415000,
+      "savingsRate": 0.8167,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2025-10",
+      "income": 18000000,
+      "expense": 6415000,
+      "savingsRate": 0.6436,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2025-11",
+      "income": 0,
+      "expense": 6415000,
+      "savingsRate": 0,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2025-12",
+      "income": 32000000,
+      "expense": 6415000,
+      "savingsRate": 0.7995,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2026-01",
+      "income": 9500000,
+      "expense": 6415000,
+      "savingsRate": 0.3247,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2026-02",
+      "income": 0,
+      "expense": 6415000,
+      "savingsRate": 0,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2026-03",
+      "income": 24000000,
+      "expense": 6415000,
+      "savingsRate": 0.7327,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2026-04",
+      "income": 41000000,
+      "expense": 6415000,
+      "savingsRate": 0.8435,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2026-05",
+      "income": 0,
+      "expense": 6415000,
+      "savingsRate": 0,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2026-06",
+      "income": 16000000,
+      "expense": 6415000,
+      "savingsRate": 0.5991,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2026-07",
+      "income": 28000000,
+      "expense": 6415000,
+      "savingsRate": 0.7709,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2026-08",
+      "income": 0,
+      "expense": 6415000,
+      "savingsRate": 0,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    },
+    {
+      "month": "2026-09",
+      "income": 35000000,
+      "expense": 6415000,
+      "savingsRate": 0.8167,
+      "categories": {
+        "Groceries": 650000,
+        "Shopping": 3500000,
+        "Travel": 1800000,
+        "Food & Dining": 420000,
+        "Fees & Interest": 45000
+      }
+    }
+  ],
+  "cardUtilization": {
+    "Credit Card A": {
+      "limit": 20000000,
+      "outstanding": 34680000,
+      "utilization": 1
+    },
+    "Credit Card B": {
+      "limit": 10000000,
+      "outstanding": 12960000,
+      "utilization": 1
+    }
+  },
+  "fdSimulation": {
+    "principalOrInstallment": 10000000,
+    "rate": 0.075,
+    "tenure": "1 Year (Quarterly Compounding)",
+    "closedFormMaturityPaise": 10771359,
+    "dayByDaySimulatedMaturityPaise": 10771359,
+    "differencePaise": 0,
+    "withinTolerance": true
+  },
+  "rdSimulation": {
+    "principalOrInstallment": 500000,
+    "rate": 0.07,
+    "tenure": "12 Months (Quarterly Compounding)",
+    "closedFormMaturityPaise": 6231066,
+    "dayByDaySimulatedMaturityPaise": 6231159,
+    "differencePaise": 93,
+    "withinTolerance": true
+  }
+}

@@ -1,10 +1,9 @@
-import { mkdtempSync, rmSync } from 'node:fs';
-import path from 'node:path';
-import { tmpdir } from 'node:os';
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { User } from '@src/lib/db/schema';
 
 let currentSessionUser: User | null = null;
+let admin: User;
+let member: User;
 
 vi.mock('@src/lib/auth/session', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@src/lib/auth/session')>();
@@ -29,21 +28,13 @@ vi.mock('@src/lib/auth/session', async (importOriginal) => {
   };
 });
 
-const previousDatabasePath = process.env.APP_DB_PATH;
-const appDatabaseDirectory = mkdtempSync(path.join(tmpdir(), 'bi-kit-folder-test-'));
-process.env.APP_DB_PATH = path.join(appDatabaseDirectory, 'app.db');
-
-const { db, runMigrations, resetConnection } = await import('@src/lib/db');
-runMigrations();
-const { seedUsers } = await import('../../../scripts/seed/users');
-const { admin, member } = await seedUsers();
-
+const { db } = await import('@src/lib/db');
 const { createWorkbook, duplicateWorkbook } = await import('@src/lib/workbooks/service');
 const { createFolder, getFolder, listFolders } = await import('@src/lib/folders/service');
 const { createQuery, getQuery } = await import('@src/lib/queries/service');
 const { createChart, getChart } = await import('@src/lib/charts/service');
 const { createDashboard, getDashboard } = await import('@src/lib/dashboards/service');
-const { folders, queries, charts, dashboards, dataSources } = await import('@src/lib/db/schema');
+const { folders, queries, charts, dashboards, dataSources, users } = await import('@src/lib/db/schema');
 const { newId } = await import('@src/lib/db/id');
 const { eq } = await import('drizzle-orm');
 
@@ -54,21 +45,17 @@ const queryDetailApi = await import('@src/app/api/queries/[id]/route');
 const chartDetailApi = await import('@src/app/api/charts/[id]/route');
 const dashboardDetailApi = await import('@src/app/api/dashboards/[id]/route');
 
-afterAll(() => {
-  rmSync(appDatabaseDirectory, { recursive: true, force: true });
-  if (previousDatabasePath) {
-    process.env.APP_DB_PATH = previousDatabasePath;
-  }
-  resetConnection();
-});
-
-beforeEach(() => {
+beforeEach(async () => {
+  const [adminUser] = await db.select().from(users).where(eq(users.role, 'admin')).limit(1);
+  const [memberUser] = await db.select().from(users).where(eq(users.role, 'member')).limit(1);
+  admin = adminUser!;
+  member = memberUser!;
   currentSessionUser = admin;
 });
 
 describe('Folders backend services and API routes', () => {
   it('creates and lists folders in a workbook via API', async () => {
-    const wb = createWorkbook({ name: 'Folder WB 1' }, admin.id);
+    const wb = await createWorkbook({ name: 'Folder WB 1' }, admin.id);
 
     // Create a query folder
     const postReq = new Request('http://localhost/api/folders', {
@@ -98,8 +85,8 @@ describe('Folders backend services and API routes', () => {
   });
 
   it('rejects duplicate folder name with 409 Conflict', async () => {
-    const wb = createWorkbook({ name: 'Folder WB Dups' }, admin.id);
-    createFolder({ workbookId: wb.id, kind: 'chart', name: 'Revenue' });
+    const wb = await createWorkbook({ name: 'Folder WB Dups' }, admin.id);
+    await createFolder({ workbookId: wb.id, kind: 'chart', name: 'Revenue' });
 
     // Same kind, same name -> 409
     const req = new Request('http://localhost/api/folders', {
@@ -131,9 +118,9 @@ describe('Folders backend services and API routes', () => {
   });
 
   it('renames folder via PATCH and rejects renaming to duplicate name', async () => {
-    const wb = createWorkbook({ name: 'Folder WB Rename' }, admin.id);
-    const f1 = createFolder({ workbookId: wb.id, kind: 'query', name: 'Original Name' });
-    const f2 = createFolder({ workbookId: wb.id, kind: 'query', name: 'Existing Name' });
+    const wb = await createWorkbook({ name: 'Folder WB Rename' }, admin.id);
+    const f1 = await createFolder({ workbookId: wb.id, kind: 'query', name: 'Original Name' });
+    const f2 = await createFolder({ workbookId: wb.id, kind: 'query', name: 'Existing Name' });
     expect(f2.name).toBe('Existing Name');
 
     // Successful rename
@@ -163,25 +150,24 @@ describe('Folders backend services and API routes', () => {
   });
 
   it('moves items into folders and back to root via PATCH', async () => {
-    const wb = createWorkbook({ name: 'Folder WB Move' }, admin.id);
+    const wb = await createWorkbook({ name: 'Folder WB Move' }, admin.id);
     const dsId = newId();
-    db.insert(dataSources)
+    await db.insert(dataSources)
       .values({
         id: dsId,
         ownerId: admin.id,
         name: 'Test DS',
         type: 'sqlite',
-        config: JSON.stringify({ path: ':memory:' }),
-      })
-      .run();
+        config: { path: ':memory:' },
+      });
 
-    const qFolder = createFolder({ workbookId: wb.id, kind: 'query', name: 'Q Folder' });
-    const cFolder = createFolder({ workbookId: wb.id, kind: 'chart', name: 'C Folder' });
-    const dFolder = createFolder({ workbookId: wb.id, kind: 'dashboard', name: 'D Folder' });
+    const qFolder = await createFolder({ workbookId: wb.id, kind: 'query', name: 'Q Folder' });
+    const cFolder = await createFolder({ workbookId: wb.id, kind: 'chart', name: 'C Folder' });
+    const dFolder = await createFolder({ workbookId: wb.id, kind: 'dashboard', name: 'D Folder' });
 
-    const query = createQuery({ workbookId: wb.id, dataSourceId: dsId, name: 'My Query' });
-    const chart = createChart({ name: 'My Chart', queryId: query.id, type: 'bar' });
-    const dashboard = createDashboard(wb.id, { name: 'My Dashboard' });
+    const query = await createQuery({ workbookId: wb.id, dataSourceId: dsId, name: 'My Query' });
+    const chart = await createChart({ name: 'My Chart', queryId: query.id, type: 'bar' });
+    const dashboard = await createDashboard(wb.id, { name: 'My Dashboard' });
 
     // Move query to qFolder
     const moveQRes = await queryDetailApi.PATCH(
@@ -193,7 +179,7 @@ describe('Folders backend services and API routes', () => {
       { params: Promise.resolve({ id: query.id }) }
     );
     expect(moveQRes.status).toBe(200);
-    expect(getQuery(query.id).folderId).toBe(qFolder.id);
+    expect((await getQuery(query.id)).folderId).toBe(qFolder.id);
 
     // Move chart to cFolder
     const moveCRes = await chartDetailApi.PATCH(
@@ -205,7 +191,7 @@ describe('Folders backend services and API routes', () => {
       { params: Promise.resolve({ id: chart.id }) }
     );
     expect(moveCRes.status).toBe(200);
-    expect(getChart(chart.id).folderId).toBe(cFolder.id);
+    expect((await getChart(chart.id)).folderId).toBe(cFolder.id);
 
     // Move dashboard to dFolder
     const moveDRes = await dashboardDetailApi.PATCH(
@@ -217,7 +203,7 @@ describe('Folders backend services and API routes', () => {
       { params: Promise.resolve({ id: dashboard.id }) }
     );
     expect(moveDRes.status).toBe(200);
-    expect(getDashboard(dashboard.id).folderId).toBe(dFolder.id);
+    expect((await getDashboard(dashboard.id)).folderId).toBe(dFolder.id);
 
     // Move query back to root (folderId: null)
     const rootQRes = await queryDetailApi.PATCH(
@@ -229,26 +215,25 @@ describe('Folders backend services and API routes', () => {
       { params: Promise.resolve({ id: query.id }) }
     );
     expect(rootQRes.status).toBe(200);
-    expect(getQuery(query.id).folderId).toBeNull();
+    expect((await getQuery(query.id)).folderId).toBeNull();
   });
 
   it('rejects cross-workbook and cross-kind folderId assignments', async () => {
-    const wb1 = createWorkbook({ name: 'WB 1' }, admin.id);
-    const wb2 = createWorkbook({ name: 'WB 2' }, admin.id);
+    const wb1 = await createWorkbook({ name: 'WB 1' }, admin.id);
+    const wb2 = await createWorkbook({ name: 'WB 2' }, admin.id);
     const dsId = newId();
-    db.insert(dataSources)
+    await db.insert(dataSources)
       .values({
         id: dsId,
         ownerId: admin.id,
         name: 'Test DS Cross',
         type: 'sqlite',
-        config: JSON.stringify({ path: ':memory:' }),
-      })
-      .run();
+        config: { path: ':memory:' },
+      });
 
-    const wb2Folder = createFolder({ workbookId: wb2.id, kind: 'query', name: 'WB2 Query Folder' });
-    const wb1ChartFolder = createFolder({ workbookId: wb1.id, kind: 'chart', name: 'WB1 Chart Folder' });
-    const query = createQuery({ workbookId: wb1.id, dataSourceId: dsId, name: 'WB1 Query' });
+    const wb2Folder = await createFolder({ workbookId: wb2.id, kind: 'query', name: 'WB2 Query Folder' });
+    const wb1ChartFolder = await createFolder({ workbookId: wb1.id, kind: 'chart', name: 'WB1 Chart Folder' });
+    const query = await createQuery({ workbookId: wb1.id, dataSourceId: dsId, name: 'WB1 Query' });
 
     // Cross-workbook assignment -> rejected with 400
     const crossWbRes = await queryDetailApi.PATCH(
@@ -275,8 +260,8 @@ describe('Folders backend services and API routes', () => {
 
   it("returns 404 when another user accesses private workbook's folders", async () => {
     // Admin creates workbook
-    const adminWb = createWorkbook({ name: "Admin's Private WB" }, admin.id);
-    const adminFolder = createFolder({ workbookId: adminWb.id, kind: 'query', name: 'Secret' });
+    const adminWb = await createWorkbook({ name: "Admin's Private WB" }, admin.id);
+    const adminFolder = await createFolder({ workbookId: adminWb.id, kind: 'query', name: 'Secret' });
 
     // Member attempts to access admin's workbook folders
     currentSessionUser = member;
@@ -323,21 +308,20 @@ describe('Folders backend services and API routes', () => {
   });
 
   it('deletes folder with mode=keep (default) moving items to root', async () => {
-    const wb = createWorkbook({ name: 'WB Keep Test' }, admin.id);
+    const wb = await createWorkbook({ name: 'WB Keep Test' }, admin.id);
     const dsId = newId();
-    db.insert(dataSources)
+    await db.insert(dataSources)
       .values({
         id: dsId,
         ownerId: admin.id,
         name: 'Test DS Keep',
         type: 'sqlite',
-        config: JSON.stringify({ path: ':memory:' }),
-      })
-      .run();
+        config: { path: ':memory:' },
+      });
 
-    const folder = createFolder({ workbookId: wb.id, kind: 'query', name: 'Queries to Keep' });
-    const q1 = createQuery({ workbookId: wb.id, dataSourceId: dsId, name: 'Q1', folderId: folder.id });
-    const q2 = createQuery({ workbookId: wb.id, dataSourceId: dsId, name: 'Q2', folderId: folder.id });
+    const folder = await createFolder({ workbookId: wb.id, kind: 'query', name: 'Queries to Keep' });
+    const q1 = await createQuery({ workbookId: wb.id, dataSourceId: dsId, name: 'Q1', folderId: folder.id });
+    const q2 = await createQuery({ workbookId: wb.id, dataSourceId: dsId, name: 'Q2', folderId: folder.id });
 
     // DELETE without mode query parameter defaults to 'keep'
     const res = await folderDetailApi.DELETE(
@@ -347,31 +331,31 @@ describe('Folders backend services and API routes', () => {
     expect(res.status).toBe(200);
 
     // Folder is gone
-    expect(db.select().from(folders).where(eq(folders.id, folder.id)).get()).toBeUndefined();
+    const [foundFolder] = await db.select().from(folders).where(eq(folders.id, folder.id));
+    expect(foundFolder).toBeUndefined();
 
     // Items still exist and have folderId = null
-    const row1 = getQuery(q1.id);
-    const row2 = getQuery(q2.id);
+    const row1 = await getQuery(q1.id);
+    const row2 = await getQuery(q2.id);
     expect(row1.folderId).toBeNull();
     expect(row2.folderId).toBeNull();
   });
 
   it('deletes folder with mode=delete cascading to items inside', async () => {
-    const wb = createWorkbook({ name: 'WB Delete Test' }, admin.id);
+    const wb = await createWorkbook({ name: 'WB Delete Test' }, admin.id);
     const dsId = newId();
-    db.insert(dataSources)
+    await db.insert(dataSources)
       .values({
         id: dsId,
         ownerId: admin.id,
         name: 'Test DS Del',
         type: 'sqlite',
-        config: JSON.stringify({ path: ':memory:' }),
-      })
-      .run();
+        config: { path: ':memory:' },
+      });
 
-    const folder = createFolder({ workbookId: wb.id, kind: 'query', name: 'Queries to Delete' });
-    const q1 = createQuery({ workbookId: wb.id, dataSourceId: dsId, name: 'Q Del 1', folderId: folder.id });
-    const q2 = createQuery({ workbookId: wb.id, dataSourceId: dsId, name: 'Q Del 2', folderId: folder.id });
+    const folder = await createFolder({ workbookId: wb.id, kind: 'query', name: 'Queries to Delete' });
+    const q1 = await createQuery({ workbookId: wb.id, dataSourceId: dsId, name: 'Q Del 1', folderId: folder.id });
+    const q2 = await createQuery({ workbookId: wb.id, dataSourceId: dsId, name: 'Q Del 2', folderId: folder.id });
 
     const res = await folderDetailApi.DELETE(
       new Request(`http://localhost/api/folders/${folder.id}?mode=delete`),
@@ -380,42 +364,44 @@ describe('Folders backend services and API routes', () => {
     expect(res.status).toBe(200);
 
     // Folder is gone
-    expect(db.select().from(folders).where(eq(folders.id, folder.id)).get()).toBeUndefined();
+    const [foundFolder] = await db.select().from(folders).where(eq(folders.id, folder.id));
+    expect(foundFolder).toBeUndefined();
 
     // Queries inside are deleted
-    expect(db.select().from(queries).where(eq(queries.id, q1.id)).get()).toBeUndefined();
-    expect(db.select().from(queries).where(eq(queries.id, q2.id)).get()).toBeUndefined();
+    const [foundQ1] = await db.select().from(queries).where(eq(queries.id, q1.id));
+    const [foundQ2] = await db.select().from(queries).where(eq(queries.id, q2.id));
+    expect(foundQ1).toBeUndefined();
+    expect(foundQ2).toBeUndefined();
   });
 
   it('duplicates workbook, copying folders and remapping folderId for copied items', async () => {
-    const wb = createWorkbook({ name: 'Source WB Duplication' }, admin.id);
+    const wb = await createWorkbook({ name: 'Source WB Duplication' }, admin.id);
     const dsId = newId();
-    db.insert(dataSources)
+    await db.insert(dataSources)
       .values({
         id: dsId,
         ownerId: admin.id,
         name: 'Test DS Dup',
         type: 'sqlite',
-        config: JSON.stringify({ path: ':memory:' }),
-      })
-      .run();
+        config: { path: ':memory:' },
+      });
 
-    const fQuery = createFolder({ workbookId: wb.id, kind: 'query', name: 'Source Q Folder' });
-    const fChart = createFolder({ workbookId: wb.id, kind: 'chart', name: 'Source C Folder' });
-    const fDash = createFolder({ workbookId: wb.id, kind: 'dashboard', name: 'Source D Folder' });
+    const fQuery = await createFolder({ workbookId: wb.id, kind: 'query', name: 'Source Q Folder' });
+    const fChart = await createFolder({ workbookId: wb.id, kind: 'chart', name: 'Source C Folder' });
+    const fDash = await createFolder({ workbookId: wb.id, kind: 'dashboard', name: 'Source D Folder' });
 
-    const query = createQuery({ workbookId: wb.id, dataSourceId: dsId, name: 'Src Q', folderId: fQuery.id });
-    const chart = createChart({ name: 'Src C', queryId: query.id, type: 'bar', folderId: fChart.id });
-    const dashboard = createDashboard(wb.id, { name: 'Src D', folderId: fDash.id });
+    const query = await createQuery({ workbookId: wb.id, dataSourceId: dsId, name: 'Src Q', folderId: fQuery.id });
+    const chart = await createChart({ name: 'Src C', queryId: query.id, type: 'bar', folderId: fChart.id });
+    const dashboard = await createDashboard(wb.id, { name: 'Src D', folderId: fDash.id });
     expect(chart.id).toBeDefined();
     expect(dashboard.id).toBeDefined();
 
     // Duplicate workbook
-    const copy = duplicateWorkbook(wb.id, 'Target WB Copy', admin.id);
+    const copy = await duplicateWorkbook(wb.id, 'Target WB Copy', admin.id);
     expect(copy.id).not.toBe(wb.id);
 
     // Copied folders exist in new workbook
-    const copiedFolders = listFolders(copy.id);
+    const copiedFolders = await listFolders(copy.id);
     expect(copiedFolders).toHaveLength(3);
     const copiedQFolder = copiedFolders.find((f) => f.kind === 'query');
     const copiedCFolder = copiedFolders.find((f) => f.kind === 'chart');
@@ -426,17 +412,17 @@ describe('Folders backend services and API routes', () => {
     expect(copiedQFolder!.name).toBe('Source Q Folder');
 
     // Copied query has remapped folderId
-    const copiedQueries = db.select().from(queries).where(eq(queries.workbookId, copy.id)).all();
+    const copiedQueries = await db.select().from(queries).where(eq(queries.workbookId, copy.id));
     expect(copiedQueries).toHaveLength(1);
     expect(copiedQueries[0].folderId).toBe(copiedQFolder!.id);
 
     // Copied chart has remapped folderId
-    const copiedCharts = db.select().from(charts).where(eq(charts.workbookId, copy.id)).all();
+    const copiedCharts = await db.select().from(charts).where(eq(charts.workbookId, copy.id));
     expect(copiedCharts).toHaveLength(1);
     expect(copiedCharts[0].folderId).toBe(copiedCFolder!.id);
 
     // Copied dashboard has remapped folderId
-    const copiedDashboards = db.select().from(dashboards).where(eq(dashboards.workbookId, copy.id)).all();
+    const copiedDashboards = await db.select().from(dashboards).where(eq(dashboards.workbookId, copy.id));
     expect(copiedDashboards).toHaveLength(1);
     expect(copiedDashboards[0].folderId).toBe(copiedDFolder!.id);
   });
@@ -445,7 +431,7 @@ describe('Folders backend services and API routes', () => {
     currentSessionUser = member;
 
     // Member creates their own workbook
-    const memberWb = createWorkbook({ name: 'Member Portfolio' }, member.id);
+    const memberWb = await createWorkbook({ name: 'Member Portfolio' }, member.id);
 
     // 1. Create folders in all three sections
     for (const kind of ['query', 'chart', 'dashboard'] as const) {
@@ -463,7 +449,7 @@ describe('Folders backend services and API routes', () => {
       expect(res.status).toBe(201);
     }
 
-    const memberFolders = listFolders(memberWb.id);
+    const memberFolders = await listFolders(memberWb.id);
     expect(memberFolders).toHaveLength(3);
     const qFolder = memberFolders.find((f) => f.kind === 'query')!;
 
@@ -477,11 +463,11 @@ describe('Folders backend services and API routes', () => {
       { params: Promise.resolve({ id: qFolder.id }) }
     );
     expect(renameRes.status).toBe(200);
-    expect(getFolder(qFolder.id).name).toBe('Renamed Q Folder');
+    expect((await getFolder(qFolder.id)).name).toBe('Renamed Q Folder');
 
     // 3. Duplicate member workbook
-    const dupCopy = duplicateWorkbook(memberWb.id, 'Member Copy', member.id);
-    const dupFolders = listFolders(dupCopy.id);
+    const dupCopy = await duplicateWorkbook(memberWb.id, 'Member Copy', member.id);
+    const dupFolders = await listFolders(dupCopy.id);
     expect(dupFolders).toHaveLength(3);
     expect(dupFolders.some((f) => f.name === 'Renamed Q Folder')).toBe(true);
   });

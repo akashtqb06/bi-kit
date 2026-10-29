@@ -1,9 +1,25 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import net from 'node:net';
+import readline from 'node:readline';
 import { sql } from 'drizzle-orm';
-import { APP_DB_PATH, AVATARS_DIR, CSV_DIR, DATA_DIR, SAMPLE_DB_PATH, UPLOADS_DIR } from '@src/lib/db/paths';
-import { assertTestIsolationGuard } from '@src/lib/db/guard';
+import { AVATARS_DIR, CSV_DIR, DATA_DIR, SAMPLE_DB_PATH, UPLOADS_DIR } from '@src/lib/db/paths';
+
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', 'host.docker.internal', 'postgres']);
+
+async function promptQuestion(promptText: string): Promise<string> {
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+    });
+
+    return new Promise((resolve) => {
+        rl.question(promptText, (answer) => {
+            rl.close();
+            resolve(answer.trim());
+        });
+    });
+}
 
 async function checkPortListening(port: number): Promise<boolean> {
     const checkHost = (host: string): Promise<boolean> => {
@@ -33,7 +49,44 @@ async function checkPortListening(port: number): Promise<boolean> {
 }
 
 async function resetDatabase(): Promise<void> {
-    assertTestIsolationGuard(APP_DB_PATH);
+    // 1. Always refuse when NODE_ENV=production
+    if (process.env.NODE_ENV === 'production') {
+        console.error('Refusing to reset database in production environment (NODE_ENV=production).');
+        process.exit(1);
+    }
+
+    // 2. Check DATABASE_URL locality guard
+    const dbUrl = process.env.DATABASE_URL || 'postgres://postgres:bi_password_123!@localhost:5432/bikit_dev';
+    let host = 'localhost';
+    let dbName = 'bikit_dev';
+    try {
+        const parsed = new URL(dbUrl);
+        host = parsed.hostname.toLowerCase();
+        dbName = parsed.pathname.replace(/^\//, '');
+    } catch {
+        // ignore
+    }
+
+    const isLocal = LOCAL_HOSTNAMES.has(host);
+    const hasRemoteFlag = process.argv.includes('--i-know-this-is-remote');
+
+    if (!isLocal) {
+        if (!hasRemoteFlag) {
+            console.error(
+                `[SAFETY REFUSAL] Refusing to reset non-local database at host "${host}".\nPass --i-know-this-is-remote and confirm database name to proceed.`
+            );
+            process.exit(1);
+        }
+
+        const typedName = await promptQuestion(
+            `\n[WARNING] You are about to reset remote database at "${host}".\nType the database name ("${dbName}") to confirm: `
+        );
+
+        if (typedName !== dbName) {
+            console.error('Confirmation mismatch: Database name typed does not match. Aborting reset.');
+            process.exit(1);
+        }
+    }
 
     const hasForceFlag = process.argv.includes('--force');
     if (!hasForceFlag) {
@@ -44,7 +97,7 @@ async function resetDatabase(): Promise<void> {
         }
     }
 
-    console.log('Resetting local databases, CSV, upload, and avatar artifacts...');
+    console.log('Resetting database schema, sample SQLite db, CSV, upload, and avatar artifacts...');
     const deletedFiles: string[] = [];
 
     function removeFile(filePath: string) {
@@ -54,11 +107,9 @@ async function resetDatabase(): Promise<void> {
         }
     }
 
-    // Delete databases and WAL/SHM
-    for (const databasePath of [APP_DB_PATH, SAMPLE_DB_PATH]) {
-        for (const suffix of ['', '-wal', '-shm']) {
-            removeFile(`${databasePath}${suffix}`);
-        }
+    // Delete sample database and WAL/SHM
+    for (const suffix of ['', '-wal', '-shm']) {
+        removeFile(`${SAMPLE_DB_PATH}${suffix}`);
     }
 
     // Delete data/csv/*, data/uploads/*, data/avatars/* (keep .gitkeep)
@@ -79,7 +130,7 @@ async function resetDatabase(): Promise<void> {
     fs.mkdirSync(UPLOADS_DIR, { recursive: true });
     fs.mkdirSync(AVATARS_DIR, { recursive: true });
 
-    console.log('Deleted files:');
+    console.log('Deleted local file artifacts:');
     if (deletedFiles.length === 0) {
         console.log('  (no files existed to delete)');
     } else {
@@ -89,20 +140,24 @@ async function resetDatabase(): Promise<void> {
     const { resetConnection, db } = await import('@src/lib/db');
     resetConnection();
 
-    // 1. Run migrations
-    const { runMigrations } = await import('@src/lib/db/migrate');
-    runMigrations();
-    console.log(`Migrated application database at ${APP_DB_PATH}`);
+    // 1. Drop and recreate public schema (and drop drizzle migrations tracking schema)
+    console.log('Dropping and recreating PostgreSQL public and drizzle schemas...');
+    await db.execute(sql`DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public; DROP SCHEMA IF EXISTS drizzle CASCADE;`);
 
-    // 2. Seed Users
+    // 2. Run migrations
+    const { runMigrations } = await import('@src/lib/db/migrate');
+    await runMigrations();
+    console.log('Migrated application database successfully.');
+
+    // 3. Seed Users
     const { seedUsers } = await import('./users');
     const { admin, member } = await seedUsers();
 
-    // 3. Seed Demo Data (sample.db)
+    // 4. Seed Demo Data (sample.db)
     const { seedDemoDatabase } = await import('./demo-data');
     seedDemoDatabase();
 
-    // 4. Seed Workbooks (admin & member)
+    // 5. Seed Workbooks (admin & member)
     const { seedSampleWorkbook } = await import('./sample-workbook');
     await seedSampleWorkbook();
 
@@ -121,17 +176,17 @@ async function resetDatabase(): Promise<void> {
     } = await import('@src/lib/db/schema');
 
     const counts = {
-        users: db.select({ count: sql<number>`count(*)` }).from(users).get()?.count ?? 0,
-        sessions: db.select({ count: sql<number>`count(*)` }).from(sessions).get()?.count ?? 0,
-        login_attempts: db.select({ count: sql<number>`count(*)` }).from(loginAttempts).get()?.count ?? 0,
-        app_settings: db.select({ count: sql<number>`count(*)` }).from(appSettings).get()?.count ?? 0,
-        data_sources: db.select({ count: sql<number>`count(*)` }).from(dataSources).get()?.count ?? 0,
-        workbooks: db.select({ count: sql<number>`count(*)` }).from(workbooks).get()?.count ?? 0,
-        queries: db.select({ count: sql<number>`count(*)` }).from(queries).get()?.count ?? 0,
-        charts: db.select({ count: sql<number>`count(*)` }).from(charts).get()?.count ?? 0,
-        dashboards: db.select({ count: sql<number>`count(*)` }).from(dashboards).get()?.count ?? 0,
-        dashboard_favorites: db.select({ count: sql<number>`count(*)` }).from(dashboardFavorites).get()?.count ?? 0,
-        dashboard_views: db.select({ count: sql<number>`count(*)` }).from(dashboardViews).get()?.count ?? 0,
+        users: (await db.select({ count: sql<number>`count(*)::int` }).from(users))[0]?.count ?? 0,
+        sessions: (await db.select({ count: sql<number>`count(*)::int` }).from(sessions))[0]?.count ?? 0,
+        login_attempts: (await db.select({ count: sql<number>`count(*)::int` }).from(loginAttempts))[0]?.count ?? 0,
+        app_settings: (await db.select({ count: sql<number>`count(*)::int` }).from(appSettings))[0]?.count ?? 0,
+        data_sources: (await db.select({ count: sql<number>`count(*)::int` }).from(dataSources))[0]?.count ?? 0,
+        workbooks: (await db.select({ count: sql<number>`count(*)::int` }).from(workbooks))[0]?.count ?? 0,
+        queries: (await db.select({ count: sql<number>`count(*)::int` }).from(queries))[0]?.count ?? 0,
+        charts: (await db.select({ count: sql<number>`count(*)::int` }).from(charts))[0]?.count ?? 0,
+        dashboards: (await db.select({ count: sql<number>`count(*)::int` }).from(dashboards))[0]?.count ?? 0,
+        dashboard_favorites: (await db.select({ count: sql<number>`count(*)::int` }).from(dashboardFavorites))[0]?.count ?? 0,
+        dashboard_views: (await db.select({ count: sql<number>`count(*)::int` }).from(dashboardViews))[0]?.count ?? 0,
     };
 
     console.log('\nFinal row counts per table:');
@@ -160,4 +215,3 @@ resetDatabase().catch((error: unknown) => {
     console.error('Database reset failed:', error);
     process.exit(1);
 });
-

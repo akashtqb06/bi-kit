@@ -28,47 +28,44 @@ describe('Frappe Insights Chart View & Editor Integration', () => {
     ];
     const columnNames = ['id', 'order_date', 'total_amount', 'items_count', 'status'];
 
-    beforeEach(() => {
-        // Setup a test workbook, data source, and query in SQLite
+    beforeEach(async () => {
+        // Setup a test workbook, data source, and query
         testWorkbookId = 'wb_test_' + nanoid(6);
         testDataSourceId = 'ds_test_' + nanoid(6);
         testQueryId = 'q_test_' + nanoid(6);
 
-        const testUser = db.select().from(users).get()!;
+        const testUser = (await db.select().from(users).limit(1))[0]!;
 
-        db.insert(workbooks)
+        await db.insert(workbooks)
             .values({
                 id: testWorkbookId,
                 ownerId: testUser.id,
                 name: 'Test Retail Workbook',
                 description: 'Test environment for Frappe chart view',
-            })
-            .run();
+            });
 
-        db.insert(dataSources)
+        await db.insert(dataSources)
             .values({
                 id: testDataSourceId,
                 ownerId: testUser.id,
                 name: 'Test SQLite Source',
                 type: 'sqlite',
-                config: JSON.stringify({ path: ':memory:' }),
-            })
-            .run();
+                config: { path: ':memory:' },
+            });
 
-        db.insert(queries)
+        await db.insert(queries)
             .values({
                 id: testQueryId,
                 workbookId: testWorkbookId,
                 name: 'Raw Orders Query',
                 dataSourceId: testDataSourceId,
                 mode: 'sql',
-                definition: '[]',
+                definition: [],
                 sql: 'SELECT * FROM orders',
-            })
-            .run();
+            });
 
         // Create an initial chart
-        const initial = createChart({
+        const initial = await createChart({
             name: 'Orders Over Time',
             queryId: testQueryId,
             type: 'bar',
@@ -89,35 +86,35 @@ describe('Frappe Insights Chart View & Editor Integration', () => {
         testChartId = initial.id;
     });
 
-    afterEach(() => {
+    afterEach(async () => {
         if (testChartId) {
-            db.delete(charts).where(eq(charts.id, testChartId)).run();
+            await db.delete(charts).where(eq(charts.id, testChartId));
         }
         if (testQueryId) {
-            db.delete(queries).where(eq(queries.id, testQueryId)).run();
+            await db.delete(queries).where(eq(queries.id, testQueryId));
         }
         if (testDataSourceId) {
-            db.delete(dataSources).where(eq(dataSources.id, testDataSourceId)).run();
+            await db.delete(dataSources).where(eq(dataSources.id, testDataSourceId));
         }
         if (testWorkbookId) {
-            db.delete(workbooks).where(eq(workbooks.id, testWorkbookId)).run();
+            await db.delete(workbooks).where(eq(workbooks.id, testWorkbookId));
         }
     });
 
-    it('1. Switches between chart types: Bar, Line, Row, Donut, Number, Table', () => {
+    it('1. Switches between chart types: Bar, Line, Row, Donut, Number, Table', async () => {
         const typesToTest: ChartType[] = ['bar', 'line', 'row', 'donut', 'number', 'table'];
 
         for (const targetType of typesToTest) {
-            const updated = updateChart(testChartId, { type: targetType });
+            const updated = await updateChart(testChartId, { type: targetType });
             expect(updated.type).toBe(targetType);
 
             // Verify persistence after reload
-            const reloaded = getChartPublic(testChartId);
+            const reloaded = await getChartPublic(testChartId);
             expect(reloaded.type).toBe(targetType);
         }
     });
 
-    it('2. Changes X column grain to month: groups dates and formats labels like "September, 2016"', () => {
+    it('2. Changes X column grain to month: groups dates and formats labels like "September, 2016"', async () => {
         // Update config with xDateGrain: 'month'
         const updatedConfig: ChartConfigData = {
             ...defaultChartConfig,
@@ -132,10 +129,10 @@ describe('Frappe Insights Chart View & Editor Integration', () => {
             ],
         };
 
-        updateChart(testChartId, { config: updatedConfig });
+        await updateChart(testChartId, { config: updatedConfig });
 
         // Reload from DB and verify persisted config
-        const reloaded = getChartPublic(testChartId);
+        const reloaded = await getChartPublic(testChartId);
         const parsed = chartConfigSchema.parse(reloaded.config);
         expect(parsed.xDateGrain).toBe('month');
 
@@ -154,7 +151,7 @@ describe('Frappe Insights Chart View & Editor Integration', () => {
         expect(agg.rows[2]['total_amount']).toBe(600);
     });
 
-    it('3. Adds a second series: updates preview and table with multiple metrics', () => {
+    it('3. Adds a second series: updates preview and table with multiple metrics', async () => {
         const configWithTwoSeries: ChartConfigData = {
             ...defaultChartConfig,
             xAxis: 'order_date',
@@ -178,10 +175,10 @@ describe('Frappe Insights Chart View & Editor Integration', () => {
             yAxis: ['total_amount', 'items_count'],
         };
 
-        updateChart(testChartId, { config: configWithTwoSeries });
+        await updateChart(testChartId, { config: configWithTwoSeries });
 
         // Reload and verify
-        const reloaded = getChartPublic(testChartId);
+        const reloaded = await getChartPublic(testChartId);
         const parsed = chartConfigSchema.parse(reloaded.config);
         expect(parsed.seriesConfig).toHaveLength(2);
         expect(parsed.seriesConfig[0].column).toBe('total_amount');
@@ -201,7 +198,7 @@ describe('Frappe Insights Chart View & Editor Integration', () => {
         expect(agg.rows[0]['items_count']).toBe(2.333);
     });
 
-    it('4. Toggles Stack: sets stacked: true and verifies persistence and preview', () => {
+    it('4. Toggles Stack: sets stacked: true and verifies persistence and preview', async () => {
         const stackedConfig: ChartConfigData = {
             ...defaultChartConfig,
             xAxis: 'order_date',
@@ -213,10 +210,10 @@ describe('Frappe Insights Chart View & Editor Integration', () => {
             ],
         };
 
-        updateChart(testChartId, { config: stackedConfig });
+        await updateChart(testChartId, { config: stackedConfig });
 
         // Reload from database
-        const reloaded = getChartPublic(testChartId);
+        const reloaded = await getChartPublic(testChartId);
         const parsed = chartConfigSchema.parse(reloaded.config);
         expect(parsed.stacked).toBe(true);
 
@@ -226,7 +223,7 @@ describe('Frappe Insights Chart View & Editor Integration', () => {
         expect(agg.rows[0]['items_count']).toBe(7);
     });
 
-    it('5. Donut chart aggregation: groups by category/label and sums values', () => {
+    it('5. Donut chart aggregation: groups by category/label and sums values', async () => {
         const donutConfig: ChartConfigData = {
             ...defaultChartConfig,
             donutLabelColumn: 'status',
@@ -234,16 +231,16 @@ describe('Frappe Insights Chart View & Editor Integration', () => {
             showLegend: true,
         };
 
-        updateChart(testChartId, { type: 'donut', config: donutConfig });
+        await updateChart(testChartId, { type: 'donut', config: donutConfig });
 
-        const reloaded = getChartPublic(testChartId);
+        const reloaded = await getChartPublic(testChartId);
         expect(reloaded.type).toBe('donut');
         const parsed = chartConfigSchema.parse(reloaded.config);
         expect(parsed.donutLabelColumn).toBe('status');
         expect(parsed.donutValueColumn).toBe('total_amount');
     });
 
-    it('6. Number card with decimals and comparison: validates config and formatting', () => {
+    it('6. Number card with decimals and comparison: validates config and formatting', async () => {
         const numberConfig: ChartConfigData = {
             ...defaultChartConfig,
             numberValueColumn: 'total_amount',
@@ -254,9 +251,9 @@ describe('Frappe Insights Chart View & Editor Integration', () => {
             numberComparisonColumn: 'items_count',
         };
 
-        updateChart(testChartId, { type: 'number', config: numberConfig });
+        await updateChart(testChartId, { type: 'number', config: numberConfig });
 
-        const reloaded = getChartPublic(testChartId);
+        const reloaded = await getChartPublic(testChartId);
         expect(reloaded.type).toBe('number');
         const parsed = chartConfigSchema.parse(reloaded.config);
         expect(parsed.numberPrefix).toBe('$');
@@ -265,9 +262,9 @@ describe('Frappe Insights Chart View & Editor Integration', () => {
         expect(parsed.numberComparisonColumn).toBe('items_count');
     });
 
-    it('7. Switches chart type (Bar, Line, Donut, Number), changes X and Y columns, toggles Stack and persists', () => {
+    it('7. Switches chart type (Bar, Line, Donut, Number), changes X and Y columns, toggles Stack and persists', async () => {
         // 1. Bar with X=order_date, Y=total_amount
-        updateChart(testChartId, {
+        await updateChart(testChartId, {
             type: 'bar',
             config: {
                 ...defaultChartConfig,
@@ -277,13 +274,13 @@ describe('Frappe Insights Chart View & Editor Integration', () => {
                 stacked: false,
             },
         });
-        let chart = getChartPublic(testChartId);
+        let chart = await getChartPublic(testChartId);
         expect(chart.type).toBe('bar');
         expect(chartConfigSchema.parse(chart.config).xAxis).toBe('order_date');
         expect(chartConfigSchema.parse(chart.config).stacked).toBe(false);
 
         // 2. Line with X=order_date, Y=items_count, Stack=true
-        updateChart(testChartId, {
+        await updateChart(testChartId, {
             type: 'line',
             config: {
                 ...defaultChartConfig,
@@ -293,13 +290,13 @@ describe('Frappe Insights Chart View & Editor Integration', () => {
                 stacked: true,
             },
         });
-        chart = getChartPublic(testChartId);
+        chart = await getChartPublic(testChartId);
         expect(chart.type).toBe('line');
         expect(chartConfigSchema.parse(chart.config).stacked).toBe(true);
         expect(chartConfigSchema.parse(chart.config).yAxis).toEqual(['items_count']);
 
         // 3. Donut with label=status, value=total_amount
-        updateChart(testChartId, {
+        await updateChart(testChartId, {
             type: 'donut',
             config: {
                 ...defaultChartConfig,
@@ -307,13 +304,13 @@ describe('Frappe Insights Chart View & Editor Integration', () => {
                 donutValueColumn: 'total_amount',
             },
         });
-        chart = getChartPublic(testChartId);
+        chart = await getChartPublic(testChartId);
         expect(chart.type).toBe('donut');
         expect(chartConfigSchema.parse(chart.config).donutLabelColumn).toBe('status');
         expect(chartConfigSchema.parse(chart.config).donutValueColumn).toBe('total_amount');
 
         // 4. Number with value=total_amount
-        updateChart(testChartId, {
+        await updateChart(testChartId, {
             type: 'number',
             config: {
                 ...defaultChartConfig,
@@ -321,7 +318,7 @@ describe('Frappe Insights Chart View & Editor Integration', () => {
                 numberAggregation: 'sum',
             },
         });
-        chart = getChartPublic(testChartId);
+        chart = await getChartPublic(testChartId);
         expect(chart.type).toBe('number');
         expect(chartConfigSchema.parse(chart.config).numberValueColumn).toBe('total_amount');
     });

@@ -7,16 +7,20 @@ import { DATA_DIR } from '@src/lib/db/paths';
 
 async function main() {
     console.log('Migrating data sources to managed connector configuration...');
-    const allSources = db.select().from(dataSources).all();
+    const allSources = await db.select().from(dataSources);
 
     let migrated = 0;
     for (const source of allSources) {
         let dirty = false;
         let config: Record<string, unknown> = {};
-        try {
-            config = JSON.parse(source.config);
-        } catch {
-            config = {};
+        if (typeof source.config === 'object' && source.config !== null) {
+            config = { ...(source.config as Record<string, unknown>) };
+        } else if (typeof source.config === 'string') {
+            try {
+                config = JSON.parse(source.config);
+            } catch {
+                config = {};
+            }
         }
 
         const updates: Partial<typeof dataSources.$inferInsert> = {
@@ -45,7 +49,7 @@ async function main() {
                         size: stat.size,
                         importedAt: (config.importedAt as string) || new Date().toISOString(),
                     };
-                    updates.config = JSON.stringify(config);
+                    updates.config = config;
                     updates.status = 'ok';
                     dirty = true;
                 } else {
@@ -74,7 +78,7 @@ async function main() {
                     };
                     delete config.path;
                     delete config.filePath;
-                    updates.config = JSON.stringify(config);
+                    updates.config = config;
                     updates.status = 'ok';
                     dirty = true;
                 }
@@ -82,10 +86,9 @@ async function main() {
         }
 
         if (dirty) {
-            db.update(dataSources)
+            await db.update(dataSources)
                 .set(updates)
-                .where(eq(dataSources.id, source.id))
-                .run();
+                .where(eq(dataSources.id, source.id));
             migrated++;
             console.log(`Migrated data source ${source.name} (${source.id})`);
         }

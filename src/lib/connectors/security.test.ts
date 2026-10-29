@@ -24,7 +24,7 @@ describe('connector security', () => {
             name: 'Connector security test',
             slug: null,
             type: 'sqlite',
-            config: JSON.stringify({ path: sourcePath }),
+            config: { path: sourcePath },
             status: 'unknown',
             lastTestedAt: null,
             lastError: null,
@@ -45,7 +45,7 @@ describe('connector security', () => {
         expect(() =>
             createConnector({
                 ...source,
-                config: JSON.stringify({ path: symlinkPath }),
+                config: { path: symlinkPath },
             })
         ).toThrow('inside the data directory');
     });
@@ -54,7 +54,7 @@ describe('connector security', () => {
         expect(() =>
             createConnector({
                 ...source,
-                config: JSON.stringify({ path: path.join(tempDirectory, 'missing.db') }),
+                config: { path: path.join(tempDirectory, 'missing.db') },
             })
         ).toThrow(expect.objectContaining({ code: 'SOURCE_NOT_FOUND' }));
     });

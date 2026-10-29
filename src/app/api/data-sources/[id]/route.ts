@@ -7,11 +7,11 @@ import {
   deleteDataSource,
   setCachedSchema,
 } from "@src/lib/data-sources/service";
-import { handleApiError } from "@src/app/api/utils";
-import { requireUserApi, assertCan } from "@src/lib/auth/dal";
-import { logNetworkAudit } from "@src/lib/audit/audit-log";
 import { getConnectorDefinition } from "@src/lib/connectors/registry";
 import { getConnector } from "@src/lib/connectors/manager";
+import { logNetworkAudit } from "@src/lib/audit/audit-log";
+import { handleApiError } from "@src/app/api/utils";
+import { requireUserApi, assertCan } from "@src/lib/auth/dal";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -22,9 +22,9 @@ export async function GET(
   try {
     const user = await requireUserApi();
     const { id } = await params;
-    const source = getDataSource(id);
+    const source = await getDataSource(id);
     assertCan(user, "view", { type: "data_source", id, ownerId: source.ownerId });
-    const data = getDataSourcePublic(id);
+    const data = await getDataSourcePublic(id);
     return NextResponse.json({ data });
   } catch (err) {
     return handleApiError(err);
@@ -38,11 +38,11 @@ export async function PUT(
   try {
     const user = await requireUserApi();
     const { id } = await params;
-    const source = getDataSource(id);
+    const source = await getDataSource(id);
     assertCan(user, "edit", { type: "data_source", id, ownerId: source.ownerId });
     const body: unknown = await req.json();
     const input = updateDataSourceSchema.parse(body);
-    const data = updateDataSource(id, input);
+    const data = await updateDataSource(id, input);
     return NextResponse.json({ data });
   } catch (err) {
     return handleApiError(err);
@@ -56,16 +56,16 @@ export async function PATCH(
   try {
     const user = await requireUserApi();
     const { id } = await params;
-    const source = getDataSource(id);
+    const source = await getDataSource(id);
     assertCan(user, "edit", { type: "data_source", id, ownerId: source.ownerId });
     const body: unknown = await req.json();
     const input = updateDataSourceSchema.parse(body);
-    const data = updateDataSource(id, input);
+    const data = await updateDataSource(id, input);
 
     const def = getConnectorDefinition(source.type);
     if (def && (def.category === 'sql' || def.category === 'nosql')) {
       const host = typeof data.config?.host === 'string' ? data.config.host : null;
-      logNetworkAudit({
+      await logNetworkAudit({
         userId: user.id,
         action: 'update',
         dataSourceId: id,
@@ -76,10 +76,10 @@ export async function PATCH(
     // If config was changed, refresh schema cache
     if (input.config) {
       try {
-        const updatedSource = getDataSource(id);
+        const updatedSource = await getDataSource(id);
         const connector = await getConnector(updatedSource);
         const snapshot = await connector.introspect();
-        setCachedSchema(id, snapshot);
+        await setCachedSchema(id, snapshot);
       } catch {
         // best effort
       }
@@ -98,19 +98,19 @@ export async function DELETE(
   try {
     const user = await requireUserApi();
     const { id } = await params;
-    const source = getDataSource(id);
+    const source = await getDataSource(id);
     assertCan(user, "delete", { type: "data_source", id, ownerId: source.ownerId });
 
     const def = getConnectorDefinition(source.type);
     if (def && (def.category === 'sql' || def.category === 'nosql')) {
       let host: string | null = null;
       try {
-        const parsed = JSON.parse(source.config);
+        const parsed = typeof source.config === 'string' ? JSON.parse(source.config) : source.config;
         host = typeof parsed.host === 'string' ? parsed.host : null;
       } catch {
         // ignore
       }
-      logNetworkAudit({
+      await logNetworkAudit({
         userId: user.id,
         action: 'delete',
         dataSourceId: id,
@@ -118,10 +118,9 @@ export async function DELETE(
       });
     }
 
-    deleteDataSource(id);
+    await deleteDataSource(id);
     return NextResponse.json({ data: { ok: true } });
   } catch (err) {
     return handleApiError(err);
   }
 }
-

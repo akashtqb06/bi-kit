@@ -60,10 +60,14 @@ export async function checkLoginRateLimit(email: string, ip: string, now = new D
     if (retryTimes.length === 0) return { allowed: true, retryAt: null, message: null };
 
     const retryAt = new Date(Math.max(...retryTimes));
+    const isEmailLockout = emailAttempts.length >= EMAIL_LIMIT;
+    const message = isEmailLockout
+        ? `Account temporarily locked due to repeated failed login attempts. Try again after ${retryAt.toLocaleTimeString()}.`
+        : `Too many login attempts from this IP address. Try again after ${retryAt.toLocaleTimeString()}.`;
     return {
         allowed: false,
         retryAt,
-        message: `Too many login attempts. Try again at ${retryAt.toISOString()}.`,
+        message,
     };
 }
 

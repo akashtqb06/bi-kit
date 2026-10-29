@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation';
 import { RegisterForm } from './register-form';
 import { getCurrentUser } from '@src/lib/auth/dal';
 import { isRegistrationAllowed } from '@src/lib/auth/registration';
+import { checkDatabaseHealth } from '@src/lib/db/health';
+import { DatabaseErrorPage } from '@src/components/db/database-error-page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -14,6 +16,11 @@ type RegisterPageProps = {
 };
 
 async function RegisterPageContent({ searchParams }: RegisterPageProps) {
+    const health = await checkDatabaseHealth();
+    if (!health.ok) {
+        return <DatabaseErrorPage health={health} />;
+    }
+
     const [user, params, allowRegistration] = await Promise.all([
         getCurrentUser(),
         searchParams,

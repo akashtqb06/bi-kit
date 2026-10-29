@@ -23,12 +23,20 @@ function hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
 }
 
+export function isSecureCookie(): boolean {
+    const appUrl = process.env.APP_URL;
+    if (appUrl) {
+        return appUrl.trim().toLowerCase().startsWith('https://');
+    }
+    return false;
+}
+
 function cookieOptions(maxAge: number) {
     return {
         httpOnly: true,
         sameSite: 'lax' as const,
         path: '/',
-        secure: process.env.NODE_ENV === 'production',
+        secure: isSecureCookie(),
         maxAge,
     };
 }

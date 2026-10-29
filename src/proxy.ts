@@ -1,6 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { validateRequestOrigin } from '@src/lib/security/origin';
 
 export function proxy(request: NextRequest) {
+    // CSRF / Origin verification on mutating requests
+    const originCheck = validateRequestOrigin(request);
+    if (!originCheck.ok) {
+        return new NextResponse(`Forbidden: ${originCheck.reason}`, { status: 403 });
+    }
+
     const { pathname, search } = request.nextUrl;
     const isPublicPage = pathname === '/login' || pathname === '/register';
     const isApi = pathname.startsWith('/api/') || pathname === '/api';

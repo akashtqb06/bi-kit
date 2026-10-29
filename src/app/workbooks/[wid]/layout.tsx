@@ -57,11 +57,18 @@ import { db } from '@src/lib/db';
 import { workbooks } from '@src/lib/db/schema';
 import { UserProvider } from '@src/components/auth/user-provider';
 import { requireUser, can } from '@src/lib/auth/dal';
+import { checkDatabaseHealth } from '@src/lib/db/health';
+import { DatabaseErrorPage } from '@src/components/db/database-error-page';
 
 async function WorkbookLayoutContent({ children, params }: WorkbookLayoutProps) {
+    const health = await checkDatabaseHealth();
+    if (!health.ok) {
+        return <DatabaseErrorPage health={health} />;
+    }
+
     const { wid } = await params;
     const user = await requireUser(`/workbooks/${wid}`);
-    const wb = db.select().from(workbooks).where(eq(workbooks.id, wid)).get();
+    const [wb] = await db.select().from(workbooks).where(eq(workbooks.id, wid)).limit(1);
     if (!wb || !can(user, 'view', { type: 'workbook', id: wid, ownerId: wb.ownerId })) {
         notFound();
     }

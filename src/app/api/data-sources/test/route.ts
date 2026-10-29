@@ -43,7 +43,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         const body: unknown = await req.json();
         const input = testInputSchema.parse(body);
 
-        if (!isConnectorTypeAllowed(input.type)) {
+        if (!(await isConnectorTypeAllowed(input.type))) {
             return apiError(`Connector type "${input.type}" is disabled by administrator policy.`, 403);
         }
 
@@ -59,7 +59,7 @@ export async function POST(req: Request): Promise<NextResponse> {
 
         // Audit-log network data source tests
         if (def && (def.category === 'sql' || def.category === 'nosql')) {
-            logNetworkAudit({
+            await logNetworkAudit({
                 userId: user.id,
                 action: 'test',
                 host: host || (typeof input.config.connectionString === 'string' ? 'connection-string' : null),

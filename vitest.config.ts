@@ -6,7 +6,9 @@ export default defineConfig({
     environment: "node",
     fileParallelism: false,
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
-    globalSetup: ["./vitest.setup.ts"],
+    setupFiles: ["./vitest.setup.ts"],
+    hookTimeout: 60000,
+    testTimeout: 60000,
   },
   resolve: {
     alias: {

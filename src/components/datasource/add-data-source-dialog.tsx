@@ -120,8 +120,10 @@ export function AddDataSourceDialog({
 
     // Selection & Config state
     const [selectedType, setSelectedType] = useState<string>(() => (sourceToEdit ? sourceToEdit.type : ''));
-    const [name, setName] = useState<string>(() => (sourceToEdit?.name ?? sourceToReplace?.name ?? ''));
-    const [config, setConfig] = useState<Record<string, unknown>>(() => (sourceToEdit?.config ? { ...sourceToEdit.config } : {}));
+    const [name, setName] = useState<string>(() => sourceToEdit?.name ?? sourceToReplace?.name ?? '');
+    const [config, setConfig] = useState<Record<string, unknown>>(() =>
+        sourceToEdit?.config ? { ...sourceToEdit.config } : {}
+    );
 
     // UI helper states
     const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -430,9 +432,7 @@ export function AddDataSourceDialog({
 
         const renderGroup = (title: string, groupConnectors: PublicConnectorDefinition[]) => (
             <div className="space-y-2">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    {title}
-                </h4>
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{title}</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     {groupConnectors.map((c) => {
                         const isAllowed = c.allowed !== false;
@@ -455,20 +455,21 @@ export function AddDataSourceDialog({
                                     !isAllowed
                                         ? 'opacity-50 cursor-not-allowed bg-muted/20 border-border'
                                         : isSelected
-                                        ? 'border-primary ring-2 ring-primary/20 bg-primary/5'
-                                        : 'hover:border-primary/40 hover:bg-muted/30 bg-card'
+                                          ? 'border-primary ring-2 ring-primary/20 bg-primary/5'
+                                          : 'hover:border-primary/40 hover:bg-muted/30 bg-card'
                                 }`}
                             >
-                                <div className="mt-0.5 shrink-0">
-                                    {getConnectorIcon(c.icon, c.category)}
-                                </div>
+                                <div className="mt-0.5 shrink-0">{getConnectorIcon(c.icon, c.category)}</div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between gap-1">
                                         <span className="text-sm font-semibold text-foreground truncate">
                                             {c.label}
                                         </span>
                                         {!isAllowed ? (
-                                            <Badge variant="outline" className="text-[10px] text-destructive border-destructive/30">
+                                            <Badge
+                                                variant="outline"
+                                                className="text-[10px] text-destructive border-destructive/30"
+                                            >
                                                 Disabled
                                             </Badge>
                                         ) : (
@@ -477,9 +478,7 @@ export function AddDataSourceDialog({
                                             </Badge>
                                         )}
                                     </div>
-                                    <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                                        {c.description}
-                                    </p>
+                                    <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{c.description}</p>
                                 </div>
                             </button>
                         );
@@ -511,10 +510,15 @@ export function AddDataSourceDialog({
     // -----------------------------------------------------------------------
     const renderStep2Network = () => {
         const portDefault =
-            selectedType === 'postgres' ? 5432 :
-            selectedType === 'mysql' ? 3306 :
-            selectedType === 'mssql' ? 1433 :
-            selectedType === 'mongodb' ? 27017 : 5432;
+            selectedType === 'postgres'
+                ? 5432
+                : selectedType === 'mysql'
+                  ? 3306
+                  : selectedType === 'mssql'
+                    ? 1433
+                    : selectedType === 'mongodb'
+                      ? 27017
+                      : 5432;
 
         return (
             <div className="space-y-4 max-h-[60vh] overflow-y-auto px-1">
@@ -522,7 +526,9 @@ export function AddDataSourceDialog({
                 <div className="flex items-center justify-between pb-2 border-b">
                     <div>
                         <p className="text-xs font-semibold text-foreground">Connection Parameters</p>
-                        <p className="text-[11px] text-muted-foreground">Configure connection details for {activeDefinition?.label}.</p>
+                        <p className="text-[11px] text-muted-foreground">
+                            Configure connection details for {activeDefinition?.label}.
+                        </p>
                     </div>
                     <Button
                         type="button"
@@ -551,15 +557,19 @@ export function AddDataSourceDialog({
                                 onChange={(e) => setConnectionUrlInput(e.target.value)}
                                 className="h-8 text-xs font-mono"
                             />
-                            <Button type="button" size="sm" onClick={handleApplyConnectionUrl} className="h-8 text-xs shrink-0">
+                            <Button
+                                type="button"
+                                size="sm"
+                                onClick={handleApplyConnectionUrl}
+                                className="h-8 text-xs shrink-0"
+                            >
                                 Apply
                             </Button>
                         </div>
-                        {urlParseError && (
-                            <p className="text-[11px] text-destructive font-medium">{urlParseError}</p>
-                        )}
+                        {urlParseError && <p className="text-[11px] text-destructive font-medium">{urlParseError}</p>}
                         <p className="text-[10px] text-muted-foreground">
-                            Parsed locally in your browser. Connection strings are never stored or logged as a single string.
+                            Parsed locally in your browser. Connection strings are never stored or logged as a single
+                            string.
                         </p>
                     </div>
                 )}
@@ -659,9 +669,7 @@ export function AddDataSourceDialog({
                                 type={showPassword ? 'text' : 'password'}
                                 placeholder={isEditMode && !isPasswordChanged ? SECRET_SENTINEL : '••••••••'}
                                 value={
-                                    isEditMode && !isPasswordChanged
-                                        ? SECRET_SENTINEL
-                                        : String(config.password ?? '')
+                                    isEditMode && !isPasswordChanged ? SECRET_SENTINEL : String(config.password ?? '')
                                 }
                                 disabled={isEditMode && !isPasswordChanged}
                                 onChange={(e) => handleFieldChange('password', e.target.value)}
@@ -703,11 +711,15 @@ export function AddDataSourceDialog({
                 <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced} className="pt-2 border-t">
                     <CollapsibleTrigger className="flex items-center justify-between w-full py-1 text-xs font-semibold text-muted-foreground hover:text-foreground">
                         <span>Advanced Connection Options</span>
-                        <ChevronDownIcon className={`size-3.5 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+                        <ChevronDownIcon
+                            className={`size-3.5 transition-transform ${showAdvanced ? 'rotate-180' : ''}`}
+                        />
                     </CollapsibleTrigger>
                     <CollapsibleContent className="space-y-3 pt-3">
                         <div className="space-y-1.5">
-                            <Label htmlFor="cfg-ca" className="text-xs font-medium">CA Certificate (Optional)</Label>
+                            <Label htmlFor="cfg-ca" className="text-xs font-medium">
+                                CA Certificate (Optional)
+                            </Label>
                             <Textarea
                                 id="cfg-ca"
                                 placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"
@@ -723,7 +735,9 @@ export function AddDataSourceDialog({
                                 <Input
                                     type="number"
                                     value={Number(config.connectTimeoutMs ?? 10000)}
-                                    onChange={(e) => handleFieldChange('connectTimeoutMs', parseInt(e.target.value, 10) || 10000)}
+                                    onChange={(e) =>
+                                        handleFieldChange('connectTimeoutMs', parseInt(e.target.value, 10) || 10000)
+                                    }
                                     className="h-8 text-xs"
                                 />
                             </div>
@@ -732,7 +746,9 @@ export function AddDataSourceDialog({
                                 <Input
                                     type="number"
                                     value={Number(config.queryTimeoutMs ?? 30000)}
-                                    onChange={(e) => handleFieldChange('queryTimeoutMs', parseInt(e.target.value, 10) || 30000)}
+                                    onChange={(e) =>
+                                        handleFieldChange('queryTimeoutMs', parseInt(e.target.value, 10) || 30000)
+                                    }
                                     className="h-8 text-xs"
                                 />
                             </div>
@@ -771,9 +787,7 @@ export function AddDataSourceDialog({
     // -----------------------------------------------------------------------
     const renderStep2File = () => {
         const acceptExtensions =
-            selectedType === 'excel' ? '.xlsx,.xlsm' :
-            selectedType === 'sqlite' ? '.db,.sqlite,.sqlite3' :
-            '.csv,.txt';
+            selectedType === 'excel' ? '.xlsx,.xlsm' : selectedType === 'sqlite' ? '.db,.sqlite,.sqlite3' : '.csv,.txt';
 
         return (
             <div className="space-y-4 max-h-[60vh] overflow-y-auto px-1">
@@ -802,7 +816,13 @@ export function AddDataSourceDialog({
                                     if (file) void handleFileUpload(file);
                                 }}
                             />
-                            <Button type="button" variant="outline" size="sm" disabled={isUploading} className="pointer-events-none gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={isUploading}
+                                className="pointer-events-none gap-2"
+                            >
                                 {isUploading && <Loader2Icon className="size-3.5 animate-spin" />}
                                 {isUploading ? 'Inspecting file...' : 'Choose File'}
                             </Button>
@@ -816,7 +836,9 @@ export function AddDataSourceDialog({
                                 <FileSpreadsheetIcon className="size-5 text-primary" />
                                 <div>
                                     <p className="text-xs font-semibold text-foreground">{filePreview.fileName}</p>
-                                    <p className="text-[10px] text-muted-foreground">{formatFileSize(filePreview.size)}</p>
+                                    <p className="text-[10px] text-muted-foreground">
+                                        {formatFileSize(filePreview.size)}
+                                    </p>
                                 </div>
                             </div>
                             <Button
@@ -831,30 +853,41 @@ export function AddDataSourceDialog({
                         </div>
 
                         {/* Excel Sheet Tabs */}
-                        {filePreview.type === 'excel' && filePreview.preview.sheets && filePreview.preview.sheets.length > 0 && (
-                            <div className="space-y-2">
-                                <Label className="text-xs font-medium">Worksheet</Label>
-                                <Tabs
-                                    value={String(selectedSheetIndex)}
-                                    onValueChange={(val) => setSelectedSheetIndex(parseInt(val, 10))}
-                                >
-                                    <TabsList className="h-8 justify-start overflow-x-auto p-0.5">
-                                        {filePreview.preview.sheets.map((s, idx) => (
-                                            <TabsTrigger key={s.name} value={String(idx)} className="text-xs h-7 px-3">
-                                                {s.name} ({s.rowCountEstimate.toLocaleString()} rows)
-                                            </TabsTrigger>
-                                        ))}
-                                    </TabsList>
-                                </Tabs>
-                            </div>
-                        )}
+                        {filePreview.type === 'excel' &&
+                            filePreview.preview.sheets &&
+                            filePreview.preview.sheets.length > 0 && (
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-medium">Worksheet</Label>
+                                    <Tabs
+                                        value={String(selectedSheetIndex)}
+                                        onValueChange={(val) => setSelectedSheetIndex(parseInt(val, 10))}
+                                    >
+                                        <TabsList className="h-8 justify-start overflow-x-auto p-0.5">
+                                            {filePreview.preview.sheets.map((s, idx) => (
+                                                <TabsTrigger
+                                                    key={s.name}
+                                                    value={String(idx)}
+                                                    className="text-xs h-7 px-3"
+                                                >
+                                                    {s.name} ({s.rowCountEstimate.toLocaleString()} rows)
+                                                </TabsTrigger>
+                                            ))}
+                                        </TabsList>
+                                    </Tabs>
+                                </div>
+                            )}
 
                         {/* CSV Options */}
                         {filePreview.type === 'csv' && (
                             <div className="grid grid-cols-2 gap-3 p-3 rounded-lg border bg-card text-xs">
                                 <div className="space-y-1">
                                     <Label className="text-[11px] font-medium">Delimiter</Label>
-                                    <Select value={csvDelimiter} onValueChange={(val) => { if (val) setCsvDelimiter(val); }}>
+                                    <Select
+                                        value={csvDelimiter}
+                                        onValueChange={(val) => {
+                                            if (val) setCsvDelimiter(val);
+                                        }}
+                                    >
                                         <SelectTrigger className="h-7 text-xs">
                                             <SelectValue />
                                         </SelectTrigger>
@@ -867,7 +900,9 @@ export function AddDataSourceDialog({
                                     </Select>
                                 </div>
                                 <div className="flex items-center justify-between pt-4">
-                                    <Label htmlFor="csv-hdr" className="text-[11px] font-medium">Has Header Row</Label>
+                                    <Label htmlFor="csv-hdr" className="text-[11px] font-medium">
+                                        Has Header Row
+                                    </Label>
                                     <Switch id="csv-hdr" checked={csvHasHeader} onCheckedChange={setCsvHasHeader} />
                                 </div>
                             </div>
@@ -900,10 +935,18 @@ export function AddDataSourceDialog({
                                                                     <SelectValue />
                                                                 </SelectTrigger>
                                                                 <SelectContent>
-                                                                    <SelectItem value="text" className="text-xs">text</SelectItem>
-                                                                    <SelectItem value="number" className="text-xs">number</SelectItem>
-                                                                    <SelectItem value="date" className="text-xs">date</SelectItem>
-                                                                    <SelectItem value="boolean" className="text-xs">boolean</SelectItem>
+                                                                    <SelectItem value="text" className="text-xs">
+                                                                        text
+                                                                    </SelectItem>
+                                                                    <SelectItem value="number" className="text-xs">
+                                                                        number
+                                                                    </SelectItem>
+                                                                    <SelectItem value="date" className="text-xs">
+                                                                        date
+                                                                    </SelectItem>
+                                                                    <SelectItem value="boolean" className="text-xs">
+                                                                        boolean
+                                                                    </SelectItem>
                                                                 </SelectContent>
                                                             </Select>
                                                         </div>
@@ -915,8 +958,17 @@ export function AddDataSourceDialog({
                                             {filePreview.preview.sampleRows.map((row, rIdx) => (
                                                 <TableRow key={rIdx}>
                                                     {row.map((cell, cIdx) => (
-                                                        <TableCell key={cIdx} className="py-1 px-2.5 font-mono text-[11px] truncate max-w-xs">
-                                                            {cell !== null && cell !== undefined ? String(cell) : <span className="italic text-muted-foreground">null</span>}
+                                                        <TableCell
+                                                            key={cIdx}
+                                                            className="py-1 px-2.5 font-mono text-[11px] truncate max-w-xs"
+                                                        >
+                                                            {cell !== null && cell !== undefined ? (
+                                                                String(cell)
+                                                            ) : (
+                                                                <span className="italic text-muted-foreground">
+                                                                    null
+                                                                </span>
+                                                            )}
                                                         </TableCell>
                                                     ))}
                                                 </TableRow>
@@ -1034,7 +1086,10 @@ export function AddDataSourceDialog({
                             {testResult.warnings && testResult.warnings.length > 0 && (
                                 <div className="space-y-1.5 pt-1">
                                     {testResult.warnings.map((warn, i) => (
-                                        <Alert key={i} className="py-2 px-3 text-xs bg-amber-500/10 border-amber-500/20 text-amber-800 dark:text-amber-400">
+                                        <Alert
+                                            key={i}
+                                            className="py-2 px-3 text-xs bg-amber-500/10 border-amber-500/20 text-amber-800 dark:text-amber-400"
+                                        >
                                             <AlertTriangleIcon className="size-3.5 shrink-0" />
                                             <div className="ml-2 text-[11px]">{warn}</div>
                                         </Alert>
@@ -1050,7 +1105,7 @@ export function AddDataSourceDialog({
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent className="sm:max-w-xl p-0 gap-0 overflow-hidden bg-background">
+            <DialogContent className="sm:max-w-xl p-2 gap-0 overflow-hidden bg-background">
                 {/* Header with 3-Step Stepper */}
                 <DialogHeader className="p-4 border-b bg-muted/10 shrink-0">
                     <DialogTitle className="text-base font-semibold">
@@ -1058,7 +1113,8 @@ export function AddDataSourceDialog({
                     </DialogTitle>
                     <DialogDescription className="text-xs text-muted-foreground">
                         {step === 1 && 'Select the connector type for your database or file.'}
-                        {step === 2 && `Configure connection parameters for ${activeDefinition?.label || 'data source'}.`}
+                        {step === 2 &&
+                            `Configure connection parameters for ${activeDefinition?.label || 'data source'}.`}
                         {step === 3 && 'Verify connectivity and name your data source.'}
                     </DialogDescription>
                 </DialogHeader>
@@ -1067,24 +1123,36 @@ export function AddDataSourceDialog({
                 {!isEditMode && (
                     <div className="flex items-center justify-between border-b px-8 py-2.5 bg-muted/20 text-xs">
                         <div className="flex items-center gap-2">
-                            <span className={`size-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step >= 1 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                            <span
+                                className={`size-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step >= 1 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+                            >
                                 1
                             </span>
-                            <span className={`font-medium ${step >= 1 ? 'text-foreground' : 'text-muted-foreground'}`}>Connector</span>
+                            <span className={`font-medium ${step >= 1 ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                Connector
+                            </span>
                         </div>
                         <div className="h-px w-10 bg-border" />
                         <div className="flex items-center gap-2">
-                            <span className={`size-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step >= 2 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                            <span
+                                className={`size-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step >= 2 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+                            >
                                 2
                             </span>
-                            <span className={`font-medium ${step >= 2 ? 'text-foreground' : 'text-muted-foreground'}`}>Configure</span>
+                            <span className={`font-medium ${step >= 2 ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                Configure
+                            </span>
                         </div>
                         <div className="h-px w-10 bg-border" />
                         <div className="flex items-center gap-2">
-                            <span className={`size-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step >= 3 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                            <span
+                                className={`size-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step >= 3 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+                            >
                                 3
                             </span>
-                            <span className={`font-medium ${step >= 3 ? 'text-foreground' : 'text-muted-foreground'}`}>Test & Save</span>
+                            <span className={`font-medium ${step >= 3 ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                Test & Save
+                            </span>
                         </div>
                     </div>
                 )}
@@ -1153,11 +1221,7 @@ export function AddDataSourceDialog({
                             <Button
                                 type="button"
                                 size="sm"
-                                disabled={
-                                    isNetworkConnector
-                                        ? !config.host || !config.database
-                                        : !filePreview
-                                }
+                                disabled={isNetworkConnector ? !config.host || !config.database : !filePreview}
                                 onClick={goToStep3}
                                 className="h-8 text-xs gap-1.5"
                             >

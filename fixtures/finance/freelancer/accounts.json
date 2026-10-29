@@ -1,0 +1,91 @@
+[
+  {
+    "id": "acc_free_bank_8u1z7xsg08hcfaaz",
+    "userId": "usr_finance_default",
+    "name": "Salary Account",
+    "kind": "bank",
+    "class": "asset",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": true,
+    "metadata": {
+      "bank": "Axis Bank"
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_free_cash_zhutaa6osf0wcnim",
+    "userId": "usr_finance_default",
+    "name": "Cash Wallet",
+    "kind": "cash",
+    "class": "asset",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": true,
+    "metadata": {},
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_free_cca_8c7i529rs5mm4sro",
+    "userId": "usr_finance_default",
+    "name": "Credit Card A",
+    "kind": "credit_card",
+    "class": "liability",
+    "currency": "INR",
+    "creditLimit": 20000000,
+    "isActive": true,
+    "metadata": {
+      "issuer": "ICICI Amazon Pay"
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_free_ccb_4pdxxeqlefjv1muh",
+    "userId": "usr_finance_default",
+    "name": "Credit Card B",
+    "kind": "credit_card",
+    "class": "liability",
+    "currency": "INR",
+    "creditLimit": 10000000,
+    "isActive": true,
+    "metadata": {
+      "issuer": "Axis Flipkart"
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_free_fd_kt2v0x0e7y7kvjpm",
+    "userId": "usr_finance_default",
+    "name": "FD 1 Year",
+    "kind": "fixed_deposit",
+    "class": "asset",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": true,
+    "metadata": {
+      "principalPaise": 5000000,
+      "interestRate": 0.072
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_free_old_6mri79662cppofwp",
+    "userId": "usr_finance_default",
+    "name": "Savings Account",
+    "kind": "bank",
+    "class": "asset",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": false,
+    "metadata": {
+      "closedReason": "Closed old current account"
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  }
+]

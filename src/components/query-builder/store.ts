@@ -28,6 +28,8 @@ export interface QueryResultData {
     truncated: boolean;
     durationMs: number;
     sql: string;
+    isStored?: boolean;
+    lastSyncedAt?: string | null;
 }
 
 export interface QueryEditorState {
@@ -672,6 +674,7 @@ export const useQueryEditorStore = create<QueryEditorState>((set, get) => ({
 
             if (mode === 'builder') {
                 body = {
+                    queryId: get().queryId,
                     dataSourceId,
                     mode: 'builder',
                     definition: cleanDefinitionForCompile(definition),
@@ -680,6 +683,7 @@ export const useQueryEditorStore = create<QueryEditorState>((set, get) => ({
                 };
             } else if (mode === 'pipeline') {
                 body = {
+                    queryId: get().queryId,
                     dataSourceId,
                     mode: 'pipeline',
                     collection: definition.source.table,
@@ -689,6 +693,7 @@ export const useQueryEditorStore = create<QueryEditorState>((set, get) => ({
                 };
             } else {
                 body = {
+                    queryId: get().queryId,
                     dataSourceId,
                     mode: 'sql',
                     sql,

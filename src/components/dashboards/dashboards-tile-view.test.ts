@@ -37,8 +37,8 @@ vi.mock('@src/lib/auth/session', async (importOriginal) => {
 
 describe('Dashboards Tile View & API Integration', () => {
     it('returns chartCount, viewCount, isFavorite, lastViewedAt, layout in GET /api/dashboards', async () => {
-        const wb = createWorkbook({ name: 'Tile View Workbook' });
-        const d1 = createDashboard(wb.id, {
+        const wb = await createWorkbook({ name: 'Tile View Workbook' });
+        const d1 = await createDashboard(wb.id, {
             title: 'Tile View Test 1',
             layout: [
                 { i: 'tile_1', x: 0, y: 0, w: 6, h: 4, widgetType: 'chart' },
@@ -64,14 +64,14 @@ describe('Dashboards Tile View & API Integration', () => {
             expect(found?.lastViewedAt).toBeNull();
             expect(Array.isArray(found?.layout)).toBe(true);
         } finally {
-            deleteDashboard(d1.id);
-            deleteWorkbook(wb.id);
+            await deleteDashboard(d1.id);
+            await deleteWorkbook(wb.id);
         }
     });
 
     it('toggles isFavorite via PATCH /api/dashboards/[id]', async () => {
-        const wb = createWorkbook({ name: 'Favorites API Workbook' });
-        const d = createDashboard(wb.id, { title: 'Favorite Dashboard' });
+        const wb = await createWorkbook({ name: 'Favorites API Workbook' });
+        const d = await createDashboard(wb.id, { title: 'Favorite Dashboard' });
 
         try {
             expect(d.isFavorite).toBe(false);
@@ -95,14 +95,14 @@ describe('Dashboards Tile View & API Integration', () => {
             const favJson = (await favRes.json()) as { data: Array<{ id: string }> };
             expect(favJson.data.some((item) => item.id === d.id)).toBe(true);
         } finally {
-            deleteDashboard(d.id);
-            deleteWorkbook(wb.id);
+            await deleteDashboard(d.id);
+            await deleteWorkbook(wb.id);
         }
     });
 
     it('increments viewCount and updates lastViewedAt via POST /api/dashboards/[id]/view', async () => {
-        const wb = createWorkbook({ name: 'Views API Workbook' });
-        const d = createDashboard(wb.id, { title: 'Views Dashboard' });
+        const wb = await createWorkbook({ name: 'Views API Workbook' });
+        const d = await createDashboard(wb.id, { title: 'Views Dashboard' });
 
         try {
             expect(d.viewCount).toBe(0);
@@ -138,15 +138,15 @@ describe('Dashboards Tile View & API Integration', () => {
             expect(recentItem).toBeDefined();
             expect(recentItem?.viewCount).toBe(2);
         } finally {
-            deleteDashboard(d.id);
-            deleteWorkbook(wb.id);
+            await deleteDashboard(d.id);
+            await deleteWorkbook(wb.id);
         }
     });
 
     it('filters by search query ?q= matching title or workbookTitle', async () => {
-        const wb = createWorkbook({ name: 'Searchable Enterprise' });
-        const d1 = createDashboard(wb.id, { title: 'UniqueXFinanceReview' });
-        const d2 = createDashboard(wb.id, { title: 'OtherMetrics' });
+        const wb = await createWorkbook({ name: 'Searchable Enterprise' });
+        const d1 = await createDashboard(wb.id, { title: 'UniqueXFinanceReview' });
+        const d2 = await createDashboard(wb.id, { title: 'OtherMetrics' });
 
         try {
             const req = new Request('http://localhost/api/dashboards?q=UniqueX');
@@ -155,9 +155,9 @@ describe('Dashboards Tile View & API Integration', () => {
             expect(json.data.some((item) => item.id === d1.id)).toBe(true);
             expect(json.data.some((item) => item.id === d2.id)).toBe(false);
         } finally {
-            deleteDashboard(d1.id);
-            deleteDashboard(d2.id);
-            deleteWorkbook(wb.id);
+            await deleteDashboard(d1.id);
+            await deleteDashboard(d2.id);
+            await deleteWorkbook(wb.id);
         }
     });
 

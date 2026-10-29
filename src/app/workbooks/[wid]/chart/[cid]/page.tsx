@@ -76,7 +76,7 @@ import { charts } from "@src/lib/db/schema";
 
 async function ChartPageContent({ params }: ChartPageProps) {
   const { wid, cid } = await params;
-  const chart = db.select().from(charts).where(eq(charts.id, cid)).get();
+  const [chart] = await db.select().from(charts).where(eq(charts.id, cid)).limit(1);
   if (!chart || chart.workbookId !== wid) {
     notFound();
   }

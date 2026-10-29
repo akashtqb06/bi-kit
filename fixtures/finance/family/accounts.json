@@ -1,0 +1,173 @@
+[
+  {
+    "id": "acc_fam_sal1_9qoiqyy1g32dxzur",
+    "userId": "usr_finance_default",
+    "name": "Salary Account",
+    "kind": "bank",
+    "class": "asset",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": true,
+    "metadata": {
+      "owner": "Earner 1",
+      "bank": "SBI"
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_fam_joint_b5al65ypzu7hx5hn",
+    "userId": "usr_finance_default",
+    "name": "Savings Account",
+    "kind": "bank",
+    "class": "asset",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": true,
+    "metadata": {
+      "joint": true,
+      "bank": "HDFC"
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_fam_cash_loqyisgaho5dc7aj",
+    "userId": "usr_finance_default",
+    "name": "Cash Wallet",
+    "kind": "cash",
+    "class": "asset",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": true,
+    "metadata": {},
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_fam_cca_bpueek20vujx96y6",
+    "userId": "usr_finance_default",
+    "name": "Credit Card A",
+    "kind": "credit_card",
+    "class": "liability",
+    "currency": "INR",
+    "creditLimit": 30000000,
+    "isActive": true,
+    "metadata": {
+      "issuer": "SBI SimplyCLICK"
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_fam_ccb_q8ptt877dqbe52jq",
+    "userId": "usr_finance_default",
+    "name": "Credit Card B",
+    "kind": "credit_card",
+    "class": "liability",
+    "currency": "INR",
+    "creditLimit": 20000000,
+    "isActive": true,
+    "metadata": {
+      "issuer": "HDFC Millennia"
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_fam_loan_0a13kwgcydsfcfzw",
+    "userId": "usr_finance_default",
+    "name": "Home Loan",
+    "kind": "loan",
+    "class": "liability",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": true,
+    "metadata": {
+      "principalPaise": 450000000,
+      "interestRate": 0.085,
+      "emiPaise": 4200000
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_fam_fd1_eqwu56k7xcztssvt",
+    "userId": "usr_finance_default",
+    "name": "FD 1 Year",
+    "kind": "fixed_deposit",
+    "class": "asset",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": true,
+    "metadata": {
+      "principalPaise": 5000000,
+      "interestRate": 0.07,
+      "maturesInsideRange": true,
+      "maturityDate": "2025-06-30"
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_fam_fd2_jyk6gpc5ed800962",
+    "userId": "usr_finance_default",
+    "name": "RD 5000 Monthly",
+    "kind": "fixed_deposit",
+    "class": "asset",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": true,
+    "metadata": {
+      "principalPaise": 10000000,
+      "interestRate": 0.075
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_fam_mf_vl3jjjh6yp07fzc8",
+    "userId": "usr_finance_default",
+    "name": "Mutual Fund SIP",
+    "kind": "mutual_fund",
+    "class": "asset",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": true,
+    "metadata": {
+      "scheme": "Mirae Asset Large Cap"
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_fam_stocks_2bwzu7r3aki6muu7",
+    "userId": "usr_finance_default",
+    "name": "Stocks Portfolio",
+    "kind": "stocks",
+    "class": "asset",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": true,
+    "metadata": {
+      "broker": "Zerodha Demat"
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  },
+  {
+    "id": "acc_fam_arch_e1y1gh2xz6jyb1tt",
+    "userId": "usr_finance_default",
+    "name": "Archived Old Wallet",
+    "kind": "cash",
+    "class": "asset",
+    "currency": "INR",
+    "creditLimit": null,
+    "isActive": false,
+    "metadata": {
+      "closedReason": "Old account"
+    },
+    "createdAt": "2024-10-01T00:00:00Z",
+    "updatedAt": "2024-10-01T00:00:00Z"
+  }
+]

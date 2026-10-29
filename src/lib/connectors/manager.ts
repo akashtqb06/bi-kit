@@ -70,7 +70,8 @@ class ConnectorManager {
             );
         }
 
-        const cacheKey = `${dataSource.id}:${this.hash(dataSource.config)}`;
+        const configStr = typeof dataSource.config === 'string' ? dataSource.config : JSON.stringify(dataSource.config);
+        const cacheKey = `${dataSource.id}:${this.hash(configStr)}`;
         const existing = this.connectorCache.get(cacheKey);
 
         if (existing) {
@@ -84,10 +85,16 @@ class ConnectorManager {
 
         // Parse and decrypt config
         let rawJson: Record<string, unknown>;
-        try {
-            rawJson = JSON.parse(dataSource.config) as Record<string, unknown>;
-        } catch {
-            throw new ConnectorError('DataSource config is not valid JSON.', 'INVALID_CONFIG_JSON');
+        if (typeof dataSource.config === 'string') {
+            try {
+                rawJson = JSON.parse(dataSource.config) as Record<string, unknown>;
+            } catch {
+                throw new ConnectorError('DataSource config is not valid JSON.', 'INVALID_CONFIG_JSON');
+            }
+        } else if (dataSource.config && typeof dataSource.config === 'object') {
+            rawJson = dataSource.config as Record<string, unknown>;
+        } else {
+            rawJson = {};
         }
 
         const decryptedConfig = decryptSecretFields(definition, rawJson);

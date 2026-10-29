@@ -157,9 +157,9 @@ describe("Dashboard Filter Schemas & Helpers", () => {
 });
 
 describe("Dashboard Service Operations", () => {
-  it("creates, retrieves, updates, and deletes dashboards with layouts and filters", () => {
+  it("creates, retrieves, updates, and deletes dashboards with layouts and filters", async () => {
     // Create a parent workbook
-    const wb = createWorkbook({
+    const wb = await createWorkbook({
       name: "Dashboard Test Workbook",
       description: "Testing dashboards",
     });
@@ -177,7 +177,7 @@ describe("Dashboard Service Operations", () => {
       },
     ];
 
-    const created = createDashboard(wb.id, {
+    const created = await createDashboard(wb.id, {
       name: "Sales KPI Dashboard",
       layout: initialLayout,
       filters: initialFilters,
@@ -190,13 +190,13 @@ describe("Dashboard Service Operations", () => {
     expect(created.filters).toEqual(initialFilters);
 
     // Retrieve dashboard
-    const fetched = getDashboardPublic(created.id);
+    const fetched = await getDashboardPublic(created.id);
     expect(fetched.name).toBe("Sales KPI Dashboard");
     expect(fetched.layout).toEqual(initialLayout);
     expect(fetched.filters).toEqual(initialFilters);
 
     // List dashboards in workbook
-    const list = listDashboards(wb.id);
+    const list = await listDashboards(wb.id);
     expect(list.some((d) => d.id === created.id)).toBe(true);
 
     // Update layout, filters, and name
@@ -214,7 +214,7 @@ describe("Dashboard Service Operations", () => {
       },
     ];
 
-    const updated = updateDashboard(created.id, {
+    const updated = await updateDashboard(created.id, {
       name: "Renamed KPI Dashboard",
       layout: updatedLayout,
       filters: updatedFilters,
@@ -224,25 +224,25 @@ describe("Dashboard Service Operations", () => {
     expect(updated.filters).toEqual(updatedFilters);
 
     // Delete dashboard
-    deleteDashboard(created.id);
-    expect(() => getDashboardPublic(created.id)).toThrow();
+    await deleteDashboard(created.id);
+    await expect(getDashboardPublic(created.id)).rejects.toThrow();
   });
 
-  it("lists all dashboards across workbooks with title search and workbook filters", () => {
-    const wb1 = createWorkbook({ name: "Alpha Finance" });
-    const wb2 = createWorkbook({ name: "Beta Marketing" });
+  it("lists all dashboards across workbooks with title search and workbook filters", async () => {
+    const wb1 = await createWorkbook({ name: "Alpha Finance" });
+    const wb2 = await createWorkbook({ name: "Beta Marketing" });
 
-    const d1 = createDashboard(wb1.id, {
+    const d1 = await createDashboard(wb1.id, {
       title: "Quarterly Revenue",
       layout: [{ i: "t1", chartId: "c1", x: 0, y: 0, w: 6, h: 4 }],
     });
-    const d2 = createDashboard(wb2.id, {
+    const d2 = await createDashboard(wb2.id, {
       title: "Campaign Performance",
       layout: [],
     });
 
     try {
-      const all = listDashboards();
+      const all = await listDashboards();
       expect(all.some((d) => d.id === d1.id)).toBe(true);
       expect(all.some((d) => d.id === d2.id)).toBe(true);
 
@@ -252,30 +252,30 @@ describe("Dashboard Service Operations", () => {
       expect(d1Summary.chartCount).toBe(1);
 
       // Search query
-      const searchRev = listDashboards().filter((d) =>
+      const searchRev = (await listDashboards()).filter((d) =>
         d.title.toLowerCase().includes("revenue")
       );
       expect(searchRev.some((d) => d.id === d1.id)).toBe(true);
       expect(searchRev.some((d) => d.id === d2.id)).toBe(false);
 
       // Filter by workbook
-      const wb1Dashboards = listDashboards(wb1.id);
+      const wb1Dashboards = await listDashboards(wb1.id);
       expect(wb1Dashboards.some((d) => d.id === d1.id)).toBe(true);
       expect(wb1Dashboards.some((d) => d.id === d2.id)).toBe(false);
     } finally {
-      deleteDashboard(d1.id);
-      deleteDashboard(d2.id);
+      await deleteDashboard(d1.id);
+      await deleteDashboard(d2.id);
     }
   });
 
-  it("duplicates and bulk deletes dashboards", () => {
-    const wb = createWorkbook({ name: "Duplicate Test Workbook" });
-    const d = createDashboard(wb.id, {
+  it("duplicates and bulk deletes dashboards", async () => {
+    const wb = await createWorkbook({ name: "Duplicate Test Workbook" });
+    const d = await createDashboard(wb.id, {
       title: "Original Dashboard",
       layout: [{ i: "t1", chartId: "c1", x: 0, y: 0, w: 6, h: 4 }],
     });
 
-    const duplicated = createDashboard(wb.id, {
+    const duplicated = await createDashboard(wb.id, {
       title: `${d.title} (Copy)`,
       layout: d.layout,
       filters: d.filters,
@@ -286,16 +286,16 @@ describe("Dashboard Service Operations", () => {
     expect(duplicated.chartCount).toBe(1);
 
     // Delete both
-    deleteDashboard(d.id);
-    deleteDashboard(duplicated.id);
-    expect(() => getDashboardPublic(d.id)).toThrow();
-    expect(() => getDashboardPublic(duplicated.id)).toThrow();
+    await deleteDashboard(d.id);
+    await deleteDashboard(duplicated.id);
+    await expect(getDashboardPublic(d.id)).rejects.toThrow();
+    await expect(getDashboardPublic(duplicated.id)).rejects.toThrow();
   });
 
-  it("handles isFavorite, viewCount tracking, and recents/favorites filters", () => {
-    const wb = createWorkbook({ name: "Favorites Workbook" });
-    const d1 = createDashboard(wb.id, { title: "Dashboard Alpha" });
-    const d2 = createDashboard(wb.id, { title: "Dashboard Beta" });
+  it("handles isFavorite, viewCount tracking, and recents/favorites filters", async () => {
+    const wb = await createWorkbook({ name: "Favorites Workbook" });
+    const d1 = await createDashboard(wb.id, { title: "Dashboard Alpha" });
+    const d2 = await createDashboard(wb.id, { title: "Dashboard Beta" });
 
     try {
       expect(d1.isFavorite).toBe(false);
@@ -303,28 +303,28 @@ describe("Dashboard Service Operations", () => {
       expect(d1.lastViewedAt).toBeNull();
 
       // Toggle favorite on d1
-      const favUpdated = updateDashboard(d1.id, { isFavorite: true });
+      const favUpdated = await updateDashboard(d1.id, { isFavorite: true });
       expect(favUpdated.isFavorite).toBe(true);
 
       // Verify favorites filter
-      const favoritesList = listDashboards().filter((d) => d.id === d1.id || d.id === d2.id);
+      const favoritesList = (await listDashboards()).filter((d) => d.id === d1.id || d.id === d2.id);
       expect(favoritesList.find((d) => d.id === d1.id)?.isFavorite).toBe(true);
 
       // Record view on d1
-      const viewed1 = recordDashboardView(d1.id);
+      const viewed1 = await recordDashboardView(d1.id);
       expect(viewed1.viewCount).toBe(1);
       expect(viewed1.lastViewedAt).not.toBeNull();
 
-      const viewed2 = recordDashboardView(d1.id);
+      const viewed2 = await recordDashboardView(d1.id);
       expect(viewed2.viewCount).toBe(2);
 
       // Verify recents
-      const recents = listDashboards().filter((d) => d.id === d1.id);
+      const recents = (await listDashboards()).filter((d) => d.id === d1.id);
       expect(recents[0].viewCount).toBe(2);
       expect(recents[0].lastViewedAt).not.toBeNull();
     } finally {
-      deleteDashboard(d1.id);
-      deleteDashboard(d2.id);
+      await deleteDashboard(d1.id);
+      await deleteDashboard(d2.id);
     }
   });
 });

@@ -43,43 +43,43 @@ describe('Connectors Product Wiring & Security Tests', () => {
     let adminUser: User;
     let memberUser: User;
 
-    beforeEach(() => {
+    beforeEach(async () => {
         // Find or create test admin and member
-        let admin = db.select().from(users).where(eq(users.role, 'admin')).limit(1).get();
+        let admin = (await db.select().from(users).where(eq(users.role, 'admin')).limit(1))[0];
         if (!admin) {
             const id = newId();
-            admin = db.insert(users).values({
+            admin = (await db.insert(users).values({
                 id,
                 name: 'Admin User',
                 email: `admin-${id}@example.com`,
                 passwordHash: 'mock-hash',
                 role: 'admin',
-            }).returning().get();
+            }).returning())[0];
         }
         adminUser = admin;
 
-        let member = db.select().from(users).where(eq(users.role, 'member')).limit(1).get();
+        let member = (await db.select().from(users).where(eq(users.role, 'member')).limit(1))[0];
         if (!member) {
             const id = newId();
-            member = db.insert(users).values({
+            member = (await db.insert(users).values({
                 id,
                 name: 'Member User',
                 email: `member-${id}@example.com`,
                 passwordHash: 'mock-hash',
                 role: 'member',
-            }).returning().get();
+            }).returning())[0];
         }
         memberUser = member;
 
         testSessionState.user = adminUser;
         // Reset allowed connector types
-        db.delete(appSettings).where(eq(appSettings.key, ALLOWED_CONNECTORS_KEY)).run();
+        await db.delete(appSettings).where(eq(appSettings.key, ALLOWED_CONNECTORS_KEY));
     });
 
     describe('Secrets Protection in Public DTOs', () => {
-        it('never returns raw plaintext passwords in listDataSources or getDataSourcePublic', () => {
+        it('never returns raw plaintext passwords in listDataSources or getDataSourcePublic', async () => {
             const rawPassword = 'SuperSecretDbPassword123!';
-            const ds = createDataSource({
+            const ds = await createDataSource({
                 name: 'Sensitive Postgres Source',
                 type: 'postgres',
                 config: {
@@ -94,26 +94,26 @@ describe('Connectors Product Wiring & Security Tests', () => {
             });
 
             // Verify getDataSourcePublic masks the password
-            const publicSource = getDataSourcePublic(ds.id);
+            const publicSource = await getDataSourcePublic(ds.id);
             expect(publicSource).toBeDefined();
             expect(publicSource.config).toBeDefined();
             expect(publicSource.config?.password).toBe('••••••••');
             expect(JSON.stringify(publicSource)).not.toContain(rawPassword);
 
             // Verify listDataSources masks the password
-            const list = listDataSources();
+            const list = await listDataSources();
             const found = list.find((s) => s.id === ds.id);
             expect(found).toBeDefined();
             expect(found?.config?.password).toBe('••••••••');
             expect(JSON.stringify(list)).not.toContain(rawPassword);
 
             // Clean up
-            deleteDataSource(ds.id);
+            await deleteDataSource(ds.id);
         });
 
-        it('preserves existing encrypted secret when editing with sentinel', () => {
+        it('preserves existing encrypted secret when editing with sentinel', async () => {
             const originalPassword = 'InitialSecretPassword999!';
-            const ds = createDataSource({
+            const ds = await createDataSource({
                 name: 'Edit Sentinel Test',
                 type: 'postgres',
                 config: {
@@ -128,7 +128,7 @@ describe('Connectors Product Wiring & Security Tests', () => {
             });
 
             // Update host but keep password as sentinel
-            updateDataSource(ds.id, {
+            await updateDataSource(ds.id, {
                 name: 'Updated Sentinel Test',
                 config: {
                     host: 'db.internal.example.com',
@@ -141,11 +141,11 @@ describe('Connectors Product Wiring & Security Tests', () => {
             });
 
             // Verify stored row still has the original password encrypted
-            const row = db.select().from(dataSources).where(eq(dataSources.id, ds.id)).get();
+            const row = (await db.select().from(dataSources).where(eq(dataSources.id, ds.id)))[0];
             expect(row).toBeDefined();
-            expect(row?.config).not.toContain('••••••••');
+            expect(JSON.stringify(row?.config)).not.toContain('••••••••');
 
-            deleteDataSource(ds.id);
+            await deleteDataSource(ds.id);
         });
     });
 
@@ -175,8 +175,8 @@ describe('Connectors Product Wiring & Security Tests', () => {
             expect(putJson.data.allowedConnectorTypes).toEqual(['sqlite', 'csv']);
 
             // Verify settings helper functions
-            expect(isConnectorTypeAllowed('sqlite')).toBe(true);
-            expect(isConnectorTypeAllowed('postgres')).toBe(false);
+            expect(await isConnectorTypeAllowed('sqlite')).toBe(true);
+            expect(await isConnectorTypeAllowed('postgres')).toBe(false);
 
             // Connectors API reflects allowed: false
             const connRes = await connectorsApi.GET();
@@ -204,7 +204,7 @@ describe('Connectors Product Wiring & Security Tests', () => {
         });
 
         it('blocks testing a disabled connector type', async () => {
-            setAllowedConnectorTypes(['sqlite', 'csv']);
+            await setAllowedConnectorTypes(['sqlite', 'csv']);
             testSessionState.user = adminUser;
 
             const testReq = new Request('http://localhost/api/data-sources/test', {

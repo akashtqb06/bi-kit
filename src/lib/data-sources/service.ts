@@ -3,8 +3,7 @@ import { rmSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { count, eq, inArray } from 'drizzle-orm';
 import { db } from '@src/lib/db';
-import { dataSources, queries, users, schemaCache, type DataSource } from '@src/lib/db/schema';
-import { serializeDataSourceConfig } from '@src/lib/db/json-helpers';
+import { dataSources, queries, users, schemaCache, type DataSource, dataStoreTables } from '@src/lib/db/schema';
 import { newId } from '@src/lib/db/id';
 import { csvSourceConfigSchema, type CreateDataSourceInput, type DataSourceType } from '@src/lib/schemas';
 import { ConflictError, NotFoundError, type SchemaSnapshot } from '@src/lib/connectors/types';
@@ -16,6 +15,8 @@ import { toPublicConfig, mergeStoredSecrets, encryptSecretFields } from '@src/li
 import { importCsvToDatabase } from './csv-import';
 import { CSV_DIR } from '@src/lib/db/paths';
 import type { PolicyUser } from '@src/lib/auth/policy';
+import { executeDbQuery } from '@src/lib/data-store/sync-engine';
+import { quoteIdent } from '@src/lib/data-store/types-mapping';
 
 // ---------------------------------------------------------------------------
 // Public shape — never includes raw secrets
@@ -39,10 +40,38 @@ export interface DataSourcePublic {
     updatedAt: Date | null;
 }
 
-function getDefaultOwnerId(): string | null {
-    const admin = db.select({ id: users.id }).from(users).where(eq(users.role, 'admin')).limit(1).get();
+function parseConfigField(config: unknown): Record<string, unknown> {
+    if (typeof config === 'object' && config !== null) {
+        return config as Record<string, unknown>;
+    }
+    if (typeof config === 'string') {
+        try {
+            return JSON.parse(config) as Record<string, unknown>;
+        } catch {
+            return {};
+        }
+    }
+    return {};
+}
+
+function parseSnapshotField(snapshot: unknown): SchemaSnapshot {
+    if (typeof snapshot === 'object' && snapshot !== null) {
+        return snapshot as SchemaSnapshot;
+    }
+    if (typeof snapshot === 'string') {
+        try {
+            return JSON.parse(snapshot) as SchemaSnapshot;
+        } catch {
+            return { tables: [], schemas: [] };
+        }
+    }
+    return { tables: [], schemas: [] };
+}
+
+async function getDefaultOwnerId(): Promise<string | null> {
+    const [admin] = await db.select({ id: users.id }).from(users).where(eq(users.role, 'admin')).limit(1);
     if (admin) return admin.id;
-    const anyUser = db.select({ id: users.id }).from(users).limit(1).get();
+    const [anyUser] = await db.select({ id: users.id }).from(users).limit(1);
     if (anyUser) return anyUser.id;
     return null;
 }
@@ -50,7 +79,7 @@ function getDefaultOwnerId(): string | null {
 function toPublic(row: DataSource, queryCount = 0, tableCount: number | null = null): DataSourcePublic {
     let publicConfig: Record<string, unknown> = {};
     try {
-        const rawConfig = JSON.parse(row.config) as Record<string, unknown>;
+        const rawConfig = parseConfigField(row.config);
         const def = getConnectorDefinition(row.type);
         publicConfig = toPublicConfig(def, rawConfig);
     } catch {
@@ -81,7 +110,7 @@ function toPublic(row: DataSource, queryCount = 0, tableCount: number | null = n
 // Service functions
 // ---------------------------------------------------------------------------
 
-export function listDataSources(user?: PolicyUser): DataSourcePublic[] {
+export async function listDataSources(user?: PolicyUser): Promise<DataSourcePublic[]> {
     let queryBuilder = db
         .select({
             id: dataSources.id,
@@ -109,16 +138,14 @@ export function listDataSources(user?: PolicyUser): DataSourcePublic[] {
         queryBuilder = queryBuilder.where(eq(dataSources.ownerId, user.id)) as typeof queryBuilder;
     }
 
-    const rows = queryBuilder
-        .groupBy(dataSources.id, users.id)
-        .all();
+    const rows = await queryBuilder.groupBy(dataSources.id, users.id);
 
     // Check schema cache for table counts
-    const allCaches = db.select().from(schemaCache).all();
+    const allCaches = await db.select().from(schemaCache);
     const cacheMap = new Map<string, number>();
     for (const c of allCaches) {
         try {
-            const snap = JSON.parse(c.snapshot) as SchemaSnapshot;
+            const snap = parseSnapshotField(c.snapshot);
             cacheMap.set(c.dataSourceId, snap.tables?.length ?? 0);
         } catch {
             // ignore
@@ -130,20 +157,7 @@ export function listDataSources(user?: PolicyUser): DataSourcePublic[] {
 
         if (tableCount === null && (row.type === 'sqlite' || row.type === 'csv')) {
             try {
-                const connector = createConnector({
-                    id: row.id,
-                    ownerId: row.ownerId,
-                    name: row.name,
-                    slug: row.slug,
-                    type: row.type,
-                    config: row.config,
-                    status: row.status,
-                    lastTestedAt: row.lastTestedAt,
-                    lastError: row.lastError,
-                    serverVersion: row.serverVersion,
-                    createdAt: row.createdAt,
-                    updatedAt: row.updatedAt,
-                });
+                const connector = createConnector(row as unknown as DataSource);
                 try {
                     tableCount = connector.getTables ? (connector.getTables() as unknown as string[]).length : null;
                 } finally {
@@ -156,7 +170,7 @@ export function listDataSources(user?: PolicyUser): DataSourcePublic[] {
 
         let publicConfig: Record<string, unknown> = {};
         try {
-            const rawConfig = JSON.parse(row.config) as Record<string, unknown>;
+            const rawConfig = parseConfigField(row.config);
             const def = getConnectorDefinition(row.type);
             publicConfig = toPublicConfig(def, rawConfig);
         } catch {
@@ -189,28 +203,27 @@ export function listDataSources(user?: PolicyUser): DataSourcePublic[] {
     });
 }
 
-export function getDataSource(id: string): DataSource {
-    const row = db.select().from(dataSources).where(eq(dataSources.id, id)).get();
+export async function getDataSource(id: string): Promise<DataSource> {
+    const [row] = await db.select().from(dataSources).where(eq(dataSources.id, id)).limit(1);
     if (!row) {
         throw new NotFoundError(`Data source "${id}" not found.`);
     }
     return row;
 }
 
-export function getDataSourcePublic(id: string): DataSourcePublic {
-    const row = getDataSource(id);
-    const queryCountResult = db
+export async function getDataSourcePublic(id: string): Promise<DataSourcePublic> {
+    const row = await getDataSource(id);
+    const [queryCountResult] = await db
         .select({ count: count() })
         .from(queries)
-        .where(eq(queries.dataSourceId, id))
-        .get();
+        .where(eq(queries.dataSourceId, id));
 
-    const cached = getCachedSchema(id);
+    const cached = await getCachedSchema(id);
     let tableCount: number | null = cached?.tables?.length ?? null;
 
     if (tableCount === null && (row.type === 'sqlite' || row.type === 'csv')) {
         try {
-            const connector = createConnector(row);
+            const connector = createConnector(row as unknown as DataSource);
             try {
                 tableCount = connector.getTables ? (connector.getTables() as unknown as string[]).length : null;
             } finally {
@@ -223,76 +236,73 @@ export function getDataSourcePublic(id: string): DataSourcePublic {
     return toPublic(row, queryCountResult?.count ?? 0, tableCount);
 }
 
-export function createDataSource(
+export async function createDataSource(
     input: CreateDataSourceInput & { ownerId?: string | null; slug?: string; status?: 'unknown' | 'ok' | 'error' },
     ownerId?: string | null
-): DataSourcePublic {
-    const configJson = typeof input.config === 'string' ? input.config : serializeDataSourceConfig(input.config);
-    const finalOwnerId = ownerId ?? input.ownerId ?? getDefaultOwnerId();
+): Promise<DataSourcePublic> {
+    const configObj = parseConfigField(input.config);
+    const finalOwnerId = ownerId ?? input.ownerId ?? (await getDefaultOwnerId());
     const insertedId = newId();
 
-    db.insert(dataSources)
+    await db.insert(dataSources)
         .values({
             id: insertedId,
             ownerId: finalOwnerId!,
             name: input.name,
             slug: input.slug,
             type: input.type,
-            config: configJson,
+            config: configObj,
             status: input.status || 'unknown',
-        })
-        .run();
+        });
 
-    const row = getDataSource(insertedId);
+    const row = await getDataSource(insertedId);
     return toPublic(row);
 }
 
-export function createCsvDataSource(
+export async function createCsvDataSource(
     input: { name: string; csvText: string; originalFileName: string; ownerId?: string; slug?: string },
     ownerId?: string
-): {
+): Promise<{
     source: DataSourcePublic;
     rowCount: number;
-} {
+}> {
     const id = newId();
-    const finalOwnerId = ownerId ?? input.ownerId ?? getDefaultOwnerId();
+    const finalOwnerId = ownerId ?? input.ownerId ?? (await getDefaultOwnerId());
     const config = importCsvToDatabase(input.csvText, id, input.originalFileName);
     try {
-        db.insert(dataSources)
+        await db.insert(dataSources)
             .values({
                 id,
                 ownerId: finalOwnerId!,
                 name: input.name,
                 slug: input.slug,
                 type: 'csv',
-                config: serializeDataSourceConfig(config),
-            })
-            .run();
+                config: config as Record<string, unknown>,
+            });
     } catch (error) {
         removeCsvDatabase(config.dbPath || config.managedPath || '');
         throw error;
     }
-    return { source: getDataSourcePublic(id), rowCount: config.rowCount ?? 0 };
+    return { source: await getDataSourcePublic(id), rowCount: config.rowCount ?? 0 };
 }
 
-export function replaceCsvDataSource(
+export async function replaceCsvDataSource(
     id: string,
     input: { name: string; csvText: string; originalFileName: string }
-): { source: DataSourcePublic; rowCount: number } {
-    const existing = getDataSource(id);
+): Promise<{ source: DataSourcePublic; rowCount: number }> {
+    const existing = await getDataSource(id);
     if (existing.type !== 'csv') {
         throw new Error('Only CSV data sources can have their file replaced.');
     }
 
-    const currentConfig = csvSourceConfigSchema.parse(JSON.parse(existing.config) as unknown);
+    const currentConfig = csvSourceConfigSchema.parse(parseConfigField(existing.config));
     const config = importCsvToDatabase(input.csvText, id, input.originalFileName, currentConfig.dbPath);
-    db.update(dataSources)
-        .set({ name: input.name, config: serializeDataSourceConfig(config), updatedAt: new Date() })
-        .where(eq(dataSources.id, id))
-        .run();
+    await db.update(dataSources)
+        .set({ name: input.name, config: config as Record<string, unknown>, updatedAt: new Date() })
+        .where(eq(dataSources.id, id));
 
     void invalidateConnector(id);
-    return { source: getDataSourcePublic(id), rowCount: config.rowCount ?? 0 };
+    return { source: await getDataSourcePublic(id), rowCount: config.rowCount ?? 0 };
 }
 
 function removeCsvDatabase(dbPath: string): void {
@@ -310,34 +320,29 @@ export interface UpdateDataSourceInput {
     config?: Record<string, unknown>;
 }
 
-export function updateDataSource(id: string, input: UpdateDataSourceInput): DataSourcePublic {
-    const existing = getDataSource(id); // throws NotFoundError if missing
+export async function updateDataSource(id: string, input: UpdateDataSourceInput): Promise<DataSourcePublic> {
+    const existing = await getDataSource(id); // throws NotFoundError if missing
 
-    const updates: Partial<DataSource> = {};
+    const updates: Partial<typeof dataSources.$inferInsert> = {};
     if (input.name !== undefined) updates.name = input.name;
     if (input.config !== undefined) {
         const def = getConnectorDefinition(existing.type);
-        let storedConfig: Record<string, unknown> = {};
-        try {
-            storedConfig = JSON.parse(existing.config) as Record<string, unknown>;
-        } catch {
-            // ignore
-        }
+        const storedConfig = parseConfigField(existing.config);
         let mergedConfig = mergeStoredSecrets(def, input.config, storedConfig);
         if (def) {
             mergedConfig = encryptSecretFields(def, mergedConfig);
         }
-        updates.config = JSON.stringify(mergedConfig);
+        updates.config = mergedConfig;
         updates.status = 'unknown';
     }
     updates.updatedAt = new Date();
 
-    db.update(dataSources).set(updates).where(eq(dataSources.id, id)).run();
+    await db.update(dataSources).set(updates).where(eq(dataSources.id, id));
     void invalidateConnector(id);
-    return getDataSourcePublic(id);
+    return await getDataSourcePublic(id);
 }
 
-export function updateDataSourceStatus(
+export async function updateDataSourceStatus(
     id: string,
     statusData: {
         status: 'unknown' | 'ok' | 'error';
@@ -345,8 +350,8 @@ export function updateDataSourceStatus(
         serverVersion?: string | null;
         lastError?: string | null;
     }
-): void {
-    db.update(dataSources)
+): Promise<void> {
+    await db.update(dataSources)
         .set({
             status: statusData.status,
             lastTestedAt: statusData.lastTestedAt ?? new Date(),
@@ -354,61 +359,57 @@ export function updateDataSourceStatus(
             lastError: statusData.lastError,
             updatedAt: new Date(),
         })
-        .where(eq(dataSources.id, id))
-        .run();
+        .where(eq(dataSources.id, id));
 }
 
-export function getCachedSchema(dataSourceId: string): SchemaSnapshot | null {
-    const row = db.select().from(schemaCache).where(eq(schemaCache.dataSourceId, dataSourceId)).get();
+export async function getCachedSchema(dataSourceId: string): Promise<SchemaSnapshot | null> {
+    const [row] = await db.select().from(schemaCache).where(eq(schemaCache.dataSourceId, dataSourceId)).limit(1);
     if (!row) return null;
     try {
-        return JSON.parse(row.snapshot) as SchemaSnapshot;
+        return parseSnapshotField(row.snapshot);
     } catch {
         return null;
     }
 }
 
-export function getCachedSchemaWithMeta(dataSourceId: string): { snapshot: SchemaSnapshot; fetchedAt: Date } | null {
-    const row = db.select().from(schemaCache).where(eq(schemaCache.dataSourceId, dataSourceId)).get();
+export async function getCachedSchemaWithMeta(dataSourceId: string): Promise<{ snapshot: SchemaSnapshot; fetchedAt: Date } | null> {
+    const [row] = await db.select().from(schemaCache).where(eq(schemaCache.dataSourceId, dataSourceId)).limit(1);
     if (!row) return null;
     try {
-        const snapshot = JSON.parse(row.snapshot) as SchemaSnapshot;
+        const snapshot = parseSnapshotField(row.snapshot);
         return { snapshot, fetchedAt: row.fetchedAt };
     } catch {
         return null;
     }
 }
 
-export function setCachedSchema(dataSourceId: string, snapshot: SchemaSnapshot): void {
-    const json = JSON.stringify(snapshot);
-    db.insert(schemaCache)
+export async function setCachedSchema(dataSourceId: string, snapshot: SchemaSnapshot): Promise<void> {
+    await db.insert(schemaCache)
         .values({
             dataSourceId,
-            snapshot: json,
+            snapshot,
             fetchedAt: new Date(),
         })
         .onConflictDoUpdate({
             target: schemaCache.dataSourceId,
             set: {
-                snapshot: json,
+                snapshot,
                 fetchedAt: new Date(),
             },
-        })
-        .run();
+        });
 }
 
-export function getDependentQueries(id: string): { id: string; name: string }[] {
-    return db
+export async function getDependentQueries(id: string): Promise<{ id: string; name: string }[]> {
+    return await db
         .select({ id: queries.id, name: queries.name })
         .from(queries)
-        .where(eq(queries.dataSourceId, id))
-        .all();
+        .where(eq(queries.dataSourceId, id));
 }
 
-export function deleteDataSource(id: string): void {
-    const source = getDataSource(id);
+export async function deleteDataSource(id: string): Promise<void> {
+    const source = await getDataSource(id);
 
-    const dependentQueries = getDependentQueries(id);
+    const dependentQueries = await getDependentQueries(id);
     if (dependentQueries.length > 0) {
         const queryNames = dependentQueries.map(({ name }) => `"${name}"`).join(', ');
         const count = dependentQueries.length;
@@ -419,7 +420,7 @@ export function deleteDataSource(id: string): void {
 
     if (source.type === 'csv') {
         try {
-            const config = JSON.parse(source.config) as Record<string, string>;
+            const config = parseConfigField(source.config) as Record<string, string>;
             if (config.dbPath) removeCsvDatabase(config.dbPath);
         } catch {
             // ignore
@@ -436,7 +437,25 @@ export function deleteDataSource(id: string): void {
         }
     }
 
-    db.delete(dataSources).where(eq(dataSources.id, id)).run();
+    // Clean up associated data store tables
+    try {
+        const storeTbls = await db
+            .select()
+            .from(dataStoreTables)
+            .where(eq(dataStoreTables.dataSourceId, id));
+        for (const st of storeTbls) {
+            try {
+                await executeDbQuery(
+                    `DROP TABLE IF EXISTS ${quoteIdent(st.storeSchema)}.${quoteIdent(st.storeTable)} CASCADE`
+                );
+            } catch {}
+        }
+        await db.delete(dataStoreTables).where(eq(dataStoreTables.dataSourceId, id));
+    } catch {
+        // ignore
+    }
+
+    await db.delete(dataSources).where(eq(dataSources.id, id));
     void invalidateConnector(id);
 }
 
@@ -445,26 +464,25 @@ export interface BulkDeleteDataSourcesResult {
     blocked: { id: string; name: string; queryCount: number }[];
 }
 
-export function bulkDeleteDataSources(ids: string[], user?: PolicyUser): BulkDeleteDataSourcesResult {
+export async function bulkDeleteDataSources(ids: string[], user?: PolicyUser): Promise<BulkDeleteDataSourcesResult> {
     if (ids.length === 0) {
         return { deleted: [], blocked: [] };
     }
 
-    return db.transaction(() => {
-        let sources = db.select().from(dataSources).where(inArray(dataSources.id, ids)).all();
+    return await db.transaction(async (tx) => {
+        let sources = await tx.select().from(dataSources).where(inArray(dataSources.id, ids));
         if (user && user.role !== 'admin') {
             sources = sources.filter((s) => s.ownerId === user.id);
         }
         const sourceMap = new Map(sources.map((s) => [s.id, s]));
 
-        const dependentQueries = db
+        const dependentQueries = await tx
             .select({
                 id: queries.id,
                 dataSourceId: queries.dataSourceId,
             })
             .from(queries)
-            .where(inArray(queries.dataSourceId, ids))
-            .all();
+            .where(inArray(queries.dataSourceId, ids));
 
         const queryCountBySourceId = new Map<string, number>();
         for (const q of dependentQueries) {
@@ -490,7 +508,7 @@ export function bulkDeleteDataSources(ids: string[], user?: PolicyUser): BulkDel
             } else {
                 if (source.type === 'csv') {
                     try {
-                        const config = JSON.parse(source.config) as Record<string, string>;
+                        const config = parseConfigField(source.config) as Record<string, string>;
                         if (config.dbPath) removeCsvDatabase(config.dbPath);
                     } catch {
                         // ignore file deletion errors
@@ -504,7 +522,7 @@ export function bulkDeleteDataSources(ids: string[], user?: PolicyUser): BulkDel
                         // ignore
                     }
                 }
-                db.delete(dataSources).where(eq(dataSources.id, id)).run();
+                await tx.delete(dataSources).where(eq(dataSources.id, id));
                 void invalidateConnector(id);
                 deleted.push(id);
             }

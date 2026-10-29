@@ -1,0 +1,80 @@
+{
+  "persona_aarav": {
+    "name": "Aarav Sharma",
+    "description": "Tech lead with salaried income, credit card, and city living expenses",
+    "monthly_spend": [
+      { "month_start": "2026-01-01", "spend": 52000 }
+    ],
+    "spend_by_category": [
+      { "category": "Rent", "total_spend": 40000 },
+      { "category": "Groceries", "total_spend": 8500 },
+      { "category": "Dining", "total_spend": 3500 }
+    ],
+    "income_vs_expense": [
+      { "month_start": "2026-01-01", "income": 150000, "expense": 52000 }
+    ],
+    "balances_by_account": [
+      { "name": "HDFC Salary Account", "balance": 110000 },
+      { "name": "ICICI Sapphiro Card", "balance": -12000 }
+    ],
+    "credit_card_utilization": [
+      { "name": "ICICI Sapphiro Card", "utilization": 0.04 }
+    ],
+    "top_payees": [
+      { "payee": "Prestige Estates", "total_spend": 40000 },
+      { "payee": "Nature Basket", "total_spend": 8500 },
+      { "payee": "Toit Brewpub", "total_spend": 3500 }
+    ],
+    "savings_rate": 65.3,
+    "recent_transactions_count": 4
+  },
+  "persona_meera": {
+    "name": "Meera Patel",
+    "description": "Active investor with demat equity, mutual funds, and fixed deposits",
+    "monthly_spend": [
+      { "month_start": "2026-02-01", "spend": 35000 }
+    ],
+    "spend_by_category": [
+      { "category": "Rent", "total_spend": 25000 },
+      { "category": "Groceries", "total_spend": 10000 }
+    ],
+    "income_vs_expense": [
+      { "month_start": "2026-02-01", "income": 200000, "expense": 35000 }
+    ],
+    "balances_by_account": [
+      { "name": "SBI Savings Account", "balance": 125000 },
+      { "name": "Zerodha Demat", "balance": 40000 }
+    ],
+    "top_payees": [
+      { "payee": "DLF Properties", "total_spend": 25000 },
+      { "payee": "FreshWorld", "total_spend": 10000 }
+    ],
+    "savings_rate": 82.5,
+    "recent_transactions_count": 4
+  },
+  "persona_kabir": {
+    "name": "Kabir Verma",
+    "description": "Small business owner with multiple accounts, vehicle EMI, and monthly RD",
+    "monthly_spend": [
+      { "month_start": "2026-03-01", "spend": 45000 }
+    ],
+    "spend_by_category": [
+      { "category": "EMI & Loans", "total_spend": 30000 },
+      { "category": "Utilities", "total_spend": 15000 }
+    ],
+    "income_vs_expense": [
+      { "month_start": "2026-03-01", "income": 180000, "expense": 45000 }
+    ],
+    "balances_by_account": [
+      { "name": "Kotak Business Account", "balance": 135000 },
+      { "name": "SBI Auto Loan", "balance": 350000 }
+    ],
+    "top_payees": [
+      { "payee": "SBI Vehicle Finance", "total_spend": 30000 },
+      { "payee": "BESCOM Power", "total_spend": 15000 }
+    ],
+    "savings_rate": 75.0,
+    "recent_transactions_count": 3
+  }
+}
+

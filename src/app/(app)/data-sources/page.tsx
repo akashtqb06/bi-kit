@@ -21,7 +21,9 @@ import {
     AlertCircleIcon,
     SearchIcon,
     CheckCircle2Icon,
+    HardDriveIcon,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -146,6 +148,7 @@ type ConnectionStatus = 'unknown' | 'testing' | 'connected' | 'error' | 'ok';
 // ---------------------------------------------------------------------------
 
 function DataSourcesContent() {
+    const router = useRouter();
     const currentUser = useCurrentUser();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -740,6 +743,10 @@ function DataSourcesContent() {
                                         <RefreshCwIcon className="mr-2 size-4" />
                                         Refresh schema
                                     </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => router.push(`/data-store?action=sync&sourceId=${source.id}`)}>
+                                        <HardDriveIcon className="mr-2 size-4 text-purple-500" />
+                                        Sync to Data Store
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => handleOpenEdit(source)}>
                                         <PencilIcon className="mr-2 size-4" />
                                         Edit
@@ -776,7 +783,7 @@ function DataSourcesContent() {
                 enableHiding: false,
             },
         ];
-    }, [handleSchemaView, handleOpenEdit, testConnection, refreshSchema, openRenameDialog, statusMap, currentUser]);
+    }, [handleSchemaView, handleOpenEdit, testConnection, refreshSchema, openRenameDialog, statusMap, currentUser, router]);
 
     // Controlled column filters
     const columnFilters = useMemo<ColumnFiltersState>(() => {
@@ -979,7 +986,9 @@ function DataSourcesContent() {
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Delete {deleteTarget?.name}?</AlertDialogTitle>
-                        <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+                        <AlertDialogDescription>
+                            This action cannot be undone. Any synchronized Data Store tables created from this data source will also be deleted.
+                        </AlertDialogDescription>
                     </AlertDialogHeader>
 
                     {deleteError && (

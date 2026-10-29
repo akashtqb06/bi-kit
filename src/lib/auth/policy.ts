@@ -7,7 +7,38 @@ import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 
 export type Action = "view" | "edit" | "delete" | "share" | "create";
 // keep: used by RBAC phase
-export type ResourceType = "workbook" | "dashboard" | "chart" | "query" | "data_source" | "user";
+export type ResourceType =
+  | "workbook"
+  | "dashboard"
+  | "chart"
+  | "query"
+  | "data_source"
+  | "user"
+  | "data_store_table"
+  | "fin_account"
+  | "fin_category"
+  | "fin_transaction"
+  | "fin_valuation"
+  | "fin_budget"
+  | "fin_recurring_rule";
+
+export const FINANCE_RESOURCE_TYPES: ResourceType[] = [
+  "fin_account",
+  "fin_category",
+  "fin_transaction",
+  "fin_valuation",
+  "fin_budget",
+  "fin_recurring_rule",
+];
+
+export function isFinanceResource(type: ResourceType): boolean {
+  return FINANCE_RESOURCE_TYPES.includes(type);
+}
+
+export function isDataStoreResource(type: ResourceType): boolean {
+  return type === "data_store_table";
+}
+
 export type Resource = {
   type: ResourceType;
   id?: string;
@@ -20,6 +51,26 @@ export type PolicyUser = { id: string; role: string };
 type Rule = (user: PolicyUser, action: Action, resource: Resource) => boolean | null;
 
 const rules: Rule[] = [
+  // Strict OWNER-ONLY rule for Data Store resources (no admin override)
+  (user, action, resource) => {
+    if (isDataStoreResource(resource.type)) {
+      if (action === "create") {
+        return !resource.ownerId || resource.ownerId === user.id ? true : false;
+      }
+      return resource.ownerId === user.id ? true : false;
+    }
+    return null;
+  },
+  // Strict OWNER-ONLY rule for finance resources (no admin override)
+  (user, action, resource) => {
+    if (isFinanceResource(resource.type)) {
+      if (action === "create") {
+        return !resource.ownerId || resource.ownerId === user.id ? true : false;
+      }
+      return resource.ownerId === user.id ? true : false;
+    }
+    return null;
+  },
   (user) => (user.role === "admin" ? true : null),
   (user, _action, resource) =>
     user.role === "member" && resource.ownerId === user.id ? true : null,
@@ -72,6 +123,9 @@ export function visibleScope(
   type: ResourceType,
 ): (ownerIdColumn: AnySQLiteColumn) => SQL | undefined {
   return (ownerIdColumn) => {
+    if (isFinanceResource(type)) {
+      return eq(ownerIdColumn, user.id);
+    }
     if (user.role === "admin") return undefined;
     // TODO: Union shared resources from resource_shares into this scope.
     void type;

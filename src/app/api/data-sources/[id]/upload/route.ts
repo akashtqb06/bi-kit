@@ -28,7 +28,7 @@ export async function PUT(
     try {
         const user = await requireUserApi();
         const { id } = await params;
-        const source = getDataSource(id);
+        const source = await getDataSource(id);
         assertCan(user, 'edit', { type: 'data_source', id, ownerId: source.ownerId });
 
         const formData = await req.formData();
@@ -64,7 +64,7 @@ export async function PUT(
         // Validate signature
         validateFileSignature(sourceFilePath, fileType);
 
-        const oldSnapshot = getCachedSchema(id);
+        const oldSnapshot = await getCachedSchema(id);
         let rowCount = 0;
 
         if (fileType === 'excel') {
@@ -83,7 +83,7 @@ export async function PUT(
         const newSnapshot = await connector.introspect();
         await connector.close();
 
-        setCachedSchema(id, newSnapshot);
+        await setCachedSchema(id, newSnapshot);
         const diff = computeSchemaDiff(oldSnapshot, newSnapshot);
 
         // Update database configuration
@@ -95,21 +95,20 @@ export async function PUT(
             importedAt: new Date().toISOString(),
         };
 
-        db.update(dataSources)
+        await db.update(dataSources)
             .set({
-                config: JSON.stringify(newConfig),
+                config: newConfig,
                 status: 'ok',
                 lastTestedAt: new Date(),
                 updatedAt: new Date(),
             })
-            .where(eq(dataSources.id, id))
-            .run();
+            .where(eq(dataSources.id, id));
 
         await invalidateConnector(id);
 
         return NextResponse.json({
             data: {
-                source: getDataSourcePublic(id),
+                source: await getDataSourcePublic(id),
                 rowCount,
                 diff,
             },

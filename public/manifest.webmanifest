@@ -1,0 +1,86 @@
+{
+  "name": "BI Kit Personal Finance",
+  "short_name": "Finance",
+  "description": "Personal finance management, account balances, net worth tracking, budgets, and investments",
+  "start_url": "/finance",
+  "scope": "/finance",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "categories": [
+    "finance",
+    "productivity",
+    "utilities"
+  ],
+  "shortcuts": [
+    {
+      "name": "Add Transaction",
+      "short_name": "Quick Add",
+      "description": "Quickly record a new transaction",
+      "url": "/finance/transactions?action=quick-add",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Overview",
+      "short_name": "Overview",
+      "description": "View financial overview and net worth",
+      "url": "/finance/overview",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Accounts",
+      "short_name": "Accounts",
+      "description": "Manage bank accounts and credit cards",
+      "url": "/finance/accounts",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

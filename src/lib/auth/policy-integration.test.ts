@@ -54,7 +54,7 @@ const appDatabaseDirectory = fs.mkdtempSync(path.join(tmpdir(), 'bi-kit-policy-t
 process.env.APP_DB_PATH = path.join(appDatabaseDirectory, 'app.db');
 
 const { db, runMigrations, resetConnection } = await import('@src/lib/db');
-runMigrations();
+await runMigrations();
 const { users, workbooks, dataSources, queries, charts, dashboards } = await import('@src/lib/db/schema');
 const { seedUsers } = await import('../../../scripts/seed/users');
 const { DATA_DIR } = await import('@src/lib/db/paths');
@@ -139,7 +139,7 @@ beforeAll(async () => {
         .values({
             name: "Member B's Secret DS",
             type: 'sqlite',
-            config: JSON.stringify({ path: sourcePath }),
+            config: { path: sourcePath },
             ownerId: memberB.id,
         })
         .returning();
@@ -232,6 +232,10 @@ describe('Policy Integration & Access Control', () => {
             const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
 
             for (const file of routeFiles) {
+                // Public health check route does not require user authentication
+                if (file.endsWith('/api/health/route.ts')) {
+                    continue;
+                }
                 const mod = await import(file);
                 for (const method of methods) {
                     if (typeof mod[method] === 'function') {

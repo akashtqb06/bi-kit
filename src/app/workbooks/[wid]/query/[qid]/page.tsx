@@ -74,7 +74,7 @@ import { queries } from "@src/lib/db/schema";
 
 async function QueryPageContent({ params }: QueryPageProps) {
   const { wid, qid } = await params;
-  const query = db.select().from(queries).where(eq(queries.id, qid)).get();
+  const [query] = await db.select().from(queries).where(eq(queries.id, qid)).limit(1);
   if (!query || query.workbookId !== wid) {
     notFound();
   }

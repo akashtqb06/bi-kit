@@ -61,7 +61,7 @@ describe('Data Sources Service & Table Integration', () => {
         expect(source.type).toBe('sqlite');
         expect(typeof created).toBe('boolean');
 
-        const sources = listDataSources();
+        const sources = await listDataSources();
         const found = sources.find((s) => s.id === source.id);
         expect(found).toBeDefined();
         expect(found?.tableCount).toBeGreaterThanOrEqual(1);
@@ -69,7 +69,7 @@ describe('Data Sources Service & Table Integration', () => {
 
     it('creates a CSV data source, tests connection, and lists table count', async () => {
         const csvContent = `id,name,value\n1,alpha,100\n2,beta,200\n3,gamma,300`;
-        const { source, rowCount } = createCsvDataSource({
+        const { source, rowCount } = await createCsvDataSource({
             name: 'Test Sales CSV',
             csvText: csvContent,
             originalFileName: 'sales.csv',
@@ -80,7 +80,7 @@ describe('Data Sources Service & Table Integration', () => {
         expect(source.type).toBe('csv');
 
         // Test connection
-        const fullSource = db.select().from(dataSources).where(eq(dataSources.id, source.id)).get();
+        const fullSource = (await db.select().from(dataSources).where(eq(dataSources.id, source.id)))[0];
         expect(fullSource).toBeDefined();
         const connector = createConnector(fullSource!) as SqliteConnector;
         expect(() => connector.testConnection()).not.toThrow();
@@ -89,69 +89,67 @@ describe('Data Sources Service & Table Integration', () => {
         await connector.close();
 
         // Check listDataSources reflects tableCount
-        const list = listDataSources();
+        const list = await listDataSources();
         const found = list.find((s) => s.id === source.id);
         expect(found).toBeDefined();
         expect(found?.tableCount).toBe(1);
         expect(found?.queryCount).toBe(0);
 
         // Clean up
-        deleteDataSource(source.id);
+        await deleteDataSource(source.id);
     });
 
-    it('renames a data source and persists changes', () => {
-        const { source } = createCsvDataSource({
+    it('renames a data source and persists changes', async () => {
+        const { source } = await createCsvDataSource({
             name: 'Original Name',
             csvText: 'a,b\n1,2',
             originalFileName: 'orig.csv',
         });
 
-        const updated = updateDataSource(source.id, { name: 'Renamed Source' });
+        const updated = await updateDataSource(source.id, { name: 'Renamed Source' });
         expect(updated.name).toBe('Renamed Source');
 
-        const fetched = getDataSourcePublic(source.id);
+        const fetched = await getDataSourcePublic(source.id);
         expect(fetched.name).toBe('Renamed Source');
 
-        deleteDataSource(source.id);
+        await deleteDataSource(source.id);
     });
 
-    it('blocks deletion of a data source used by dependent queries with a clear ConflictError message', () => {
+    it('blocks deletion of a data source used by dependent queries with a clear ConflictError message', async () => {
         // 1. Create a data source
-        const { source } = createCsvDataSource({
+        const { source } = await createCsvDataSource({
             name: 'Used Data Source',
             csvText: 'id,score\n1,99',
             originalFileName: 'used.csv',
         });
 
         // 2. Create a workbook and a dependent query
-        const user = db.select().from(users).get()!;
+        const user = (await db.select().from(users).limit(1))[0]!;
         const wbId = 'wb-dep-' + Date.now();
-        db.insert(workbooks)
-            .values({ id: wbId, name: 'Dependency Workbook', ownerId: user.id })
-            .run();
+        await db.insert(workbooks)
+            .values({ id: wbId, name: 'Dependency Workbook', ownerId: user.id });
 
         const qId = 'query-dep-' + Date.now();
-        db.insert(queries)
+        await db.insert(queries)
             .values({
                 id: qId,
                 name: 'Revenue Summary Query',
                 workbookId: wbId,
                 dataSourceId: source.id,
                 sql: 'SELECT * FROM "used"',
-            })
-            .run();
+            });
 
         // 3. Verify listDataSources reports queryCount = 1
-        const list = listDataSources();
+        const list = await listDataSources();
         const found = list.find((s) => s.id === source.id);
         expect(found?.queryCount).toBe(1);
 
         // 4. Single delete must throw ConflictError with clear message listing the query name
-        expect(() => deleteDataSource(source.id)).toThrow(ConflictError);
-        expect(() => deleteDataSource(source.id)).toThrow(/Revenue Summary Query/);
+        await expect(deleteDataSource(source.id)).rejects.toThrow(ConflictError);
+        await expect(deleteDataSource(source.id)).rejects.toThrow(/Revenue Summary Query/);
 
         // 5. Bulk delete must report it as blocked
-        const bulkResult = bulkDeleteDataSources([source.id]);
+        const bulkResult = await bulkDeleteDataSources([source.id]);
         expect(bulkResult.deleted).not.toContain(source.id);
         expect(bulkResult.blocked).toEqual([
             expect.objectContaining({
@@ -162,23 +160,23 @@ describe('Data Sources Service & Table Integration', () => {
         ]);
 
         // Clean up: delete query, workbook, then source
-        db.delete(queries).where(eq(queries.id, qId)).run();
-        db.delete(workbooks).where(eq(workbooks.id, wbId)).run();
-        deleteDataSource(source.id);
+        await db.delete(queries).where(eq(queries.id, qId));
+        await db.delete(workbooks).where(eq(workbooks.id, wbId));
+        await deleteDataSource(source.id);
     });
 
-    it('bulk deletes unused data sources while blocking used ones in transaction', () => {
-        const { source: ds1 } = createCsvDataSource({
+    it('bulk deletes unused data sources while blocking used ones in transaction', async () => {
+        const { source: ds1 } = await createCsvDataSource({
             name: 'Unused Source 1',
             csvText: 'x,y\n1,2',
             originalFileName: 'u1.csv',
         });
-        const { source: ds2 } = createCsvDataSource({
+        const { source: ds2 } = await createCsvDataSource({
             name: 'Unused Source 2',
             csvText: 'x,y\n3,4',
             originalFileName: 'u2.csv',
         });
-        const { source: dsBlocked } = createCsvDataSource({
+        const { source: dsBlocked } = await createCsvDataSource({
             name: 'Blocked Source',
             csvText: 'x,y\n5,6',
             originalFileName: 'b.csv',
@@ -186,20 +184,19 @@ describe('Data Sources Service & Table Integration', () => {
 
         // Add query to dsBlocked
         const wbId = 'wb-bulk-' + Date.now();
-        const user = db.select().from(users).get()!;
-        db.insert(workbooks).values({ id: wbId, name: 'WB Bulk', ownerId: user.id }).run();
+        const user = (await db.select().from(users).limit(1))[0]!;
+        await db.insert(workbooks).values({ id: wbId, name: 'WB Bulk', ownerId: user.id });
         const qId = 'q-bulk-' + Date.now();
-        db.insert(queries)
+        await db.insert(queries)
             .values({
                 id: qId,
                 name: 'Active Query',
                 workbookId: wbId,
                 dataSourceId: dsBlocked.id,
                 sql: 'SELECT 1',
-            })
-            .run();
+            });
 
-        const result = bulkDeleteDataSources([ds1.id, ds2.id, dsBlocked.id]);
+        const result = await bulkDeleteDataSources([ds1.id, ds2.id, dsBlocked.id]);
         expect(result.deleted).toContain(ds1.id);
         expect(result.deleted).toContain(ds2.id);
         expect(result.blocked).toHaveLength(1);
@@ -208,23 +205,23 @@ describe('Data Sources Service & Table Integration', () => {
         expect(result.blocked[0].queryCount).toBe(1);
 
         // Verify ds1 and ds2 are gone from database
-        const after = listDataSources();
+        const after = await listDataSources();
         expect(after.some((s) => s.id === ds1.id)).toBe(false);
         expect(after.some((s) => s.id === ds2.id)).toBe(false);
         expect(after.some((s) => s.id === dsBlocked.id)).toBe(true);
 
         // Clean up query, workbook, dsBlocked
-        db.delete(queries).where(eq(queries.id, qId)).run();
-        db.delete(workbooks).where(eq(workbooks.id, wbId)).run();
-        deleteDataSource(dsBlocked.id);
+        await db.delete(queries).where(eq(queries.id, qId));
+        await db.delete(workbooks).where(eq(workbooks.id, wbId));
+        await deleteDataSource(dsBlocked.id);
     });
 
     it('tests connection via API route handler', async () => {
-        const testUser = db.select().from(users).where(eq(users.role, 'admin')).get() ?? db.select().from(users).get()!;
+        const testUser = (await db.select().from(users).where(eq(users.role, 'admin')).limit(1))[0] ?? (await db.select().from(users).limit(1))[0]!;
         setTestSessionUser(testUser);
 
         try {
-            const { source } = createCsvDataSource({
+            const { source } = await createCsvDataSource({
                 name: 'API Test CSV',
                 csvText: 'col1,col2\nv1,v2',
                 originalFileName: 'api_test.csv',
@@ -243,18 +240,18 @@ describe('Data Sources Service & Table Integration', () => {
             expect(json.data?.ok).toBe(true);
             expect(json.data?.tableCount).toBe(1);
 
-            deleteDataSource(source.id);
+            await deleteDataSource(source.id);
         } finally {
             setTestSessionUser(null);
         }
     });
 
     it('returns 409 with dependent query details when deleting data source via API', async () => {
-        const testUser = db.select().from(users).where(eq(users.role, 'admin')).get() ?? db.select().from(users).get()!;
+        const testUser = (await db.select().from(users).where(eq(users.role, 'admin')).limit(1))[0] ?? (await db.select().from(users).limit(1))[0]!;
         setTestSessionUser(testUser);
 
         try {
-            const { source } = createCsvDataSource({
+            const { source } = await createCsvDataSource({
                 name: 'API 409 Test Source',
                 csvText: 'id,metric\n1,100',
                 originalFileName: 'api_409.csv',
@@ -262,16 +259,16 @@ describe('Data Sources Service & Table Integration', () => {
             });
 
             const wbId = 'wb-api-409-' + Date.now();
-            db.insert(workbooks).values({ id: wbId, name: 'WB 409', ownerId: testUser.id }).run();
+            await db.insert(workbooks).values({ id: wbId, name: 'WB 409', ownerId: testUser.id });
 
             const qId = 'q-api-409-' + Date.now();
-            db.insert(queries).values({
+            await db.insert(queries).values({
                 id: qId,
                 name: 'Financial Audit Query',
                 workbookId: wbId,
                 dataSourceId: source.id,
                 sql: 'SELECT 1',
-            }).run();
+            });
 
             // 1. Single delete via API returns 409 Conflict
             const req = new Request(`http://localhost/api/data-sources/${source.id}`, { method: 'DELETE' });
@@ -294,9 +291,9 @@ describe('Data Sources Service & Table Integration', () => {
             ]);
 
             // Clean up
-            db.delete(queries).where(eq(queries.id, qId)).run();
-            db.delete(workbooks).where(eq(workbooks.id, wbId)).run();
-            deleteDataSource(source.id);
+            await db.delete(queries).where(eq(queries.id, qId));
+            await db.delete(workbooks).where(eq(workbooks.id, wbId));
+            await deleteDataSource(source.id);
         } finally {
             setTestSessionUser(null);
         }

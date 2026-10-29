@@ -21,7 +21,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         const upload = validateCsvUpload(formData);
         const savedFile = await saveCsvUpload(upload.file);
         uploadPath = savedFile.path;
-        const data = createCsvDataSource({
+        const data = await createCsvDataSource({
             name: upload.name,
             csvText: savedFile.text,
             originalFileName: upload.originalFileName,

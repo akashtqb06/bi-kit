@@ -10,11 +10,10 @@ export async function GET(_req: Request, { params }: RouteParams): Promise<NextR
   try {
     const user = await requireUserApi();
     const { id } = await params;
-    const wb = getWorkbook(id);
+    const wb = await getWorkbook(id);
     assertCan(user, "view", { type: "workbook", id, ownerId: wb.ownerId });
-    return NextResponse.json({ data: listFolders(id) });
+    return NextResponse.json({ data: await listFolders(id) });
   } catch (err) {
     return handleApiError(err);
   }
 }
-

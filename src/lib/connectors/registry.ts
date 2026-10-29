@@ -6,6 +6,7 @@ import { postgresDefinition } from './drivers/postgres';
 import { mysqlDefinition } from './drivers/mysql';
 import { mssqlDefinition } from './drivers/mssql';
 import { mongoDefinition } from './drivers/mongodb';
+import { datastoreDefinition } from './drivers/datastore';
 
 class ConnectorRegistry {
     private definitions = new Map<string, ConnectorDefinition>();
@@ -18,6 +19,7 @@ class ConnectorRegistry {
         this.register(mysqlDefinition as ConnectorDefinition);
         this.register(mssqlDefinition as ConnectorDefinition);
         this.register(mongoDefinition as ConnectorDefinition);
+        this.register(datastoreDefinition as ConnectorDefinition);
     }
 
     register(definition: ConnectorDefinition): void {
@@ -47,20 +49,37 @@ class ConnectorRegistry {
 
 // Global registry instance surviving hot reloads
 const globalRegistry = (globalThis as unknown as { __connector_registry?: ConnectorRegistry });
-export const connectorRegistry = (globalRegistry.__connector_registry ??= new ConnectorRegistry());
+
+function getRegistry(): ConnectorRegistry {
+    if (!globalRegistry.__connector_registry) {
+        globalRegistry.__connector_registry = new ConnectorRegistry();
+    }
+    return globalRegistry.__connector_registry;
+}
+
+export const connectorRegistry: ConnectorRegistry = new Proxy({} as ConnectorRegistry, {
+    get(_target, prop) {
+        const reg = getRegistry();
+        const value = (reg as unknown as Record<string, unknown>)[prop as string];
+        if (typeof value === 'function') {
+            return value.bind(reg);
+        }
+        return value;
+    },
+});
 
 export function registerConnector(definition: ConnectorDefinition): void {
-    connectorRegistry.register(definition);
+    getRegistry().register(definition);
 }
 
 export function getConnectorDefinition(type: string): ConnectorDefinition | undefined {
-    return connectorRegistry.get(type);
+    return getRegistry().get(type);
 }
 
 export function listConnectorDefinitions(): ConnectorDefinition[] {
-    return connectorRegistry.list();
+    return getRegistry().list();
 }
 
 export function listPublicConnectorDefinitions(): PublicConnectorDefinition[] {
-    return connectorRegistry.listPublic();
+    return getRegistry().listPublic();
 }

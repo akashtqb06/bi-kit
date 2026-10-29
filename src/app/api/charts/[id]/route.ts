@@ -16,10 +16,10 @@ export async function GET(_req: Request, { params }: RouteParams): Promise<NextR
   try {
     const user = await requireUserApi();
     const { id } = await params;
-    const chart = getChart(id);
-    const wb = getWorkbook(chart.workbookId);
+    const chart = await getChart(id);
+    const wb = await getWorkbook(chart.workbookId);
     assertCan(user, 'view', { type: 'chart', id, ownerId: wb.ownerId, workbookId: chart.workbookId });
-    return NextResponse.json({ data: getChartPublic(id) });
+    return NextResponse.json({ data: await getChartPublic(id) });
   } catch (err) {
     return handleApiError(err);
   }
@@ -29,12 +29,12 @@ export async function PUT(req: Request, { params }: RouteParams): Promise<NextRe
   try {
     const user = await requireUserApi();
     const { id } = await params;
-    const chart = getChart(id);
-    const wb = getWorkbook(chart.workbookId);
+    const chart = await getChart(id);
+    const wb = await getWorkbook(chart.workbookId);
     assertCan(user, 'edit', { type: 'chart', id, ownerId: wb.ownerId, workbookId: chart.workbookId });
     const body: unknown = await req.json();
     const input = updateChartSchema.parse(body);
-    return NextResponse.json({ data: updateChart(id, input) });
+    return NextResponse.json({ data: await updateChart(id, input) });
   } catch (err) {
     return handleApiError(err);
   }
@@ -48,14 +48,12 @@ export async function DELETE(_req: Request, { params }: RouteParams): Promise<Ne
   try {
     const user = await requireUserApi();
     const { id } = await params;
-    const chart = getChart(id);
-    const wb = getWorkbook(chart.workbookId);
+    const chart = await getChart(id);
+    const wb = await getWorkbook(chart.workbookId);
     assertCan(user, 'delete', { type: 'chart', id, ownerId: wb.ownerId, workbookId: chart.workbookId });
-    deleteChart(id);
+    await deleteChart(id);
     return NextResponse.json({ data: { ok: true } });
   } catch (err) {
     return handleApiError(err);
   }
 }
-
-

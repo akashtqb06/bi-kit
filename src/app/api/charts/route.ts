@@ -12,11 +12,11 @@ export async function GET(req: Request): Promise<NextResponse> {
     const { searchParams } = new URL(req.url);
     const workbookId = searchParams.get("workbookId") ?? undefined;
     if (workbookId) {
-      const wb = getWorkbook(workbookId);
+      const wb = await getWorkbook(workbookId);
       assertCan(user, 'view', { type: 'workbook', id: workbookId, ownerId: wb.ownerId });
     }
     return NextResponse.json({
-      data: listCharts(workbookId, { id: user.id, role: user.role }),
+      data: await listCharts(workbookId, { id: user.id, role: user.role }),
     });
   } catch (err) {
     return handleApiError(err);
@@ -28,13 +28,11 @@ export async function POST(req: Request): Promise<NextResponse> {
     const user = await requireUserApi();
     const body: unknown = await req.json();
     const input = createChartSchema.parse(body);
-    const query = getQuery(input.queryId);
-    const wb = getWorkbook(query.workbookId);
+    const query = await getQuery(input.queryId);
+    const wb = await getWorkbook(query.workbookId);
     assertCan(user, 'edit', { type: 'workbook', id: query.workbookId, ownerId: wb.ownerId });
-    return NextResponse.json({ data: createChart(input, user.id) }, { status: 201 });
+    return NextResponse.json({ data: await createChart(input, user.id) }, { status: 201 });
   } catch (err) {
     return handleApiError(err);
   }
 }
-
-

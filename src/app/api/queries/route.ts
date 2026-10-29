@@ -12,11 +12,11 @@ export async function GET(req: Request): Promise<NextResponse> {
     const { searchParams } = new URL(req.url);
     const workbookId = searchParams.get("workbookId") ?? undefined;
     if (workbookId) {
-      const wb = getWorkbook(workbookId);
+      const wb = await getWorkbook(workbookId);
       assertCan(user, 'view', { type: 'workbook', id: workbookId, ownerId: wb.ownerId });
     }
     return NextResponse.json({
-      data: listQueries(workbookId, { id: user.id, role: user.role }),
+      data: await listQueries(workbookId, { id: user.id, role: user.role }),
     });
   } catch (err) {
     return handleApiError(err);
@@ -28,14 +28,12 @@ export async function POST(req: Request): Promise<NextResponse> {
     const user = await requireUserApi();
     const body: unknown = await req.json();
     const input = createQuerySchema.parse(body);
-    const wb = getWorkbook(input.workbookId);
+    const wb = await getWorkbook(input.workbookId);
     assertCan(user, 'edit', { type: 'workbook', id: input.workbookId, ownerId: wb.ownerId });
-    const ds = getDataSource(input.dataSourceId);
+    const ds = await getDataSource(input.dataSourceId);
     assertCan(user, 'view', { type: 'data_source', id: input.dataSourceId, ownerId: ds.ownerId });
-    return NextResponse.json({ data: createQuery(input, user.id) }, { status: 201 });
+    return NextResponse.json({ data: await createQuery(input, user.id) }, { status: 201 });
   } catch (err) {
     return handleApiError(err);
   }
 }
-
-

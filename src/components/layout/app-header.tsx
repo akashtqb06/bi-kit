@@ -16,6 +16,7 @@ import {
 import { useBreadcrumbStore } from "./breadcrumb-store";
 import { ThemeToggle } from "./theme-toggle";
 import { KeyboardShortcutsDialog } from "./keyboard-shortcuts-dialog";
+import { QuickAddSlot } from "@src/components/finance/quick-add/quick-add-slot";
 
 function pathToBreadcrumbs(pathname: string) {
   const segments = pathname.split("/").filter(Boolean);
@@ -99,6 +100,7 @@ export function AppHeader() {
       </div>
 
       <div className="flex items-center gap-1.5 ml-4 shrink-0">
+        <QuickAddSlot />
         <KeyboardShortcutsDialog />
         <ThemeToggle />
       </div>

@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { LoginForm } from './login-form';
 import { isRegistrationAllowed } from '@src/lib/auth/registration';
 import { getCurrentUser } from '@src/lib/auth/dal';
+import { checkDatabaseHealth } from '@src/lib/db/health';
+import { DatabaseErrorPage } from '@src/components/db/database-error-page';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -11,6 +13,11 @@ type LoginPageProps = {
 };
 
 async function LoginPageContent({ searchParams }: LoginPageProps) {
+    const health = await checkDatabaseHealth();
+    if (!health.ok) {
+        return <DatabaseErrorPage health={health} />;
+    }
+
     const [user, params, allowRegistration] = await Promise.all([
         getCurrentUser(),
         searchParams,

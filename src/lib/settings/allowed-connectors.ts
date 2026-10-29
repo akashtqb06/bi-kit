@@ -9,13 +9,13 @@ export function getDefaultAllowedConnectors(): string[] {
     return listConnectorDefinitions().map((d) => d.type);
 }
 
-export function getAllowedConnectorTypes(): string[] {
+export async function getAllowedConnectorTypes(): Promise<string[]> {
     try {
-        const row = db
+        const [row] = await db
             .select()
             .from(appSettings)
             .where(eq(appSettings.key, ALLOWED_CONNECTORS_KEY))
-            .get();
+            .limit(1);
 
         if (row && Array.isArray(row.value)) {
             return (row.value as unknown[]).filter((v): v is string => typeof v === 'string');
@@ -26,11 +26,12 @@ export function getAllowedConnectorTypes(): string[] {
     return getDefaultAllowedConnectors();
 }
 
-export function setAllowedConnectorTypes(types: string[]): void {
+export async function setAllowedConnectorTypes(types: string[]): Promise<void> {
     const validTypes = getDefaultAllowedConnectors();
     const filtered = types.filter((t) => validTypes.includes(t));
 
-    db.insert(appSettings)
+    await db
+        .insert(appSettings)
         .values({
             key: ALLOWED_CONNECTORS_KEY,
             value: filtered,
@@ -40,12 +41,10 @@ export function setAllowedConnectorTypes(types: string[]): void {
             set: {
                 value: filtered,
             },
-        })
-        .run();
+        });
 }
 
-export function isConnectorTypeAllowed(type: string): boolean {
-    const allowed = getAllowedConnectorTypes();
+export async function isConnectorTypeAllowed(type: string): Promise<boolean> {
+    const allowed = await getAllowedConnectorTypes();
     return allowed.includes(type);
 }
-
