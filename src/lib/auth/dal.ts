@@ -14,9 +14,11 @@ function toSafeUser(user: NonNullable<Awaited<ReturnType<typeof getSession>>>["u
     email: user.email,
     name: user.name,
     role: user.role,
+    status: user.status,
     avatarUrl: user.avatarUrl,
     createdAt: user.createdAt,
     lastLoginAt: user.lastLoginAt,
+    mustChangePassword: user.mustChangePassword,
   };
 }
 
@@ -29,6 +31,9 @@ export async function getCurrentUser(): Promise<SafeUser | null> {
 export async function requireUser(next = "/"): Promise<SafeUser> {
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=${encodeURIComponent(next)}`);
+  if (user.mustChangePassword && !next.startsWith('/settings/security')) {
+    redirect('/settings/security?forced=true');
+  }
   return user;
 }
 
@@ -57,6 +62,9 @@ export async function requireRole(
   if (user.role !== role) {
     if (options.api) return Response.json({ error: "Forbidden" }, { status: 403 });
     redirect("/?toast=forbidden");
+  }
+  if (!options.api && user.mustChangePassword && !options.next?.startsWith('/settings/security')) {
+    redirect('/settings/security?forced=true');
   }
   return user;
 }

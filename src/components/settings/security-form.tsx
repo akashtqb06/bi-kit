@@ -133,6 +133,15 @@ export function SecurityForm({ user, isLastAdmin }: SecurityFormProps) {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                        {user.mustChangePassword && (
+                            <Alert className="bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400">
+                                <AlertTriangleIcon className="size-4 shrink-0" />
+                                <AlertTitle>Password Change Required</AlertTitle>
+                                <AlertDescription>
+                                    Your account has a temporary password or was flagged for a password reset by an administrator. You must set a new password before you can access other areas of the application.
+                                </AlertDescription>
+                            </Alert>
+                        )}
                         {passwordFormError && (
                             <Alert variant="destructive">
                                 <AlertTriangleIcon className="size-4" />

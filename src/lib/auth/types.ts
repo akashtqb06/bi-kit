@@ -20,6 +20,8 @@ export type SafeUser = {
     avatarUrl: string | null;
     createdAt: Date;
     lastLoginAt: Date | null;
+    mustChangePassword?: boolean;
+    status?: string;
 };
 
 export type ListedSession = {

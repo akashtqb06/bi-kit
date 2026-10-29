@@ -1,27 +1,34 @@
 import { sql } from 'drizzle-orm';
-import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core';
 import { newId } from './id';
 
-export const users = sqliteTable('users', {
-    id: text('id')
-        .primaryKey()
-        .$defaultFn(() => newId()),
-    email: text('email').notNull().unique(),
-    name: text('name').notNull(),
-    passwordHash: text('password_hash').notNull(),
-    role: text('role').notNull().default('member'),
-    status: text('status').notNull().default('active'),
-    avatarUrl: text('avatar_url'),
-    createdAt: integer('created_at', { mode: 'timestamp' })
-        .notNull()
-        .default(sql`(unixepoch())`),
-    updatedAt: integer('updated_at', { mode: 'timestamp' })
-        .notNull()
-        .default(sql`(unixepoch())`),
-    lastLoginAt: integer('last_login_at', { mode: 'timestamp' }),
-});
+export const users = pgTable(
+    'users',
+    {
+        id: text('id')
+            .primaryKey()
+            .$defaultFn(() => newId()),
+        email: text('email').notNull(),
+        name: text('name').notNull(),
+        passwordHash: text('password_hash').notNull(),
+        role: text('role').notNull().default('member'),
+        status: text('status').notNull().default('active'),
+        avatarUrl: text('avatar_url'),
+        createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
+            .notNull()
+            .defaultNow(),
+        updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' })
+            .notNull()
+            .defaultNow(),
+        lastLoginAt: timestamp('last_login_at', { withTimezone: true, mode: 'date' }),
+        mustChangePassword: boolean('must_change_password').notNull().default(false),
+    },
+    (table) => [
+        uniqueIndex('users_email_lower_idx').on(sql`lower(${table.email})`),
+    ]
+);
 
-export const sessions = sqliteTable(
+export const sessions = pgTable(
     'sessions',
     {
         id: text('id')
@@ -31,40 +38,40 @@ export const sessions = sqliteTable(
             .notNull()
             .references(() => users.id, { onDelete: 'cascade' }),
         tokenHash: text('token_hash').notNull().unique(),
-        createdAt: integer('created_at', { mode: 'timestamp' })
+        createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
             .notNull()
-            .default(sql`(unixepoch())`),
-        expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
-        lastUsedAt: integer('last_used_at', { mode: 'timestamp' })
+            .defaultNow(),
+        expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull(),
+        lastUsedAt: timestamp('last_used_at', { withTimezone: true, mode: 'date' })
             .notNull()
-            .default(sql`(unixepoch())`),
+            .defaultNow(),
         ipAddress: text('ip_address'),
         userAgent: text('user_agent'),
     },
     (table) => [index('sessions_user_id_idx').on(table.userId)]
 );
 
-export const loginAttempts = sqliteTable(
+export const loginAttempts = pgTable(
     'login_attempts',
     {
         id: text('id')
             .primaryKey()
             .$defaultFn(() => newId()),
         key: text('key').notNull(),
-        attemptedAt: integer('attempted_at', { mode: 'timestamp' })
+        attemptedAt: timestamp('attempted_at', { withTimezone: true, mode: 'date' })
             .notNull()
-            .default(sql`(unixepoch())`),
-        success: integer('success', { mode: 'boolean' }).notNull().default(false),
+            .defaultNow(),
+        success: boolean('success').notNull().default(false),
     },
     (table) => [index('login_attempts_key_attempted_at_idx').on(table.key, table.attemptedAt)]
 );
 
-export const appSettings = sqliteTable('app_settings', {
+export const appSettings = pgTable('app_settings', {
     key: text('key').primaryKey(),
-    value: text('value', { mode: 'json' }).notNull().$type<unknown>(),
+    value: jsonb('value').notNull().$type<unknown>(),
 });
 
-export const auditLog = sqliteTable('audit_log', {
+export const auditLog = pgTable('audit_log', {
     id: text('id')
         .primaryKey()
         .$defaultFn(() => newId()),
@@ -72,12 +79,14 @@ export const auditLog = sqliteTable('audit_log', {
     action: text('action').notNull(),
     dataSourceId: text('data_source_id'),
     host: text('host'),
-    at: integer('at', { mode: 'timestamp' })
+    details: jsonb('details').$type<Record<string, unknown>>(),
+    ipAddress: text('ip_address'),
+    at: timestamp('at', { withTimezone: true, mode: 'date' })
         .notNull()
-        .default(sql`(unixepoch())`),
+        .defaultNow(),
 });
 
-export const dataSources = sqliteTable(
+export const dataSources = pgTable(
     'data_sources',
     {
         id: text('id')
@@ -89,34 +98,34 @@ export const dataSources = sqliteTable(
         name: text('name').notNull(),
         slug: text('slug').unique(),
         type: text('type').notNull(),
-        config: text('config').notNull(), // JSON — encrypted secrets where applicable
+        config: jsonb('config').notNull().$type<Record<string, unknown>>().default(sql`'{}'::jsonb`), // JSON — encrypted secrets where applicable
         status: text('status', { enum: ['unknown', 'ok', 'error'] })
             .notNull()
             .default('unknown'),
-        lastTestedAt: integer('last_tested_at', { mode: 'timestamp' }),
+        lastTestedAt: timestamp('last_tested_at', { withTimezone: true, mode: 'date' }),
         lastError: text('last_error'),
         serverVersion: text('server_version'),
-        createdAt: integer('created_at', { mode: 'timestamp' })
+        createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
             .notNull()
-            .default(sql`(unixepoch())`),
-        updatedAt: integer('updated_at', { mode: 'timestamp' })
+            .defaultNow(),
+        updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' })
             .notNull()
-            .default(sql`(unixepoch())`),
+            .defaultNow(),
     },
     (table) => [index('data_sources_owner_id_idx').on(table.ownerId)]
 );
 
-export const schemaCache = sqliteTable('schema_cache', {
+export const schemaCache = pgTable('schema_cache', {
     dataSourceId: text('data_source_id')
         .primaryKey()
         .references(() => dataSources.id, { onDelete: 'cascade' }),
-    snapshot: text('snapshot').notNull(), // JSON SchemaSnapshot
-    fetchedAt: integer('fetched_at', { mode: 'timestamp' })
+    snapshot: jsonb('snapshot').notNull().$type<unknown>(), // JSON SchemaSnapshot
+    fetchedAt: timestamp('fetched_at', { withTimezone: true, mode: 'date' })
         .notNull()
-        .default(sql`(unixepoch())`),
+        .defaultNow(),
 });
 
-export const workbooks = sqliteTable(
+export const workbooks = pgTable(
     'workbooks',
     {
         id: text('id')
@@ -128,17 +137,17 @@ export const workbooks = sqliteTable(
         name: text('name').notNull(),
         slug: text('slug').unique(),
         description: text('description').notNull().default(''),
-        createdAt: integer('created_at', { mode: 'timestamp' })
+        createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
             .notNull()
-            .default(sql`(unixepoch())`),
-        updatedAt: integer('updated_at', { mode: 'timestamp' })
+            .defaultNow(),
+        updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' })
             .notNull()
-            .default(sql`(unixepoch())`),
+            .defaultNow(),
     },
     (table) => [index('workbooks_owner_id_idx').on(table.ownerId)]
 );
 
-export const folders = sqliteTable(
+export const folders = pgTable(
     'folders',
     {
         id: text('id')
@@ -151,12 +160,12 @@ export const folders = sqliteTable(
         name: text('name').notNull(),
         parentId: text('parent_id'),
         position: integer('position').notNull().default(0),
-        createdAt: integer('created_at', { mode: 'timestamp' })
+        createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
             .notNull()
-            .default(sql`(unixepoch())`),
-        updatedAt: integer('updated_at', { mode: 'timestamp' })
+            .defaultNow(),
+        updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' })
             .notNull()
-            .default(sql`(unixepoch())`),
+            .defaultNow(),
     },
     (table) => [
         index('folders_workbook_id_kind_idx').on(table.workbookId, table.kind),
@@ -164,7 +173,7 @@ export const folders = sqliteTable(
     ]
 );
 
-export const queries = sqliteTable(
+export const queries = pgTable(
     'queries',
     {
         id: text('id')
@@ -180,17 +189,17 @@ export const queries = sqliteTable(
         mode: text('mode', { enum: ['builder', 'sql', 'pipeline'] })
             .notNull()
             .default('sql'),
-        definition: text('definition').notNull().default('[]'), // JSON builder steps
+        definition: jsonb('definition').notNull().$type<unknown>().default(sql`'[]'::jsonb`), // JSON builder steps
         sql: text('sql').notNull().default(''),
         folderId: text('folder_id').references(() => folders.id, { onDelete: 'set null' }),
         position: integer('position').notNull().default(0),
         createdBy: text('created_by'),
-        createdAt: integer('created_at', { mode: 'timestamp' })
+        createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
             .notNull()
-            .default(sql`(unixepoch())`),
-        updatedAt: integer('updated_at', { mode: 'timestamp' })
+            .defaultNow(),
+        updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' })
             .notNull()
-            .default(sql`(unixepoch())`),
+            .defaultNow(),
     },
     (table) => [
         index('queries_workbook_id_idx').on(table.workbookId),
@@ -199,7 +208,7 @@ export const queries = sqliteTable(
     ]
 );
 
-export const charts = sqliteTable(
+export const charts = pgTable(
     'charts',
     {
         id: text('id')
@@ -215,16 +224,16 @@ export const charts = sqliteTable(
         type: text('type', {
             enum: ['bar', 'line', 'row', 'donut', 'pie', 'area', 'number', 'table'],
         }).notNull(),
-        config: text('config').notNull().default('{}'), // JSON — validated via json-helpers
+        config: jsonb('config').notNull().$type<unknown>().default(sql`'{}'::jsonb`), // JSON — validated via json-helpers
         folderId: text('folder_id').references(() => folders.id, { onDelete: 'set null' }),
         position: integer('position').notNull().default(0),
         createdBy: text('created_by'),
-        createdAt: integer('created_at', { mode: 'timestamp' })
+        createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
             .notNull()
-            .default(sql`(unixepoch())`),
-        updatedAt: integer('updated_at', { mode: 'timestamp' })
+            .defaultNow(),
+        updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' })
             .notNull()
-            .default(sql`(unixepoch())`),
+            .defaultNow(),
     },
     (table) => [
         index('charts_workbook_id_idx').on(table.workbookId),
@@ -233,7 +242,7 @@ export const charts = sqliteTable(
     ]
 );
 
-export const dashboards = sqliteTable(
+export const dashboards = pgTable(
     'dashboards',
     {
         id: text('id')
@@ -247,19 +256,19 @@ export const dashboards = sqliteTable(
             .references(() => users.id, { onDelete: 'cascade' }),
         name: text('name').notNull(),
         slug: text('slug').unique(),
-        layout: text('layout').notNull().default('[]'), // JSON react-grid-layout items
-        filters: text('filters').notNull().default('[]'), // JSON dashboard filters
+        layout: jsonb('layout').notNull().$type<unknown>().default(sql`'[]'::jsonb`), // JSON react-grid-layout items
+        filters: jsonb('filters').notNull().$type<unknown>().default(sql`'[]'::jsonb`), // JSON dashboard filters
         autoRefresh: text('auto_refresh').notNull().default('off'),
         folderId: text('folder_id').references(() => folders.id, { onDelete: 'set null' }),
         position: integer('position').notNull().default(0),
         createdBy: text('created_by')
             .references(() => users.id, { onDelete: 'set null' }),
-        createdAt: integer('created_at', { mode: 'timestamp' })
+        createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
             .notNull()
-            .default(sql`(unixepoch())`),
-        updatedAt: integer('updated_at', { mode: 'timestamp' })
+            .defaultNow(),
+        updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' })
             .notNull()
-            .default(sql`(unixepoch())`),
+            .defaultNow(),
     },
     (table) => [
         index('dashboards_owner_id_idx').on(table.ownerId),
@@ -268,7 +277,7 @@ export const dashboards = sqliteTable(
     ]
 );
 
-export const dashboardFavorites = sqliteTable(
+export const dashboardFavorites = pgTable(
     'dashboard_favorites',
     {
         userId: text('user_id')
@@ -277,9 +286,9 @@ export const dashboardFavorites = sqliteTable(
         dashboardId: text('dashboard_id')
             .notNull()
             .references(() => dashboards.id, { onDelete: 'cascade' }),
-        createdAt: integer('created_at', { mode: 'timestamp' })
+        createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
             .notNull()
-            .default(sql`(unixepoch())`),
+            .defaultNow(),
     },
     (table) => [
         primaryKey({ columns: [table.userId, table.dashboardId] }),
@@ -288,7 +297,7 @@ export const dashboardFavorites = sqliteTable(
     ]
 );
 
-export const dashboardViews = sqliteTable(
+export const dashboardViews = pgTable(
     'dashboard_views',
     {
         userId: text('user_id')
@@ -298,7 +307,7 @@ export const dashboardViews = sqliteTable(
             .notNull()
             .references(() => dashboards.id, { onDelete: 'cascade' }),
         viewCount: integer('view_count').notNull().default(0),
-        lastViewedAt: integer('last_viewed_at', { mode: 'timestamp' }),
+        lastViewedAt: timestamp('last_viewed_at', { withTimezone: true, mode: 'date' }),
     },
     (table) => [
         primaryKey({ columns: [table.userId, table.dashboardId] }),
@@ -336,3 +345,6 @@ export type LoginAttempt = typeof loginAttempts.$inferSelect;
 export type AppSetting = typeof appSettings.$inferSelect;
 export type AuditLogEntry = typeof auditLog.$inferSelect;
 export type InsertAuditLogEntry = typeof auditLog.$inferInsert;
+
+export * from './schema/data-store';
+

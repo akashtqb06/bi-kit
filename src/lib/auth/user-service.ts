@@ -1,7 +1,8 @@
 import 'server-only';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { and, count, eq } from 'drizzle-orm';
+import { randomBytes } from 'node:crypto';
+import { and, count, desc, eq } from 'drizzle-orm';
 import { db } from '@src/lib/db';
 import {
     dashboards,
@@ -12,6 +13,9 @@ import {
     type User,
 } from '@src/lib/db/schema';
 import { getAvatarsDir } from '@src/lib/db/paths';
+import { hashPassword } from './password';
+import { destroyAllSessions } from './session';
+import { logAuditEvent } from '@src/lib/audit/audit-log';
 import type { SafeUser } from './types';
 
 export async function getUserById(id: string): Promise<User | null> {
@@ -63,6 +67,7 @@ export async function updateUserPassword(userId: string, newPasswordHash: string
         .update(users)
         .set({
             passwordHash: newPasswordHash,
+            mustChangePassword: false,
             updatedAt: new Date(),
         })
         .where(eq(users.id, userId));
@@ -175,14 +180,270 @@ export async function deleteUserAccount(userId: string): Promise<void> {
     }
 
     // In a transaction, delete user content & account
-    db.transaction((tx) => {
-        tx.delete(dashboards).where(eq(dashboards.ownerId, userId)).run();
-        tx.delete(workbooks).where(eq(workbooks.ownerId, userId)).run();
-        tx.delete(dataSources).where(eq(dataSources.ownerId, userId)).run();
-        tx.delete(sessions).where(eq(sessions.userId, userId)).run();
-        tx.delete(users).where(eq(users.id, userId)).run();
+    await db.transaction(async (tx) => {
+        await tx.delete(dashboards).where(eq(dashboards.ownerId, userId));
+        await tx.delete(workbooks).where(eq(workbooks.ownerId, userId));
+        await tx.delete(dataSources).where(eq(dataSources.ownerId, userId));
+        await tx.delete(sessions).where(eq(sessions.userId, userId));
+        await tx.delete(users).where(eq(users.id, userId));
     });
 
     // Remove avatar file from disk if present
     await removeAvatar(userId).catch(() => {});
+}
+
+export type UserAdminRecord = {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    status: string;
+    avatarUrl: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    lastLoginAt: Date | null;
+    mustChangePassword: boolean;
+};
+
+export function generateTemporaryPassword(): string {
+    return `Tmp_${randomBytes(6).toString('base64url')}!`;
+}
+
+export async function listUsersAdmin(): Promise<UserAdminRecord[]> {
+    return db
+        .select({
+            id: users.id,
+            email: users.email,
+            name: users.name,
+            role: users.role,
+            status: users.status,
+            avatarUrl: users.avatarUrl,
+            createdAt: users.createdAt,
+            updatedAt: users.updatedAt,
+            lastLoginAt: users.lastLoginAt,
+            mustChangePassword: users.mustChangePassword,
+        })
+        .from(users)
+        .orderBy(desc(users.createdAt));
+}
+
+export async function createUserAdmin(
+    input: {
+        name: string;
+        email: string;
+        role: 'admin' | 'member';
+        mustChangePassword?: boolean;
+    },
+    adminUserId: string
+): Promise<{ user: UserAdminRecord; temporaryPassword: string }> {
+    const temporaryPassword = generateTemporaryPassword();
+    const passwordHash = await hashPassword(temporaryPassword);
+
+    const [user] = await db
+        .insert(users)
+        .values({
+            name: input.name,
+            email: input.email,
+            passwordHash,
+            role: input.role,
+            status: 'active',
+            mustChangePassword: input.mustChangePassword ?? true,
+        })
+        .returning({
+            id: users.id,
+            email: users.email,
+            name: users.name,
+            role: users.role,
+            status: users.status,
+            avatarUrl: users.avatarUrl,
+            createdAt: users.createdAt,
+            updatedAt: users.updatedAt,
+            lastLoginAt: users.lastLoginAt,
+            mustChangePassword: users.mustChangePassword,
+        });
+
+    await logAuditEvent({
+        userId: adminUserId,
+        action: 'user.create',
+        details: { targetUserId: user.id, targetEmail: user.email, role: user.role },
+    });
+
+    return { user, temporaryPassword };
+}
+
+export async function updateUserRoleAdmin(
+    targetUserId: string,
+    newRole: 'admin' | 'member',
+    adminUserId: string
+): Promise<UserAdminRecord> {
+    const target = await getUserById(targetUserId);
+    if (!target) {
+        throw new Error('User not found');
+    }
+
+    if (target.role === 'admin' && newRole === 'member') {
+        const adminCount = await countActiveAdmins();
+        if (adminCount <= 1) {
+            throw new Error('Cannot demote the only remaining active administrator.');
+        }
+    }
+
+    const [updated] = await db
+        .update(users)
+        .set({ role: newRole, updatedAt: new Date() })
+        .where(eq(users.id, targetUserId))
+        .returning({
+            id: users.id,
+            email: users.email,
+            name: users.name,
+            role: users.role,
+            status: users.status,
+            avatarUrl: users.avatarUrl,
+            createdAt: users.createdAt,
+            updatedAt: users.updatedAt,
+            lastLoginAt: users.lastLoginAt,
+            mustChangePassword: users.mustChangePassword,
+        });
+
+    await logAuditEvent({
+        userId: adminUserId,
+        action: 'user.update_role',
+        details: { targetUserId, previousRole: target.role, newRole },
+    });
+
+    return updated;
+}
+
+export async function updateUserStatusAdmin(
+    targetUserId: string,
+    newStatus: 'active' | 'disabled',
+    adminUserId: string
+): Promise<UserAdminRecord> {
+    const target = await getUserById(targetUserId);
+    if (!target) {
+        throw new Error('User not found');
+    }
+
+    if (target.role === 'admin' && newStatus === 'disabled') {
+        const adminCount = await countActiveAdmins();
+        if (adminCount <= 1) {
+            throw new Error('Cannot disable the only remaining active administrator.');
+        }
+    }
+
+    const [updated] = await db
+        .update(users)
+        .set({ status: newStatus, updatedAt: new Date() })
+        .where(eq(users.id, targetUserId))
+        .returning({
+            id: users.id,
+            email: users.email,
+            name: users.name,
+            role: users.role,
+            status: users.status,
+            avatarUrl: users.avatarUrl,
+            createdAt: users.createdAt,
+            updatedAt: users.updatedAt,
+            lastLoginAt: users.lastLoginAt,
+            mustChangePassword: users.mustChangePassword,
+        });
+
+    if (newStatus === 'disabled') {
+        await destroyAllSessions(targetUserId);
+    }
+
+    await logAuditEvent({
+        userId: adminUserId,
+        action: newStatus === 'disabled' ? 'user.disable' : 'user.enable',
+        details: { targetUserId, status: newStatus },
+    });
+
+    return updated;
+}
+
+export async function resetUserPasswordAdmin(
+    targetUserId: string,
+    adminUserId: string
+): Promise<{ temporaryPassword: string }> {
+    const target = await getUserById(targetUserId);
+    if (!target) {
+        throw new Error('User not found');
+    }
+
+    const temporaryPassword = generateTemporaryPassword();
+    const newPasswordHash = await hashPassword(temporaryPassword);
+
+    await db
+        .update(users)
+        .set({
+            passwordHash: newPasswordHash,
+            mustChangePassword: true,
+            updatedAt: new Date(),
+        })
+        .where(eq(users.id, targetUserId));
+
+    await destroyAllSessions(targetUserId);
+
+    await logAuditEvent({
+        userId: adminUserId,
+        action: 'user.reset_password',
+        details: { targetUserId, targetEmail: target.email },
+    });
+
+    return { temporaryPassword };
+}
+
+export async function revokeUserSessionsAdmin(
+    targetUserId: string,
+    adminUserId: string
+): Promise<void> {
+    const target = await getUserById(targetUserId);
+    if (!target) {
+        throw new Error('User not found');
+    }
+
+    await destroyAllSessions(targetUserId);
+
+    await logAuditEvent({
+        userId: adminUserId,
+        action: 'user.revoke_sessions',
+        details: { targetUserId, targetEmail: target.email },
+    });
+}
+
+export async function deleteUserAccountAdmin(
+    targetUserId: string,
+    currentUserId: string
+): Promise<void> {
+    if (targetUserId === currentUserId) {
+        throw new Error('You cannot delete your own account from user management.');
+    }
+
+    const target = await getUserById(targetUserId);
+    if (!target) {
+        throw new Error('User not found');
+    }
+
+    if (target.role === 'admin') {
+        const adminCount = await countActiveAdmins();
+        if (adminCount <= 1) {
+            throw new Error('Cannot delete the only remaining active administrator account.');
+        }
+    }
+
+    await db.transaction(async (tx) => {
+        await tx.delete(dashboards).where(eq(dashboards.ownerId, targetUserId));
+        await tx.delete(workbooks).where(eq(workbooks.ownerId, targetUserId));
+        await tx.delete(dataSources).where(eq(dataSources.ownerId, targetUserId));
+        await tx.delete(sessions).where(eq(sessions.userId, targetUserId));
+        await tx.delete(users).where(eq(users.id, targetUserId));
+    });
+
+    await removeAvatar(targetUserId).catch(() => {});
+
+    await logAuditEvent({
+        userId: currentUserId,
+        action: 'user.delete',
+        details: { deletedUserId: targetUserId, deletedEmail: target.email, role: target.role },
+    });
 }

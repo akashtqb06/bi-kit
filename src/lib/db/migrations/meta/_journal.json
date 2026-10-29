@@ -1,33 +1,40 @@
 {
   "version": "7",
-  "dialect": "sqlite",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "6",
-      "when": 1792345579363,
+      "version": "7",
+      "when": 1793183086587,
       "tag": "0000_init",
       "breakpoints": true
     },
     {
       "idx": 1,
-      "version": "6",
-      "when": 1793005992797,
-      "tag": "0001_cute_scalphunter",
+      "version": "7",
+      "when": 1793189108012,
+      "tag": "0001_real_dark_phoenix",
       "breakpoints": true
     },
     {
       "idx": 2,
-      "version": "6",
-      "when": 1793165781315,
-      "tag": "0002_minor_deadpool",
+      "version": "7",
+      "when": 1793284539621,
+      "tag": "0002_regular_wolverine",
       "breakpoints": true
     },
     {
       "idx": 3,
-      "version": "6",
-      "when": 1793265781315,
-      "tag": "0003_audit_log",
+      "version": "7",
+      "when": 1793284772441,
+      "tag": "0003_rich_taskmaster",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793294394233,
+      "tag": "0004_colorful_titanium_man",
       "breakpoints": true
     }
   ]
