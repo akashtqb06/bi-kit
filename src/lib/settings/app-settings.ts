@@ -1,7 +1,6 @@
 import { db } from '@src/lib/db';
 import { appSettings } from '@src/lib/db/schema';
-import { eq } from 'drizzle-orm';
-import { getAllowedConnectorTypes, setAllowedConnectorTypes, getDefaultAllowedConnectors } from './allowed-connectors';
+import { getAllowedConnectorTypes, setAllowedConnectorTypes } from './allowed-connectors';
 import { logAuditEvent } from '@src/lib/audit/audit-log';
 
 export interface GeneralSettings {

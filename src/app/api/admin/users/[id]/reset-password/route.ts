@@ -20,3 +20,4 @@ export async function POST(_req: Request, { params }: RouteParams): Promise<Next
         return handleApiError(err);
     }
 }
+

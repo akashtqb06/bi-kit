@@ -111,16 +111,6 @@ export function AppSidebar() {
                     <SidebarMenuItem>
                         <UserMenu variant="sidebar" />
                     </SidebarMenuItem>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton
-                            onClick={toggleSidebar}
-                            tooltip={state === 'collapsed' ? 'Expand sidebar' : 'Collapse sidebar'}
-                            className="text-muted-foreground hover:text-foreground"
-                        >
-                            <PanelLeftIcon className="size-4 shrink-0" />
-                            <span>{state === 'collapsed' ? 'Expand' : 'Collapse'}</span>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarFooter>
         </Sidebar>

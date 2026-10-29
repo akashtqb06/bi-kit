@@ -62,3 +62,4 @@ Derived directly from `src/lib/auth/policy.ts`:
 4. **Commit 4**: Roles & Permissions (Declarative roles matrix derived from policy, sharing roadmap notes).
 5. **Commit 5**: Standalone Dashboards (Viewer and list verified with real data, fix UI event handlers).
 6. **Commit 6**: Security Hardening (Lockout messages, session invalidation, secure headers/CSP, rate limits, 401 route audit test).
+

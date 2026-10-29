@@ -39,3 +39,4 @@ export async function GET(req: Request): Promise<NextResponse | Response> {
         return handleApiError(err);
     }
 }
+

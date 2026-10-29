@@ -57,7 +57,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrentUser } from '@src/components/auth/user-provider';
 import { formatRelativeTime } from '@src/lib/utils';
@@ -135,7 +135,16 @@ export function UsersAdminTable() {
     }, []);
 
     useEffect(() => {
-        void loadUsers();
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            if (!cancelled) {
+                void loadUsers();
+            }
+        }, 0);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
     }, [loadUsers]);
 
     const filteredUsers = useMemo(() => {

@@ -3,16 +3,13 @@ import { db } from '@src/lib/db';
 import { users, sessions, auditLog } from '@src/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import {
-    listUsersAdmin,
     createUserAdmin,
     updateUserRoleAdmin,
     updateUserStatusAdmin,
     resetUserPasswordAdmin,
-    revokeUserSessionsAdmin,
     deleteUserAccountAdmin,
     countActiveAdmins,
 } from '@src/lib/auth/user-service';
-import { createSession, getSession } from '@src/lib/auth/session';
 import { hashPassword } from '@src/lib/auth/password';
 import { can } from '@src/lib/auth/policy';
 

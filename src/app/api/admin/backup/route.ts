@@ -47,3 +47,4 @@ export async function POST(): Promise<NextResponse> {
         return handleApiError(err);
     }
 }
+

@@ -2,15 +2,11 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    ScrollTextIcon,
     SearchIcon,
     DownloadIcon,
     RefreshCwIcon,
     Trash2Icon,
     ClockIcon,
-    UserIcon,
-    NetworkIcon,
-    ShieldAlertIcon,
     SaveIcon,
     AlertTriangleIcon,
 } from 'lucide-react';
@@ -148,7 +144,16 @@ export function AuditLogTable() {
     }, [selectedAction, searchQuery, pageIndex]);
 
     useEffect(() => {
-        void fetchLogs();
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            if (!cancelled) {
+                void fetchLogs();
+            }
+        }, 0);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
     }, [fetchLogs]);
 
     const handleSaveRetention = async (e: React.FormEvent) => {
@@ -205,7 +210,12 @@ export function AuditLogTable() {
         if (searchQuery.trim()) {
             params.set('q', searchQuery.trim());
         }
-        window.location.href = `/api/admin/audit-log/export?${params.toString()}`;
+        const a = document.createElement('a');
+        a.href = `/api/admin/audit-log/export?${params.toString()}`;
+        a.download = `audit-log-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
     };
 
     const totalPages = Math.ceil(total / pageSize);

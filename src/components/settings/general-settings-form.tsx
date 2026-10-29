@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Settings2Icon,
     GlobeIcon,
@@ -86,7 +86,16 @@ export function GeneralSettingsForm() {
     };
 
     useEffect(() => {
-        void loadSettings();
+        let cancelled = false;
+        const timer = setTimeout(() => {
+            if (!cancelled) {
+                void loadSettings();
+            }
+        }, 0);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
     }, []);
 
     const handleSave = async (e: React.FormEvent) => {

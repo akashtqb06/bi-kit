@@ -78,3 +78,4 @@ export async function DELETE(req: Request, { params }: RouteParams): Promise<Nex
         return handleApiError(err);
     }
 }
+

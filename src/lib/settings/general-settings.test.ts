@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { db } from '@src/lib/db';
-import { users, auditLog, appSettings } from '@src/lib/db/schema';
+import { users, auditLog } from '@src/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import {
     getGeneralSettings,
