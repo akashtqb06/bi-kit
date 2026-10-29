@@ -1337,7 +1337,7 @@ function DashboardsContent() {
                                                 <CommandGroup>
                                                     <CommandItem
                                                         value="__new__ create new workbook"
-                                                        onSelect={() => {
+                                                        onClick={() => {
                                                             setSelectedWorkbookId('__new__');
                                                             setWorkbookPickerOpen(false);
                                                         }}
@@ -1353,7 +1353,7 @@ function DashboardsContent() {
                                                         <CommandItem
                                                             key={wb.id}
                                                             value={`${wb.name} ${wb.id}`}
-                                                            onSelect={() => {
+                                                            onClick={() => {
                                                                 setSelectedWorkbookId(wb.id);
                                                                 setWorkbookPickerOpen(false);
                                                             }}
