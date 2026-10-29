@@ -13,8 +13,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN corepack enable && corepack prepare pnpm@11.20.0 --activate
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm config set fetch-retries 5 && \
+    pnpm config set fetch-timeout 300000 && \
     pnpm install --frozen-lockfile
 
 # =============================================================================
@@ -34,7 +36,7 @@ ENV NODE_ENV=production
 ENV DATABASE_URL=postgres://placeholder:placeholder@localhost:5432/bikit
 
 RUN pnpm build
-RUN pnpm run build:scripts
+RUN [ -f dist/migrate.cjs ] && [ -f dist/bootstrap.cjs ] && [ -f dist/validate-env.cjs ] || pnpm run build:scripts
 
 # =============================================================================
 # Stage 3: runner — lean, non-root production runtime
@@ -53,6 +55,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 ENV TZ=Asia/Kolkata
 ENV DATA_DIR=/app/data
 

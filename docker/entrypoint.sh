@@ -19,15 +19,16 @@ ATTEMPT=1
 
 node -e "
 const pg = require('pg');
-const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
 async function check() {
   for (let i = 1; i <= ${MAX_ATTEMPTS}; i++) {
+    const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
     try {
       await client.connect();
       await client.query('SELECT 1');
       await client.end();
       process.exit(0);
     } catch (err) {
+      try { await client.end(); } catch {}
       if (i === ${MAX_ATTEMPTS}) {
         console.error('❌ Could not connect to PostgreSQL after ${MAX_ATTEMPTS} attempts:', err.message);
         process.exit(1);

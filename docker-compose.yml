@@ -20,7 +20,7 @@ services:
       - "-c"
       - "effective_cache_size=256MB"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - prod_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-bikit_prod}"]
       interval: 5s
@@ -45,6 +45,8 @@ services:
       db:
         condition: service_healthy
     env_file: .env.production
+    environment:
+      HOSTNAME: "0.0.0.0"
     ports:
       - "127.0.0.1:${APP_PORT:-3100}:3000"
     read_only: true
@@ -145,7 +147,7 @@ services:
         max-file: "3"
 
 volumes:
-  postgres_data:
+  prod_postgres_data:
   app_data:
   caddy_data:
   caddy_config:
