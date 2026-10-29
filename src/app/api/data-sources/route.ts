@@ -20,12 +20,12 @@ import { getConnectorDefinition } from '@src/lib/connectors/registry';
 import { encryptSecretFields } from '@src/lib/connectors/secrets';
 import { getConnector } from '@src/lib/connectors/manager';
 import { isConnectorTypeAllowed } from '@src/lib/settings/allowed-connectors';
-import { logNetworkAudit } from '@src/lib/audit/audit-log';
+import { logNetworkAudit, logAuditEvent } from '@src/lib/audit/audit-log';
 
 export async function GET(): Promise<NextResponse> {
     try {
         const user = await requireUserApi();
-        const data = listDataSources({ id: user.id, role: user.role });
+        const data = await listDataSources({ id: user.id, role: user.role });
         return NextResponse.json({ data });
     } catch (err) {
         return handleApiError(err);
@@ -38,7 +38,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         const body: unknown = await req.json();
         const input = createDataSourceSchema.parse(body);
 
-        if (!isConnectorTypeAllowed(input.type)) {
+        if (!(await isConnectorTypeAllowed(input.type))) {
             return apiError(`Connector type "${input.type}" is disabled by administrator policy.`, 403);
         }
 
@@ -130,11 +130,11 @@ export async function POST(req: Request): Promise<NextResponse> {
             rawConfig = encryptSecretFields(def, rawConfig);
         }
 
-        const publicDs = createDataSource(
+        const publicDs = await createDataSource(
             {
                 name: input.name,
                 type: input.type,
-                config: JSON.stringify(rawConfig),
+                config: rawConfig,
                 status: 'unknown',
             },
             user.id
@@ -142,7 +142,7 @@ export async function POST(req: Request): Promise<NextResponse> {
 
         if (def && (def.category === 'sql' || def.category === 'nosql')) {
             const host = typeof rawConfig.host === 'string' ? rawConfig.host : null;
-            logNetworkAudit({
+            await logNetworkAudit({
                 userId: user.id,
                 action: 'create',
                 dataSourceId: publicDs.id,
@@ -152,9 +152,9 @@ export async function POST(req: Request): Promise<NextResponse> {
 
         // Pre-warm schema cache if connection is valid
         try {
-            const connector = await getConnector({ id: publicDs.id, type: input.type, config: JSON.stringify(rawConfig) });
+            const connector = await getConnector({ id: publicDs.id, type: input.type, config: rawConfig });
             const snapshot = await connector.introspect();
-            setCachedSchema(publicDs.id, snapshot);
+            await setCachedSchema(publicDs.id, snapshot);
         } catch {
             // best effort; schema can be fetched later on demand
         }
@@ -170,7 +170,12 @@ export async function DELETE(req: Request): Promise<NextResponse> {
         const user = await requireUserApi();
         const body: unknown = await req.json();
         const { ids } = bulkDeleteDataSourcesSchema.parse(body);
-        const data = bulkDeleteDataSources(ids, { id: user.id, role: user.role });
+        const data = await bulkDeleteDataSources(ids, { id: user.id, role: user.role });
+        await logAuditEvent({
+            userId: user.id,
+            action: 'data_source.delete',
+            details: { ids },
+        });
         return NextResponse.json({ data });
     } catch (err) {
         return handleApiError(err);

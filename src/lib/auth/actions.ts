@@ -1,14 +1,16 @@
 'use server';
 
-import { count, eq } from 'drizzle-orm';
+import { count, eq, sql } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { db } from '@src/lib/db';
-import { appSettings, users } from '@src/lib/db/schema';
+import { users } from '@src/lib/db/schema';
 import { createSession, destroySession } from './session';
 import { hashPassword, verifyPassword } from './password';
 import { checkLoginRateLimit, recordLoginAttempt } from './rate-limit';
 import { credentialsSchema, registerSchema } from './schemas';
+import { isRegistrationAllowed } from './registration';
+import { logAuditEvent } from '@src/lib/audit/audit-log';
 import type { AuthActionResult, AuthField } from './types';
 
 const invalidCredentialsMessage = 'Invalid email or password';
@@ -62,17 +64,17 @@ export async function registerAction(_previousState: AuthActionResult, formData:
     });
     if (!parsed.success) return fieldErrors(parsed.error);
 
-    const [setting] = await db.select().from(appSettings).where(eq(appSettings.key, 'allowRegistration')).limit(1);
-    if (setting?.value !== true) {
+    const allowed = await isRegistrationAllowed();
+    if (!allowed) {
         return { ok: false, formError: 'Registration is closed' };
     }
 
     const passwordHash = await hashPassword(parsed.data.password);
     let user: typeof users.$inferSelect;
     try {
-        user = await db.transaction((transaction) => {
-            const [userCount] = transaction.select({ count: count() }).from(users).all();
-            const [created] = transaction
+        user = await db.transaction(async (transaction) => {
+            const [userCount] = await transaction.select({ count: count() }).from(users);
+            const [created] = await transaction
                 .insert(users)
                 .values({
                     name: parsed.data.name,
@@ -80,8 +82,7 @@ export async function registerAction(_previousState: AuthActionResult, formData:
                     passwordHash,
                     role: userCount.count === 0 ? 'admin' : 'member',
                 })
-                .returning()
-                .all();
+                .returning();
             return created;
         });
     } catch {
@@ -93,6 +94,11 @@ export async function registerAction(_previousState: AuthActionResult, formData:
 
     const metadata = await requestMetadata();
     await createSession(user.id, metadata);
+    await logAuditEvent({
+        userId: user.id,
+        action: 'auth.register',
+        ipAddress: metadata.ip,
+    });
     redirect(safeNextPath(readString(formData, 'next')));
 }
 
@@ -109,20 +115,39 @@ export async function loginAction(_previousState: AuthActionResult, formData: Fo
         return { ok: false, formError: rateLimit.message ?? 'Too many login attempts. Try again later.' };
     }
 
-    const [user] = await db.select().from(users).where(eq(users.email, parsed.data.email)).limit(1);
+    const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(sql`lower(${users.email})`, parsed.data.email.toLowerCase()))
+        .limit(1);
     const passwordHash = user?.passwordHash ?? (await dummyPasswordHash);
     const passwordMatches = await verifyPassword(parsed.data.password, passwordHash);
 
     if (!user || !passwordMatches) {
         await recordLoginAttempt(parsed.data.email, metadata.ip, false);
+        await logAuditEvent({
+            action: 'auth.login_failed',
+            ipAddress: metadata.ip,
+            details: { email: parsed.data.email, reason: 'invalid_credentials' },
+        });
         return { ok: false, formError: invalidCredentialsMessage };
     }
     if (user.status !== 'active') {
         await recordLoginAttempt(parsed.data.email, metadata.ip, false);
+        await logAuditEvent({
+            action: 'auth.login_failed',
+            ipAddress: metadata.ip,
+            details: { email: parsed.data.email, reason: 'account_disabled' },
+        });
         return { ok: false, formError: 'This account is disabled' };
     }
 
     await recordLoginAttempt(parsed.data.email, metadata.ip, true);
+    await logAuditEvent({
+        userId: user.id,
+        action: 'auth.login',
+        ipAddress: metadata.ip,
+    });
     await db.update(users).set({ lastLoginAt: new Date(), updatedAt: new Date() }).where(eq(users.id, user.id));
     await destroySession();
     await createSession(user.id, metadata);
@@ -130,6 +155,9 @@ export async function loginAction(_previousState: AuthActionResult, formData: Fo
 }
 
 export async function logoutAction(): Promise<void> {
+    await logAuditEvent({
+        action: 'auth.logout',
+    });
     await destroySession();
     redirect('/login');
 }

@@ -10,6 +10,8 @@ import {
     UsersIcon,
     KeyRoundIcon,
     Settings2Icon,
+    LandmarkIcon,
+    ScrollTextIcon,
 } from 'lucide-react';
 import { cn } from 'cn';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -27,10 +29,12 @@ const baseNavItems: NavItem[] = [
     { label: 'Security', href: '/settings/security', icon: ShieldCheckIcon },
     { label: 'Sessions', href: '/settings/sessions', icon: LaptopIcon },
     { label: 'Appearance', href: '/settings/appearance', icon: PaletteIcon },
+    { label: 'Finance', href: '/settings/finance', icon: LandmarkIcon },
 ];
 
 const adminNavItems: NavItem[] = [
     { label: 'Users', href: '/settings/users', icon: UsersIcon, adminOnly: true },
+    { label: 'Audit Log', href: '/settings/audit', icon: ScrollTextIcon, adminOnly: true },
     { label: 'Roles & Permissions', href: '/settings/roles', icon: KeyRoundIcon, adminOnly: true },
     { label: 'General', href: '/settings/general', icon: Settings2Icon, adminOnly: true },
 ];
