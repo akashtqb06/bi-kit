@@ -110,7 +110,7 @@ services:
     volumes:
       - ./backups:/backups
       - app_data:/app_data:ro
-      - ./docker/backup.sh:/usr/local/bin/backup.sh:ro
+      - ./docker/backup.sh:/usr/local/bin/backup.sh
     entrypoint: ["/bin/sh", "-c"]
     command: >
       "apk add --no-cache tzdata bash rsync &&

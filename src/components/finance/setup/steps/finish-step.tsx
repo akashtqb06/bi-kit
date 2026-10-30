@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFinanceStore } from '../../shared/finance-store';
+import { isFinanceFeatureEnabled } from '@src/lib/finance/flags';
 
 interface FinishStepProps {
   accountsCreatedCount: number;
@@ -21,6 +22,9 @@ interface FinishStepProps {
 export function FinishStep({ accountsCreatedCount }: FinishStepProps) {
   const router = useRouter();
   const openQuickAdd = useFinanceStore((s) => s.openQuickAdd);
+
+  const showImport = isFinanceFeatureEnabled('import');
+  const showRecurring = isFinanceFeatureEnabled('recurring');
 
   const handleOpenTransaction = () => {
     // Open Quick Add and navigate to overview/transactions
@@ -71,45 +75,49 @@ export function FinishStep({ accountsCreatedCount }: FinishStepProps) {
           <span className="text-[11px] font-semibold text-primary">Open Quick Add →</span>
         </div>
 
-        {/* Next Step 2: Import a statement */}
-        <Link
-          href="/finance/import"
-          className="p-4 rounded-xl border bg-card/60 hover:bg-muted/40 transition-colors text-left flex flex-col justify-between space-y-3 group"
-        >
-          <div className="space-y-1.5">
-            <div className="size-8 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-              <UploadCloudIcon className="size-4" />
+        {/* Next Step 2: Import a statement (only if import feature is enabled) */}
+        {showImport && (
+          <Link
+            href="/finance/import"
+            className="p-4 rounded-xl border bg-card/60 hover:bg-muted/40 transition-colors text-left flex flex-col justify-between space-y-3 group"
+          >
+            <div className="space-y-1.5">
+              <div className="size-8 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                <UploadCloudIcon className="size-4" />
+              </div>
+              <h3 className="text-xs font-bold text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
+                <span>Import a bank statement</span>
+                <ArrowRightIcon className="size-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </h3>
+              <p className="text-[11px] text-muted-foreground">
+                Upload bank CSVs or PDF statements with automatic deduplication.
+              </p>
             </div>
-            <h3 className="text-xs font-bold text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
-              <span>Import a bank statement</span>
-              <ArrowRightIcon className="size-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </h3>
-            <p className="text-[11px] text-muted-foreground">
-              Upload bank CSVs or PDF statements with automatic deduplication.
-            </p>
-          </div>
-          <span className="text-[11px] font-semibold text-primary">Statement Importer →</span>
-        </Link>
+            <span className="text-[11px] font-semibold text-primary">Statement Importer →</span>
+          </Link>
+        )}
 
-        {/* Next Step 3: Set up recurring items */}
-        <Link
-          href="/finance/recurring"
-          className="p-4 rounded-xl border bg-card/60 hover:bg-muted/40 transition-colors text-left flex flex-col justify-between space-y-3 group"
-        >
-          <div className="space-y-1.5">
-            <div className="size-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-              <CalendarSyncIcon className="size-4" />
+        {/* Next Step 3: Set up recurring items (only if recurring feature is enabled) */}
+        {showRecurring && (
+          <Link
+            href="/finance/recurring"
+            className="p-4 rounded-xl border bg-card/60 hover:bg-muted/40 transition-colors text-left flex flex-col justify-between space-y-3 group"
+          >
+            <div className="space-y-1.5">
+              <div className="size-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                <CalendarSyncIcon className="size-4" />
+              </div>
+              <h3 className="text-xs font-bold text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
+                <span>Set up recurring items</span>
+                <ArrowRightIcon className="size-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </h3>
+              <p className="text-[11px] text-muted-foreground">
+                Automate rent, EMIs, salary, and utility bills on a schedule.
+              </p>
             </div>
-            <h3 className="text-xs font-bold text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
-              <span>Set up recurring items</span>
-              <ArrowRightIcon className="size-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </h3>
-            <p className="text-[11px] text-muted-foreground">
-              Automate rent, EMIs, salary, and utility bills on a schedule.
-            </p>
-          </div>
-          <span className="text-[11px] font-semibold text-primary">Recurring Rules →</span>
-        </Link>
+            <span className="text-[11px] font-semibold text-primary">Recurring Rules →</span>
+          </Link>
+        )}
 
         {/* Next Step 4: Open dashboards */}
         <Link

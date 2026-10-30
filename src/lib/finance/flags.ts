@@ -27,6 +27,7 @@ export const DEFAULT_ENABLED_FEATURES: readonly FinanceFeature[] = [
   'overview',
   'transactions',
   'accounts',
+  'setup',
   'import',
 ] as const;
 
