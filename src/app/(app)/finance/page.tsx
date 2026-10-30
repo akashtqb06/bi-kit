@@ -4,8 +4,6 @@ import { requireUser } from '@src/lib/auth/dal';
 import { checkSetupRedirect } from '@src/lib/finance/setup/service';
 import { isAnyFinanceFeatureEnabled, isFinanceFeatureEnabled } from '@src/lib/finance/flags';
 
-export const dynamic = 'force-dynamic';
-
 async function FinanceEntryRedirect(): Promise<null> {
   if (!isAnyFinanceFeatureEnabled()) {
     notFound();

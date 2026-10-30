@@ -2,6 +2,8 @@ import 'server-only';
 import type { FinanceService } from './service';
 import { DbFinanceService } from './db-service';
 
+declare const __non_webpack_require__: NodeRequire | undefined;
+
 let _loggedOnce = false;
 
 export function getFinanceService(): FinanceService {
@@ -20,14 +22,13 @@ export function getFinanceService(): FinanceService {
       );
     }
     // Dynamic import so mock service is never bundled into production build
-    if (typeof require !== 'undefined' && require.extensions && !require.extensions['.ts']) {
+    const req = typeof __non_webpack_require__ !== 'undefined' ? __non_webpack_require__ : eval('require');
+    if (typeof req !== 'undefined' && req.extensions && !req.extensions['.ts']) {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        require('tsx/cjs');
+        req('tsx/cjs');
       } catch {}
     }
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { MockFinanceService } = require('./mock-service') as { MockFinanceService: new () => FinanceService };
+    const { MockFinanceService } = req('./mock-service') as { MockFinanceService: new () => FinanceService };
     return new MockFinanceService();
   }
 
