@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useFinanceStore } from '../shared/finance-store';
 import { formatINR } from '@src/components/finance/shared/format';
-import { SAMPLE_FIXTURES, type SampleFixture } from '@src/lib/finance/import/sample-fixtures';
+import { SAMPLE_FIXTURES, type SampleFixture } from '@src/lib/finance/testdata/import-sample-fixtures';
 import {
   getCsvQuickPreview,
   parseAndProcessStatement,

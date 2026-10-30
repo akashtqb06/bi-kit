@@ -14,7 +14,7 @@ import {
   learnRulesFromTransactions,
   suggestCategory,
 } from './categorizer';
-import { SAMPLE_FIXTURES } from './sample-fixtures';
+import { SAMPLE_FIXTURES } from '@src/lib/finance/testdata/import-sample-fixtures';
 import { commitImportTransactions } from './commit';
 import { setupFinanceTestDb, USER_A, USER_B } from '../__tests__/db/test-helper';
 import { db, finAccounts, finTransactions } from '@src/lib/db';

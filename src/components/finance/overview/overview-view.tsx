@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useFinanceStore } from '../shared/finance-store';
 import { formatINR, formatPercent } from '../shared/format';
+import { FinancePageSkeleton } from '../shared/finance-skeleton';
 import { ChartRenderer } from '@src/components/charts/chart-renderer';
 import { defaultChartConfig, type ChartConfigData } from '@src/lib/schemas';
 import { cn } from '@/lib/utils';
@@ -27,6 +28,10 @@ export function OverviewView() {
     categories,
     netWorthHistory,
     overviewStats,
+    overviewStatus,
+    refreshOverviewStats,
+    refreshAccounts,
+    refreshNetWorthHistory,
     openQuickAdd,
   } = useFinanceStore();
 
@@ -108,6 +113,13 @@ export function OverviewView() {
 
   // Spend by Category Donut Data
   const spendByCategoryData = useMemo(() => {
+    if (overviewStats?.spendByCategory && overviewStats.spendByCategory.length > 0) {
+      return overviewStats.spendByCategory.map((c) => ({
+        category: c.categoryName,
+        amount: Math.round(c.amount / 100),
+      }));
+    }
+
     const categoryTotals: Record<string, number> = {};
 
     transactions.forEach((t) => {
@@ -124,18 +136,8 @@ export function OverviewView() {
       };
     });
 
-    // If empty, supply placeholder data
-    if (rows.length === 0) {
-      return [
-        { category: 'Groceries', amount: 8500 },
-        { category: 'Food & Dining', amount: 4500 },
-        { category: 'Fuel & Transport', amount: 3200 },
-        { category: 'Shopping', amount: 5500 },
-      ];
-    }
-
     return rows.sort((a, b) => b.amount - a.amount);
-  }, [transactions, categories]);
+  }, [overviewStats, transactions, categories]);
 
   const donutConfig: ChartConfigData = {
     ...defaultChartConfig,
@@ -146,23 +148,63 @@ export function OverviewView() {
     showLegend: true,
   };
 
-  // Month-over-month calculations (Mock deltas for demo/fidelity)
+  // Month-over-month calculations
   const currentIncome = overviewStats?.monthlyIncome ?? 0;
-  const prevIncome = 19500000; // ₹1,95,000
-  const incomeDeltaPct = Math.round(((currentIncome - prevIncome) / prevIncome) * 1000) / 10;
+  const prevIncome = overviewStats?.previousPeriod?.income ?? 0;
+  const incomeDeltaPct = prevIncome > 0
+    ? Math.round(((currentIncome - prevIncome) / prevIncome) * 1000) / 10
+    : null;
 
   const currentExpense = overviewStats?.monthlyExpense ?? 0;
-  const prevExpense = 7850000; // ₹78,500
-  const expenseDeltaPct = Math.round(((currentExpense - prevExpense) / prevExpense) * 1000) / 10;
+  const prevExpense = overviewStats?.previousPeriod?.expense ?? 0;
+  const expenseDeltaPct = prevExpense > 0
+    ? Math.round(((currentExpense - prevExpense) / prevExpense) * 1000) / 10
+    : null;
 
   const currentSavingsRate = overviewStats?.savingsRate ?? 0;
-  const prevSavingsRate = 59.7;
-  const savingsRateDelta = Math.round((currentSavingsRate - prevSavingsRate) * 10) / 10;
+  const prevSavingsRate = overviewStats?.previousPeriod?.savingsRate ?? 0;
+  const savingsRateDelta = prevSavingsRate > 0
+    ? Math.round((currentSavingsRate - prevSavingsRate) * 10) / 10
+    : null;
+
+  const netWorthChange = useMemo(() => {
+    if (netWorthHistory.length < 2) return null;
+    const prev = netWorthHistory[netWorthHistory.length - 2];
+    const curr = netWorthHistory[netWorthHistory.length - 1];
+    if (!prev || prev.netWorth === 0) return null;
+    const pct = Math.round(((curr.netWorth - prev.netWorth) / Math.abs(prev.netWorth)) * 1000) / 10;
+    return pct;
+  }, [netWorthHistory]);
 
   // Recent transactions (latest 6)
   const recentTransactions = useMemo(() => {
     return transactions.slice(0, 6);
   }, [transactions]);
+
+  if (overviewStatus === 'loading' || overviewStatus === 'idle') {
+    return <FinancePageSkeleton title="Loading Overview..." />;
+  }
+
+  if (overviewStatus === 'error') {
+    return (
+      <div className="flex-1 min-h-[400px] flex items-center justify-center">
+        <div className="p-8 text-center border rounded-xl bg-card space-y-4 max-w-md mx-auto shadow-xs">
+          <p className="text-sm text-destructive font-medium">Failed to load overview data.</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              refreshOverviewStats();
+              refreshAccounts();
+              refreshNetWorthHistory();
+            }}
+          >
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 min-h-0 flex flex-col gap-6 w-full pb-10">
@@ -236,9 +278,19 @@ export function OverviewView() {
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Total Net Worth
               </span>
-              <Badge variant="outline" className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                +4.1% this month
-              </Badge>
+              {netWorthChange !== null && (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'text-[10px] font-semibold',
+                    netWorthChange >= 0
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-destructive'
+                  )}
+                >
+                  {netWorthChange >= 0 ? `+${netWorthChange}% this month` : `${netWorthChange}% this month`}
+                </Badge>
+              )}
             </div>
             <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mt-2">
               {formatINR(netWorth)}
@@ -288,10 +340,23 @@ export function OverviewView() {
               {formatINR(currentIncome)}
             </div>
             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-1">
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center">
-                +{incomeDeltaPct}%
-              </span>
-              <span>vs last month ({formatINR(prevIncome)})</span>
+              {incomeDeltaPct !== null ? (
+                <>
+                  <span
+                    className={cn(
+                      'font-semibold flex items-center',
+                      incomeDeltaPct >= 0
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-destructive'
+                    )}
+                  >
+                    {incomeDeltaPct >= 0 ? `+${incomeDeltaPct}%` : `${incomeDeltaPct}%`}
+                  </span>
+                  <span>vs last month ({formatINR(prevIncome)})</span>
+                </>
+              ) : (
+                <span>No prior month data</span>
+              )}
             </div>
           </div>
         </div>
@@ -309,10 +374,23 @@ export function OverviewView() {
               {formatINR(currentExpense)}
             </div>
             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-1">
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center">
-                {expenseDeltaPct}%
-              </span>
-              <span>vs last month ({formatINR(prevExpense)})</span>
+              {expenseDeltaPct !== null ? (
+                <>
+                  <span
+                    className={cn(
+                      'font-semibold flex items-center',
+                      expenseDeltaPct <= 0
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-destructive'
+                    )}
+                  >
+                    {expenseDeltaPct >= 0 ? `+${expenseDeltaPct}%` : `${expenseDeltaPct}%`}
+                  </span>
+                  <span>vs last month ({formatINR(prevExpense)})</span>
+                </>
+              ) : (
+                <span>No prior month data</span>
+              )}
             </div>
           </div>
         </div>
@@ -330,10 +408,23 @@ export function OverviewView() {
               {formatPercent(currentSavingsRate)}
             </div>
             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-1">
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center">
-                +{savingsRateDelta}%
-              </span>
-              <span>vs last month ({formatPercent(prevSavingsRate)})</span>
+              {savingsRateDelta !== null ? (
+                <>
+                  <span
+                    className={cn(
+                      'font-semibold flex items-center',
+                      savingsRateDelta >= 0
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-destructive'
+                    )}
+                  >
+                    {savingsRateDelta >= 0 ? `+${savingsRateDelta}%` : `${savingsRateDelta}%`}
+                  </span>
+                  <span>vs last month ({formatPercent(prevSavingsRate)})</span>
+                </>
+              ) : (
+                <span>No prior month data</span>
+              )}
             </div>
           </div>
         </div>
@@ -399,15 +490,21 @@ export function OverviewView() {
             </span>
           </div>
 
-          <div className="h-64 w-full">
-            <ChartRenderer
-              type="donut"
-              config={donutConfig}
-              data={spendByCategoryData}
-              showTitle={false}
-              className="h-full"
-            />
-          </div>
+          {spendByCategoryData.length === 0 ? (
+            <div className="h-64 w-full flex items-center justify-center text-xs text-muted-foreground">
+              No expenses this month
+            </div>
+          ) : (
+            <div className="h-64 w-full">
+              <ChartRenderer
+                type="donut"
+                config={donutConfig}
+                data={spendByCategoryData}
+                showTitle={false}
+                className="h-full"
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -486,46 +583,52 @@ export function OverviewView() {
             </Link>
           </div>
 
-          <div className="divide-y divide-border/60">
-            {recentTransactions.map((tx) => {
-              const cat = categories.find((c) => c.id === tx.categoryId);
-              return (
-                <div
-                  key={tx.id}
-                  className="py-2 flex items-center justify-between text-xs gap-2"
-                >
-                  <div className="min-w-0">
-                    <div className="font-semibold text-foreground truncate">
-                      {tx.payee || tx.type}
-                    </div>
-                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
-                      <span>{tx.date}</span>
-                      {cat && (
-                        <>
-                          <span>•</span>
-                          <span>{cat.name}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
+          {recentTransactions.length === 0 ? (
+            <div className="py-8 text-center text-xs text-muted-foreground">
+              No recent transactions yet.
+            </div>
+          ) : (
+            <div className="divide-y divide-border/60">
+              {recentTransactions.map((tx) => {
+                const cat = categories.find((c) => c.id === tx.categoryId);
+                return (
                   <div
-                    className={cn(
-                      'font-bold shrink-0',
-                      tx.type === 'income'
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : tx.type === 'transfer'
-                        ? 'text-blue-600 dark:text-blue-400'
-                        : 'text-foreground'
-                    )}
+                    key={tx.id}
+                    className="py-2 flex items-center justify-between text-xs gap-2"
                   >
-                    {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}
-                    {formatINR(tx.amount)}
+                    <div className="min-w-0">
+                      <div className="font-semibold text-foreground truncate">
+                        {tx.payee || tx.type}
+                      </div>
+                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground mt-0.5">
+                        <span>{tx.date}</span>
+                        {cat && (
+                          <>
+                            <span>•</span>
+                            <span>{cat.name}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div
+                      className={cn(
+                        'font-bold shrink-0',
+                        tx.type === 'income'
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : tx.type === 'transfer'
+                          ? 'text-blue-600 dark:text-blue-400'
+                          : 'text-foreground'
+                      )}
+                    >
+                      {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}
+                      {formatINR(tx.amount)}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
