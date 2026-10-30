@@ -47,6 +47,7 @@ services:
     env_file: .env.production
     environment:
       HOSTNAME: "0.0.0.0"
+      FINANCE_BACKEND: "db"
     ports:
       - "127.0.0.1:${APP_PORT:-3100}:3000"
     read_only: true

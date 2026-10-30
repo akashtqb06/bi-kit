@@ -12,6 +12,7 @@ export async function GET() {
                 {
                     status: 'error',
                     database: 'unhealthy',
+                    financeBackend: process.env.FINANCE_BACKEND ?? 'db',
                     reason: health.reason,
                     error: health.exactFix,
                     fix: health.fix,
@@ -27,6 +28,7 @@ export async function GET() {
             {
                 status: 'error',
                 database: 'unhealthy',
+                financeBackend: process.env.FINANCE_BACKEND ?? 'db',
                 backup,
             },
             { status: 503 }
@@ -37,6 +39,7 @@ export async function GET() {
         {
             status: 'ok',
             database: 'healthy',
+            financeBackend: process.env.FINANCE_BACKEND ?? 'db',
             backup,
         },
         { status: 200 }
