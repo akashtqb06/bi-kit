@@ -23,6 +23,7 @@
     "db:seed:categories": "tsx --conditions=react-server scripts/seed/system-categories.ts",
     "finance:fixtures": "tsx --conditions=react-server scripts/seed/finance-fixtures.ts",
     "finance:init": "tsx --conditions=react-server scripts/setup-personal-finance.ts",
+    "finance:verify": "tsx --conditions=react-server scripts/finance-verify.ts",
     "finance:coverage": "tsx --conditions=react-server scripts/finance-coverage.ts",
     "db:seed": "pnpm run db:seed:users && pnpm run db:seed:demo && pnpm run db:seed:workbook",
     "db:reset": "tsx --conditions=react-server scripts/seed/reset.ts",
