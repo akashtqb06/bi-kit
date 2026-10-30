@@ -33,3 +33,4 @@ export function previousMonthRangeInTz(tz: string = DEFAULT_TZ): { start: string
     end: `${prevYear}-${mm}-${String(lastDay).padStart(2, '0')}`,
   };
 }
+

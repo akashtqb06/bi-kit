@@ -6,3 +6,4 @@ export function jsonNoStore<T>(data: T, status = 200): NextResponse<T> {
   response.headers.set('Cache-Control', 'no-store');
   return response;
 }
+

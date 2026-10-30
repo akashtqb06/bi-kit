@@ -21,3 +21,4 @@ export function FinanceInitializer() {
 
   return null;
 }
+
