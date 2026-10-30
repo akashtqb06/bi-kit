@@ -537,7 +537,7 @@ function WorkbooksContent() {
 
     return (
         <TooltipProvider>
-            <div className="h-full min-h-0 flex flex-col gap-6 p-6 overflow-hidden">
+            <div className="h-full min-h-0 min-w-0 flex flex-col gap-6 p-6 overflow-hidden">
                 {/* Page header row */}
                 <div className="flex items-center justify-between shrink-0">
                     <div>
@@ -577,7 +577,7 @@ function WorkbooksContent() {
                 {/* Data Table */}
                 {(!loadError || loading) && (
                     <DataTable
-                        className="flex-1 min-h-0"
+                        className="flex-1 min-h-0 min-w-0"
                         columns={columns}
                         data={workbooks}
                         loading={loading}
@@ -737,7 +737,7 @@ function WorkbooksContent() {
 
 function WorkbooksSkeleton() {
     return (
-        <div className="flex flex-1 flex-col gap-6 p-6">
+        <div className="flex flex-1 min-w-0 flex-col gap-6 p-6">
             <div className="flex items-center justify-between">
                 <div className="space-y-1">
                     <Skeleton className="h-6 w-32" />

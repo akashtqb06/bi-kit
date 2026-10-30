@@ -7,15 +7,20 @@ export async function POST(request: NextRequest) {
   try {
     assertCronAuthorized(request);
     const result = await generateDueRecurringTransactions();
+    const timestamp = new Date().toISOString();
+    console.log(
+      `[cron/recurring] Generated ${result.generated} transactions (${result.backfilled} backfilled, ${result.skipped} skipped) from ${result.processed} rules at ${timestamp}`
+    );
     return NextResponse.json({
       success: true,
       processed: result.processed,
       generated: result.generated,
       backfilled: result.backfilled,
       skipped: result.skipped,
-      timestamp: new Date().toISOString(),
+      timestamp,
     });
   } catch (err) {
+    console.error('[cron/recurring] Execution failed:', err);
     return handleApiError(err);
   }
 }

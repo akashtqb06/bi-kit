@@ -317,6 +317,7 @@ export interface ChartRendererProps {
     type: ChartType;
     config: ChartConfigData;
     data?: QueryResultData | { columns?: unknown[]; rows?: unknown[][] } | Record<string, unknown>[] | null;
+    categoryColorMap?: Record<string, string>;
     loading?: boolean;
     error?: string | null;
     className?: string;
@@ -331,6 +332,7 @@ export function ChartRenderer({
     type,
     config,
     data,
+    categoryColorMap,
     loading = false,
     error = null,
     className,
@@ -361,14 +363,18 @@ export function ChartRenderer({
         const cConfig: ChartConfig = {};
         seriesList.forEach((s, idx) => {
             const safeKey = s.key.replace(/[^a-zA-Z0-9_-]/g, '_');
-            const color = s.color || palette[idx % palette.length];
+            const mappedColor =
+                categoryColorMap?.[s.label] ||
+                categoryColorMap?.[s.key] ||
+                categoryColorMap?.[safeKey];
+            const color = s.color || mappedColor || palette[idx % palette.length];
             cConfig[safeKey] = { label: s.label, color };
             if (safeKey !== s.key) {
                 cConfig[s.key] = { label: s.label, color };
             }
         });
         return cConfig;
-    }, [seriesList, palette]);
+    }, [seriesList, palette, categoryColorMap]);
 
     if (loading) {
         return (
@@ -572,7 +578,8 @@ export function ChartRenderer({
         const pieConfig: ChartConfig = {};
         pieData.forEach((d, idx) => {
             const safeKey = d.name.replace(/[^a-zA-Z0-9_-]/g, '_');
-            const color = palette[idx % palette.length];
+            const mappedColor = categoryColorMap?.[d.name] || categoryColorMap?.[safeKey];
+            const color = mappedColor || palette[idx % palette.length];
             pieConfig[safeKey] = { label: d.name, color };
             if (safeKey !== d.name) {
                 pieConfig[d.name] = { label: d.name, color };
@@ -705,7 +712,16 @@ export function ChartRenderer({
                                               }
                                             : false
                                     }
-                                />
+                                >
+                                    {categoryColorMap &&
+                                        chartData.map((entry, entryIdx) => {
+                                            const itemLabel = String(entry[xAxisKey] ?? '');
+                                            const cColor =
+                                                categoryColorMap[itemLabel] ||
+                                                palette[entryIdx % palette.length];
+                                            return <Cell key={`row-cell-${entryIdx}`} fill={cColor} />;
+                                        })}
+                                </Bar>
                             );
                         })}
                     </BarChart>
@@ -871,7 +887,16 @@ export function ChartRenderer({
                                           }
                                         : false
                                 }
-                            />
+                            >
+                                {categoryColorMap &&
+                                    chartData.map((entry, entryIdx) => {
+                                        const itemLabel = String(entry[xAxisKey] ?? '');
+                                        const cColor =
+                                            categoryColorMap[itemLabel] ||
+                                            palette[entryIdx % palette.length];
+                                        return <Cell key={`bar-cell-${entryIdx}`} fill={cColor} />;
+                                    })}
+                            </Bar>
                         );
                     })}
                 </ComposedChart>
@@ -993,13 +1018,19 @@ function PieChartWithLegend({
                             outerRadius="85%"
                             paddingAngle={isDonut ? 1 : 0}
                         >
-                            {data.map((item, index) => (
-                                <Cell
-                                    key={item.name}
-                                    fill={palette[index % palette.length]}
-                                    fillOpacity={hoveredName && hoveredName !== item.name ? 0.35 : 1}
-                                />
-                            ))}
+                            {data.map((item, index) => {
+                                const itemColor =
+                                    chartConfig[item.name]?.color ||
+                                    chartConfig[item.name.replace(/[^a-zA-Z0-9_-]/g, '_')]?.color ||
+                                    palette[index % palette.length];
+                                return (
+                                    <Cell
+                                        key={item.name}
+                                        fill={itemColor}
+                                        fillOpacity={hoveredName && hoveredName !== item.name ? 0.35 : 1}
+                                    />
+                                );
+                            })}
                         </Pie>
                     </PieChart>
                 </ChartContainer>
@@ -1037,6 +1068,10 @@ function PieChartWithLegend({
                     >
                         {data.map((item, index) => {
                             const percent = total > 0 ? (item.value / total) * 100 : 0;
+                            const itemColor =
+                                chartConfig[item.name]?.color ||
+                                chartConfig[item.name.replace(/[^a-zA-Z0-9_-]/g, '_')]?.color ||
+                                palette[index % palette.length];
                             return (
                                 <Tooltip key={item.name}>
                                     <TooltipTrigger
@@ -1052,7 +1087,7 @@ function PieChartWithLegend({
                                     >
                                         <span
                                             className="size-2 shrink-0 rounded-full"
-                                            style={{ backgroundColor: palette[index % palette.length] }}
+                                            style={{ backgroundColor: itemColor }}
                                         />
                                         <span
                                             className="min-w-0 flex-1 truncate text-foreground"

@@ -298,6 +298,7 @@ export const budgetProgressSchema = z.object({
   budgetId: z.string(),
   categoryId: z.string(),
   categoryName: z.string(),
+  categoryColor: z.string().nullable().optional(),
   period: z.enum(BUDGET_PERIODS),
   budgetedAmount: moneyPaiseSchema,
   spentAmount: moneyPaiseSchema,
@@ -409,6 +410,7 @@ export const overviewStatsSchema = z.object({
   spendByCategory: z.array(z.object({
     categoryId: z.string(),
     categoryName: z.string(),
+    categoryColor: z.string().nullable().optional(),
     amount: moneyPaiseSchema,
     percentage: z.number(),
   })).optional(),
@@ -418,9 +420,24 @@ export const overviewStatsSchema = z.object({
   })).optional(),
   recentTransactions: z.array(z.any()).optional(),
   cardsDueSoon: z.array(z.any()).optional(),
+  activePeriod: z.object({
+    from: z.string(),
+    to: z.string(),
+    preset: z.string().optional(),
+    accounts: z.array(z.string()).optional(),
+  }).optional(),
 });
 
 export type OverviewStatsDTO = z.infer<typeof overviewStatsSchema>;
+
+export const overviewStatsQuerySchema = z.object({
+  from: dateStringSchema.optional(),
+  to: dateStringSchema.optional(),
+  preset: z.enum(['this_month', 'last_month', 'last_3_months', 'this_year', 'custom']).optional(),
+  accounts: z.string().optional(),
+});
+
+export type OverviewStatsQuery = z.infer<typeof overviewStatsQuerySchema>;
 
 export const netWorthPointSchema = z.object({
   date: dateStringSchema,

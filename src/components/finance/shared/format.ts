@@ -119,3 +119,63 @@ export function formatPercent(value: number, showSign = false): string {
   const sign = showSign && value > 0 ? '+' : '';
   return `${sign}${value.toFixed(1)}%`;
 }
+
+/**
+ * Formats a liability balance in plain words: "Owes ₹2,159", "Credit ₹500", or "₹0".
+ * For credit cards: negative balance means money is owed, positive balance means overpaid credit.
+ */
+export function formatLiabilityBalance(balance: number): string {
+  if (balance < 0) {
+    return `Owes ${formatINR(Math.abs(balance))}`;
+  }
+  if (balance > 0) {
+    return `Credit ${formatINR(balance)}`;
+  }
+  return '₹0';
+}
+
+/**
+ * Formats an account's balance for display in dropdowns, tiles, and tables.
+ * Displays plain words for liabilities ("Owes ₹X", "Credit ₹Y") without internal negative signs.
+ */
+export function formatAccountDisplayBalance(acc: {
+  class?: string;
+  kind?: string;
+  balance: number;
+  outstanding?: number;
+}): string {
+  const isLiability =
+    acc.class === 'liability' ||
+    acc.kind === 'credit_card' ||
+    acc.kind === 'loan' ||
+    acc.kind === 'other_liability';
+
+  if (isLiability) {
+    if (acc.kind === 'loan' || acc.kind === 'other_liability') {
+      const outstanding = acc.outstanding ?? Math.max(0, acc.balance);
+      return outstanding > 0 ? `Owes ${formatINR(outstanding)}` : '₹0';
+    }
+    return formatLiabilityBalance(acc.balance);
+  }
+
+  return formatINR(acc.balance);
+}
+
+/**
+ * Formats an investment gain/return amount with proper sign prefix.
+ * e.g. +₹1,500 or -₹500.
+ */
+export function formatGain(gain: number): {
+  text: string;
+  isPositive: boolean;
+  isNegative: boolean;
+} {
+  const isPositive = gain > 0;
+  const isNegative = gain < 0;
+  const prefix = isPositive ? '+' : '';
+  return {
+    text: `${prefix}${formatINR(gain)}`,
+    isPositive,
+    isNegative,
+  };
+}

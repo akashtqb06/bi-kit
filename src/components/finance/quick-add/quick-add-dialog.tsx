@@ -9,6 +9,7 @@ import {
   CheckIcon,
   ArrowRightLeftIcon,
   SparklesIcon,
+  AlertTriangleIcon,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -18,7 +19,8 @@ import { Label } from '@/components/ui/label';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useFinanceStore } from '../shared/finance-store';
 import { parseAmountExpression } from '../shared/expression-parser';
-import { formatINR } from '../shared/format';
+import { getDeterministicCategoryColor } from '@src/lib/finance/colors';
+import { formatINR, formatAccountDisplayBalance } from '../shared/format';
 import type { TransactionType } from '@src/lib/finance/constants';
 import type { CreateTransactionDTO } from '@src/lib/finance/contract';
 import { cn } from '@/lib/utils';
@@ -36,6 +38,7 @@ export function QuickAddForm({
     transactions,
     lastUsedAccountId,
     addTransaction,
+    openPayBill,
   } = useFinanceStore();
 
   // Form states
@@ -43,6 +46,7 @@ export function QuickAddForm({
   const [amountInput, setAmountInput] = useState('');
   const [accountId, setAccountId] = useState('');
   const [toAccountId, setToAccountId] = useState('');
+  const [showCardsAndLoans, setShowCardsAndLoans] = useState(false);
   const [categoryId, setCategoryId] = useState('');
   const [payee, setPayee] = useState('');
   const [note, setNote] = useState('');
@@ -51,6 +55,16 @@ export function QuickAddForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
+
+  // Default asset account helper (never defaults to a liability)
+  const defaultAssetAccountId = useMemo(() => {
+    const lastAcc = accounts.find((a) => a.id === lastUsedAccountId);
+    if (lastAcc && lastAcc.class === 'asset') return lastAcc.id;
+    const firstBankOrCash = accounts.find((a) => (a.kind === 'bank' || a.kind === 'cash') && a.isActive);
+    if (firstBankOrCash) return firstBankOrCash.id;
+    const firstAsset = accounts.find((a) => a.class === 'asset' && a.isActive);
+    return firstAsset?.id || accounts[0]?.id || '';
+  }, [accounts, lastUsedAccountId]);
 
   // Today and Yesterday date strings
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
@@ -75,14 +89,25 @@ export function QuickAddForm({
   // Sync initial data
   useEffect(() => {
     if (initialData) {
+      const initType = initialData.type || 'expense';
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setType(initialData.type || 'expense');
+      setType(initType);
       if (initialData.amount) {
         setAmountInput((initialData.amount / 100).toString());
       } else {
         setAmountInput('');
       }
-      setAccountId(initialData.accountId || lastUsedAccountId || accounts[0]?.id || '');
+
+      let fromId = initialData.accountId || lastUsedAccountId || '';
+      if (initType === 'transfer') {
+        const fromAcc = accounts.find((a) => a.id === fromId);
+        if (!fromAcc || fromAcc.class === 'liability') {
+          fromId = defaultAssetAccountId;
+        }
+      } else {
+        if (!fromId) fromId = accounts[0]?.id || '';
+      }
+      setAccountId(fromId);
       setToAccountId(initialData.toAccountId || '');
       setCategoryId(initialData.categoryId || '');
       setPayee(initialData.payee || '');
@@ -109,7 +134,8 @@ export function QuickAddForm({
     }
     setErrors({});
     setCategorySearch('');
-  }, [initialData, lastUsedAccountId, accounts, todayStr, yesterdayStr]);
+    setShowCardsAndLoans(false);
+  }, [initialData, lastUsedAccountId, accounts, defaultAssetAccountId, todayStr, yesterdayStr]);
 
   // Auto-suggest category based on payee
   const handlePayeeChange = (val: string) => {
@@ -286,6 +312,10 @@ export function QuickAddForm({
           onClick={() => {
             setType('transfer');
             setCategoryId('');
+            const currentAcc = accounts.find((a) => a.id === accountId);
+            if (!currentAcc || currentAcc.class === 'liability') {
+              setAccountId(defaultAssetAccountId);
+            }
           }}
         >
           <ArrowRightLeftIcon className="size-3 text-blue-500 inline-block" />
@@ -330,9 +360,18 @@ export function QuickAddForm({
       {type === 'transfer' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label htmlFor="from-account" className="text-xs font-medium text-muted-foreground">
-              From Account
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="from-account" className="text-xs font-medium text-muted-foreground">
+                From Account
+              </Label>
+              <button
+                type="button"
+                onClick={() => setShowCardsAndLoans((prev) => !prev)}
+                className="text-[10px] text-muted-foreground hover:text-foreground underline underline-offset-2"
+              >
+                {showCardsAndLoans ? 'Hide cards & loans' : 'Show cards and loans'}
+              </button>
+            </div>
             <select
               id="from-account"
               className="w-full h-9 rounded-md border border-input bg-card px-3 text-xs focus:ring-1 focus:ring-primary focus:outline-hidden"
@@ -340,12 +379,18 @@ export function QuickAddForm({
               onChange={(e) => setAccountId(e.target.value)}
             >
               <option value="">Select source account...</option>
-              {accounts.map((acc) => (
+              {(showCardsAndLoans ? accounts : accounts.filter((a) => a.class === 'asset')).map((acc) => (
                 <option key={acc.id} value={acc.id}>
-                  {acc.name} ({formatINR(acc.balance)})
+                  {acc.name} ({formatAccountDisplayBalance(acc)})
                 </option>
               ))}
             </select>
+            {accounts.find((a) => a.id === accountId)?.class === 'liability' && (
+              <div className="flex items-center gap-1.5 p-2 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-[11px]">
+                <AlertTriangleIcon className="size-3.5 shrink-0" />
+                <span>This records a cash advance from your card or loan.</span>
+              </div>
+            )}
             {errors.accountId && (
               <p className="text-xs font-medium text-destructive">{errors.accountId}</p>
             )}
@@ -366,7 +411,7 @@ export function QuickAddForm({
                 .filter((a) => a.id !== accountId)
                 .map((acc) => (
                   <option key={acc.id} value={acc.id}>
-                    {acc.name} ({acc.kind === 'credit_card' ? `Due: ${formatINR(acc.outstanding)}` : formatINR(acc.balance)})
+                    {acc.name} ({formatAccountDisplayBalance(acc)})
                   </option>
                 ))}
             </select>
@@ -389,7 +434,7 @@ export function QuickAddForm({
             <option value="">Select account...</option>
             {accounts.map((acc) => (
               <option key={acc.id} value={acc.id}>
-                {acc.name} ({acc.kind === 'credit_card' ? `Due: ${formatINR(acc.outstanding)}` : formatINR(acc.balance)})
+                {acc.name} ({formatAccountDisplayBalance(acc)})
               </option>
             ))}
           </select>
@@ -405,26 +450,70 @@ export function QuickAddForm({
           <div className="flex items-center gap-2">
             <CreditCardIcon className="size-4 text-primary shrink-0" />
             <div className="text-xs">
-              <span className="font-semibold text-foreground">Card Bill Due: </span>
-              <span className="text-destructive font-medium">{formatINR(cardOutstanding)}</span>
+              <span className="font-semibold text-foreground">Card bill due: </span>
+              <span className="text-destructive font-bold">{formatINR(cardOutstanding)}</span>
             </div>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs font-medium gap-1"
-            onClick={() => setAmountInput((cardOutstanding / 100).toString())}
-          >
-            <span>Pay Full Bill</span>
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs font-medium px-2.5"
+              onClick={() => setAmountInput((cardOutstanding / 100).toString())}
+            >
+              Pay full
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs font-medium px-2.5"
+              onClick={() => {
+                const el = document.getElementById('amount-input') as HTMLInputElement | null;
+                el?.focus();
+              }}
+            >
+              Custom
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="h-7 text-xs font-semibold px-2.5"
+              onClick={() => {
+                onClose?.();
+                openPayBill(toAccountId);
+              }}
+            >
+              Pay bill dialog
+            </Button>
+          </div>
         </div>
       )}
 
       {/* Category Selection (Expense / Income) */}
       {type !== 'transfer' && (
         <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-muted-foreground">Category</Label>
+          <div className="flex items-center justify-between">
+            <Label className="text-xs font-medium text-muted-foreground">Category</Label>
+            {categoryId && (
+              (() => {
+                const sel = categories.find((c) => c.id === categoryId);
+                if (!sel) return null;
+                const col = sel.color || getDeterministicCategoryColor(sel.name);
+                return (
+                  <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                    <span
+                      className="size-2 rounded-full shrink-0 ring-1 ring-border shadow-xs"
+                      style={{ backgroundColor: col }}
+                    />
+                    <span className="truncate max-w-[130px]">{sel.name}</span>
+                  </span>
+                );
+              })()
+            )}
+          </div>
           <div className="space-y-2">
             <Input
               type="text"
@@ -436,6 +525,7 @@ export function QuickAddForm({
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-36 overflow-y-auto p-1 border rounded-md bg-muted/20">
               {filteredCategories.map((cat) => {
                 const isSelected = categoryId === cat.id;
+                const catColor = cat.color || getDeterministicCategoryColor(cat.name);
                 return (
                   <button
                     key={cat.id}
@@ -449,8 +539,8 @@ export function QuickAddForm({
                     )}
                   >
                     <span
-                      className="size-2 rounded-full shrink-0"
-                      style={{ backgroundColor: cat.color || '#94a3b8' }}
+                      className="size-2 rounded-full shrink-0 ring-1 ring-border shadow-xs"
+                      style={{ backgroundColor: catColor }}
                     />
                     <span className="truncate">{cat.name}</span>
                     {isSelected && <CheckIcon className="size-3 ml-auto shrink-0" />}

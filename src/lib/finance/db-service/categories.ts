@@ -25,10 +25,60 @@ export function mapCategoryToDTO(row: typeof finCategories.$inferSelect): Catego
   };
 }
 
+export async function getOrCreateCreditCardPaymentCategory(): Promise<CategoryDTO> {
+  const [existing] = await db
+    .select()
+    .from(finCategories)
+    .where(and(eq(finCategories.name, 'Credit card payment'), eq(finCategories.isSystem, true)))
+    .limit(1);
+
+  if (existing) {
+    return mapCategoryToDTO(existing);
+  }
+
+  try {
+    const [created] = await db
+      .insert(finCategories)
+      .values({
+        id: 'cat_system_cc_payment',
+        userId: null,
+        name: 'Credit card payment',
+        type: 'expense',
+        isSystem: true,
+        icon: 'credit-card',
+        color: '#8b5cf6',
+      })
+      .onConflictDoNothing()
+      .returning();
+
+    if (created) {
+      return mapCategoryToDTO(created);
+    }
+  } catch {
+    // If conflict on ID or unique constraint, re-fetch below
+  }
+
+  const [found] = await db
+    .select()
+    .from(finCategories)
+    .where(
+      or(
+        eq(finCategories.id, 'cat_system_cc_payment'),
+        and(eq(finCategories.name, 'Credit card payment'), eq(finCategories.isSystem, true))
+      )
+    )
+    .limit(1);
+
+  return mapCategoryToDTO(found);
+}
+
 export async function listCategories(
   userId: string,
   filters?: CategoryFilters
 ): Promise<CategoryDTO[]> {
+  // Ensure the system credit card payment category exists
+  await getOrCreateCreditCardPaymentCategory().catch(() => {});
+
   const userOrSystem = or(eq(finCategories.userId, userId), eq(finCategories.isSystem, true));
   const conditions = [userOrSystem];
 

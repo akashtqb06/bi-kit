@@ -40,6 +40,7 @@ import {
 import { useFinanceStore } from '../shared/finance-store';
 import { formatINR } from '../shared/format';
 import { TransactionEditDialog } from './transaction-edit-dialog';
+import { getDeterministicCategoryColor } from '@src/lib/finance/colors';
 import type { TransactionDTO } from '@src/lib/finance/contract';
 import { cn } from '@/lib/utils';
 
@@ -399,9 +400,27 @@ export function TransactionTable() {
           </div>
 
           <div>
-            <label className="text-[11px] font-medium text-muted-foreground block mb-1">
-              Category
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-medium text-muted-foreground block">
+                Category
+              </label>
+              {selectedCategoryId !== 'all' && (
+                (() => {
+                  const sel = categories.find((c) => c.id === selectedCategoryId);
+                  if (!sel) return null;
+                  const col = sel.color || getDeterministicCategoryColor(sel.name);
+                  return (
+                    <span className="flex items-center gap-1 text-[11px] font-medium">
+                      <span
+                        className="size-1.5 rounded-full inline-block shrink-0 ring-1 ring-border"
+                        style={{ backgroundColor: col }}
+                      />
+                      <span className="truncate max-w-[90px]">{sel.name}</span>
+                    </span>
+                  );
+                })()
+              )}
+            </div>
             <select
               className="w-full h-8 rounded-md border border-input bg-card px-2 text-xs"
               value={selectedCategoryId}
@@ -658,8 +677,11 @@ export function TransactionTable() {
                               {category && (
                                 <span className="flex items-center gap-1">
                                   <span
-                                    className="size-1.5 rounded-full inline-block shrink-0"
-                                    style={{ backgroundColor: category.color || '#94a3b8' }}
+                                    className="size-1.5 rounded-full inline-block shrink-0 ring-1 ring-border"
+                                    style={{
+                                      backgroundColor:
+                                        category.color || getDeterministicCategoryColor(category.name),
+                                    }}
                                   />
                                   <span>{category.name}</span>
                                 </span>

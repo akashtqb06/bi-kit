@@ -186,9 +186,9 @@ export function ResultsTable() {
   });
 
   return (
-    <div className="flex-1 min-h-0 p-3 flex flex-col overflow-hidden bg-muted/10">
+    <div className="flex-1 min-h-0 min-w-0 p-3 flex flex-col overflow-hidden bg-muted/10">
       {/* Rounded border card containing table with horizontal & vertical scroll */}
-      <div className="flex-1 min-h-0 rounded-lg border bg-card overflow-hidden flex flex-col relative shadow-xs">
+      <div className="flex-1 min-h-0 min-w-0 rounded-lg border bg-card overflow-hidden flex flex-col relative shadow-xs">
         {/* Truncation notice banner */}
         {!isRunning && results && results.truncated && (
           <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-800 dark:text-amber-400 text-xs shrink-0 select-none">

@@ -4,6 +4,7 @@ import {
   DEFAULT_EXPENSE_CATEGORIES,
   DEFAULT_INCOME_CATEGORIES,
 } from '../src/lib/finance/constants';
+import { getDeterministicCategoryColor } from '../src/lib/finance/colors';
 
 function generateId(): string {
   return randomBytes(12).toString('hex');
@@ -55,10 +56,11 @@ async function runBootstrap() {
         [name]
       );
       if (existing.rowCount === 0) {
+        const color = getDeterministicCategoryColor(name);
         await client.query(
-          `INSERT INTO fin_categories (id, user_id, name, type, is_system, created_at, updated_at)
-           VALUES ($1, NULL, $2, 'expense', true, $3, $3)`,
-          [generateId(), name, now]
+          `INSERT INTO fin_categories (id, user_id, name, type, color, is_system, created_at, updated_at)
+           VALUES ($1, NULL, $2, 'expense', $3, true, $4, $4)`,
+          [generateId(), name, color, now]
         );
       }
     }
@@ -69,12 +71,29 @@ async function runBootstrap() {
         [name]
       );
       if (existing.rowCount === 0) {
+        const color = getDeterministicCategoryColor(name);
         await client.query(
-          `INSERT INTO fin_categories (id, user_id, name, type, is_system, created_at, updated_at)
-           VALUES ($1, NULL, $2, 'income', true, $3, $3)`,
-          [generateId(), name, now]
+          `INSERT INTO fin_categories (id, user_id, name, type, color, is_system, created_at, updated_at)
+           VALUES ($1, NULL, $2, 'income', $3, true, $4, $4)`,
+          [generateId(), name, color, now]
         );
       }
+    }
+
+    // 1b. Idempotent category color backfill for any existing categories with null color
+    const nullCats = await client.query(
+      'SELECT id, name FROM fin_categories WHERE color IS NULL'
+    );
+    if (nullCats.rowCount && nullCats.rowCount > 0) {
+      console.log(`🎨 Backfilling colors for ${nullCats.rowCount} category record(s)...`);
+      for (const row of nullCats.rows) {
+        const color = getDeterministicCategoryColor(row.name);
+        await client.query(
+          'UPDATE fin_categories SET color = $1, updated_at = $2 WHERE id = $3 AND color IS NULL',
+          [color, now, row.id]
+        );
+      }
+      console.log(`✅ Category colors backfilled successfully.`);
     }
 
     // 2. Check if users already exist

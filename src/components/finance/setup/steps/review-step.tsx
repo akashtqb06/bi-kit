@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { DraftAccount, SetupPreferences } from '@src/lib/finance/setup/types';
 import { calculateReviewTotals } from '@src/lib/finance/setup/review-totals';
+import { calculateFDAccruedValue, calculateRDAccruedValue } from '@src/lib/finance/domain/deposits';
 import { formatINR } from '../../shared/format';
 
 interface ReviewStepProps {
@@ -118,15 +119,45 @@ export function ReviewStep({
             <tbody className="divide-y">
               {accounts.map((acc, i) => {
                 const isLiability = acc.kind === 'credit_card' || acc.kind === 'loan';
-                const displayPaise = isLiability
-                  ? acc.owedPaise || 0
-                  : acc.kind === 'fixed_deposit'
-                  ? acc.principalPaise || acc.balancePaise || 0
-                  : acc.kind === 'recurring_deposit'
-                  ? acc.monthlyInstallmentPaise || acc.balancePaise || 0
-                  : acc.kind === 'mutual_fund' || acc.kind === 'stocks'
-                  ? acc.currentValuePaise || acc.balancePaise || 0
-                  : acc.balancePaise || 0;
+                let displayPaise = 0;
+                if (isLiability) {
+                  displayPaise = acc.owedPaise || 0;
+                } else if (acc.kind === 'fixed_deposit') {
+                  const principal = acc.principalPaise || acc.balancePaise || 0;
+                  if (acc.currentValuePaise !== undefined) {
+                    displayPaise = acc.currentValuePaise;
+                  } else if (principal > 0 && acc.startDate) {
+                    displayPaise = calculateFDAccruedValue({
+                      principal,
+                      annualInterestRate: acc.interestRate || 0,
+                      compoundingFrequency: acc.compoundingFrequency ?? 'quarterly',
+                      startDate: acc.startDate,
+                      maturityDate: acc.maturityDate,
+                      asOfDate: preferences.trackingStartDate,
+                    });
+                  } else {
+                    displayPaise = principal;
+                  }
+                } else if (acc.kind === 'recurring_deposit') {
+                  const installment = acc.monthlyInstallmentPaise || 0;
+                  if (acc.currentValuePaise !== undefined) {
+                    displayPaise = acc.currentValuePaise;
+                  } else if (installment > 0 && acc.startDate && acc.tenureMonths) {
+                    displayPaise = calculateRDAccruedValue({
+                      monthlyInstallment: installment,
+                      annualInterestRate: acc.interestRate || 0,
+                      startDate: acc.startDate,
+                      tenureMonths: acc.tenureMonths,
+                      asOfDate: preferences.trackingStartDate,
+                    });
+                  } else {
+                    displayPaise = installment;
+                  }
+                } else if (acc.kind === 'mutual_fund' || acc.kind === 'stocks') {
+                  displayPaise = acc.currentValuePaise || acc.balancePaise || 0;
+                } else {
+                  displayPaise = acc.balancePaise || 0;
+                }
 
                 return (
                   <tr key={acc.id || i} className="hover:bg-muted/20">

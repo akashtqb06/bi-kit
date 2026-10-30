@@ -4,6 +4,16 @@ import { renderToString } from 'react-dom/server';
 import { OverviewView } from '../overview-view';
 import { useFinanceStore } from '../../shared/finance-store';
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/finance/overview',
+}));
+
 describe('OverviewView Component & API Integration', () => {
   const originalFetch = globalThis.fetch;
 

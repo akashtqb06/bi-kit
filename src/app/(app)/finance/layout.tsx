@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { SetupBanner } from '@src/components/finance/setup/setup-banner';
 import { FinanceInitializer } from '@src/components/finance/shared/finance-initializer';
-import { isFinanceFeatureEnabled, type FinanceFeature } from '@src/lib/finance/flags';
+import { isFeatureEnabled, type FinanceFeature } from '@src/lib/finance/flags';
 
 interface FinanceTabItem {
   label: string;
@@ -51,7 +51,7 @@ export default function FinanceLayout({
   }
 
   return (
-    <div className="flex flex-1 flex-col min-h-0 overflow-hidden bg-background">
+    <div className="flex flex-1 min-w-0 flex-col min-h-0 overflow-hidden bg-background">
       <FinanceInitializer />
       <SetupBanner />
       <header className="border-b bg-card/50 px-6 py-3 shrink-0">
@@ -66,7 +66,7 @@ export default function FinanceLayout({
 
         <nav className="flex space-x-1 sm:space-x-2 mt-4 overflow-x-auto no-scrollbar">
           {financeTabs
-            .filter((tab) => !tab.feature || isFinanceFeatureEnabled(tab.feature))
+            .filter((tab) => !tab.feature || isFeatureEnabled(tab.feature))
             .map((tab) => {
             const isActive =
               pathname === tab.href ||
@@ -92,7 +92,7 @@ export default function FinanceLayout({
         </nav>
       </header>
 
-      <main className="flex-1 min-h-0 overflow-y-auto p-6">{children}</main>
+      <main className="flex-1 min-h-0 min-w-0 overflow-y-auto p-6">{children}</main>
     </div>
   );
 }

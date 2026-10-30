@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useFinanceStore } from '../shared/finance-store';
 import { parseAmountExpression } from '../shared/expression-parser';
-import { formatINR } from '../shared/format';
+import { formatAccountDisplayBalance } from '../shared/format';
+import { getDeterministicCategoryColor } from '@src/lib/finance/colors';
 import type { TransactionDTO } from '@src/lib/finance/contract';
 
 export function TransactionEditDialog({
@@ -129,7 +130,7 @@ export function TransactionEditDialog({
             >
               {accounts.map((acc) => (
                 <option key={acc.id} value={acc.id}>
-                  {acc.name} ({formatINR(acc.balance)})
+                  {acc.name} ({formatAccountDisplayBalance(acc)})
                 </option>
               ))}
             </select>
@@ -138,9 +139,27 @@ export function TransactionEditDialog({
           {/* Category */}
           {transaction.type !== 'transfer' && (
             <div className="space-y-1">
-              <Label htmlFor="edit-category" className="text-xs font-medium text-muted-foreground">
-                Category
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="edit-category" className="text-xs font-medium text-muted-foreground">
+                  Category
+                </Label>
+                {categoryId && (
+                  (() => {
+                    const sel = categories.find((c) => c.id === categoryId);
+                    if (!sel) return null;
+                    const col = sel.color || getDeterministicCategoryColor(sel.name);
+                    return (
+                      <span className="flex items-center gap-1.5 text-xs text-foreground">
+                        <span
+                          className="size-2 rounded-full inline-block shrink-0 ring-1 ring-border shadow-xs"
+                          style={{ backgroundColor: col }}
+                        />
+                        <span className="truncate max-w-[120px] font-medium">{sel.name}</span>
+                      </span>
+                    );
+                  })()
+                )}
+              </div>
               <select
                 id="edit-category"
                 className="w-full h-9 rounded-md border border-input bg-card px-3 text-xs"

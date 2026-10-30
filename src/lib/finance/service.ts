@@ -16,6 +16,7 @@ import type {
   NetWorthHistoryQuery,
   NetWorthPointDTO,
   OverviewStatsDTO,
+  OverviewStatsQuery,
   PaginatedTransactionsResponse,
   RecurringRuleDTO,
   TransactionDTO,
@@ -105,7 +106,10 @@ export interface FinanceService {
   deleteRecurringRule(userId: string, ruleId: string): Promise<void>;
 
   // Stats / Dashboard
-  getOverviewStats(userId: string): Promise<OverviewStatsDTO>;
+  getOverviewStats(
+    userId: string,
+    query?: OverviewStatsQuery
+  ): Promise<OverviewStatsDTO>;
   getNetWorthHistory(
     userId: string,
     query?: NetWorthHistoryQuery

@@ -17,13 +17,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useFinanceStore } from '../shared/finance-store';
-import { formatINR, formatPercent } from '../shared/format';
+import { formatINR, formatPercent, formatGain, formatLiabilityBalance } from '../shared/format';
 import { AddAccountDialog } from './add-account-dialog';
 import type { AccountWithBalance } from '../shared/fixtures';
 import { cn } from '@/lib/utils';
 
 export function AccountsView() {
-  const { accounts, openQuickAdd } = useFinanceStore();
+  const { accounts, openQuickAdd, openPayBill } = useFinanceStore();
   const [addAccountOpen, setAddAccountOpen] = useState(false);
 
   // Group accounts
@@ -234,13 +234,7 @@ export function AccountsView() {
                         size="sm"
                         variant="outline"
                         className="h-7 text-xs px-2 font-medium"
-                        onClick={() =>
-                          openQuickAdd({
-                            type: 'transfer',
-                            toAccountId: acc.id,
-                            amount: acc.outstanding,
-                          })
-                        }
+                        onClick={() => openPayBill(acc.id)}
                       >
                         Pay Bill
                       </Button>
@@ -248,11 +242,24 @@ export function AccountsView() {
                   </div>
 
                   <div className="mt-3">
-                    <div className="text-lg font-bold text-destructive">
-                      {formatINR(acc.outstanding)}
+                    <div
+                      className={cn(
+                        'text-lg font-bold',
+                        acc.balance < 0
+                          ? 'text-destructive'
+                          : acc.balance > 0
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-foreground'
+                      )}
+                    >
+                      {formatLiabilityBalance(acc.balance)}
                     </div>
                     <div className="text-[11px] text-muted-foreground">
-                      Outstanding balance
+                      {acc.balance < 0
+                        ? 'Outstanding balance'
+                        : acc.balance > 0
+                        ? 'Credit balance'
+                        : 'No balance due'}
                     </div>
                   </div>
                 </div>
@@ -328,10 +335,24 @@ export function AccountsView() {
 
                   {acc.gain !== undefined && (
                     <div className="text-right">
-                      <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                        +{formatINR(acc.gain)}
+                      <div
+                        className={cn(
+                          'text-xs font-bold',
+                          acc.gain >= 0
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-rose-600 dark:text-rose-400'
+                        )}
+                      >
+                        {formatGain(acc.gain).text}
                       </div>
-                      <div className="text-[10px] text-muted-foreground">
+                      <div
+                        className={cn(
+                          'text-[10px]',
+                          acc.gain >= 0
+                            ? 'text-muted-foreground'
+                            : 'text-rose-600 dark:text-rose-400 font-medium'
+                        )}
+                      >
                         {formatPercent(acc.gainPct || 0, true)}
                       </div>
                     </div>
@@ -432,7 +453,7 @@ export function AccountsView() {
 
                   <div className="mt-4">
                     <div className="text-lg font-bold text-destructive">
-                      {formatINR(acc.outstanding)}
+                      Owes {formatINR(acc.outstanding)}
                     </div>
                     <div className="text-[11px] text-muted-foreground mt-0.5">
                       Remaining principal

@@ -81,6 +81,7 @@ const connectorMeta: Record<
     sqlite: { label: 'SQLite', category: 'file', icon: <DatabaseIcon className="size-3.5 text-amber-500" /> },
     csv: { label: 'CSV', category: 'file', icon: <FileSpreadsheetIcon className="size-3.5 text-amber-500" /> },
     excel: { label: 'Excel', category: 'file', icon: <FileSpreadsheetIcon className="size-3.5 text-amber-500" /> },
+    datastore: { label: 'Data Store', category: 'sql', icon: <HardDriveIcon className="size-3.5 text-purple-500" /> },
 };
 
 function getCategoryBadge(category?: string) {
@@ -547,6 +548,8 @@ function DataSourcesContent() {
                             secondaryText = `${cfg.host}${portStr} • ${cfg.database}`;
                         } else if (cfg.database) {
                             secondaryText = String(cfg.database);
+                        } else if (source.type === 'datastore') {
+                            secondaryText = 'Internal storage';
                         }
                     } else if (meta.category === 'file') {
                         const fileStr = typeof cfg.fileName === 'string' ? cfg.fileName : 'Managed database file';
@@ -798,6 +801,17 @@ function DataSourcesContent() {
     const typeFilterControl = (
         <Select
             value={typeFilter}
+            items={[
+                { value: 'all', label: 'All Types' },
+                { value: 'postgres', label: 'PostgreSQL' },
+                { value: 'mysql', label: 'MySQL' },
+                { value: 'mssql', label: 'SQL Server' },
+                { value: 'mongodb', label: 'MongoDB' },
+                { value: 'sqlite', label: 'SQLite' },
+                { value: 'csv', label: 'CSV' },
+                { value: 'excel', label: 'Excel' },
+                { value: 'datastore', label: 'Data Store' },
+            ]}
             onValueChange={(val) => {
                 if (val) setTypeFilter(val);
                 setPagination((prev) => ({ ...prev, pageIndex: 0 }));
@@ -815,6 +829,7 @@ function DataSourcesContent() {
                 <SelectItem value="sqlite">SQLite</SelectItem>
                 <SelectItem value="csv">CSV</SelectItem>
                 <SelectItem value="excel">Excel</SelectItem>
+                <SelectItem value="datastore">Data Store</SelectItem>
             </SelectContent>
         </Select>
     );
@@ -869,7 +884,7 @@ function DataSourcesContent() {
     }, [dataSources]);
 
     return (
-        <div className="h-full min-h-0 flex flex-col gap-6 p-6 overflow-hidden">
+        <div className="h-full min-h-0 min-w-0 flex flex-col gap-6 p-6 overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between shrink-0">
                 <div>
@@ -886,7 +901,7 @@ function DataSourcesContent() {
 
             {/* Main Data Table */}
             <DataTable
-                className="flex-1 min-h-0"
+                className="flex-1 min-h-0 min-w-0"
                 columns={columns}
                 data={dataSources}
                 loading={loading}

@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   TrendingUpIcon,
   TrendingDownIcon,
@@ -11,17 +12,30 @@ import {
   WalletIcon,
   ChevronRightIcon,
   CoinsIcon,
+  RotateCcwIcon,
+  FilterIcon,
+  CalendarIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { useFinanceStore } from '../shared/finance-store';
 import { formatINR, formatPercent } from '../shared/format';
 import { FinancePageSkeleton } from '../shared/finance-skeleton';
 import { ChartRenderer } from '@src/components/charts/chart-renderer';
 import { defaultChartConfig, type ChartConfigData } from '@src/lib/schemas';
 import { cn } from '@/lib/utils';
+import {
+  formatDateRangeDisplay,
+  getPresetDateRange,
+  type OverviewPreset,
+} from '@src/lib/finance/timezone';
+import { getCategoryColorMap } from '@src/lib/finance/colors';
 
 export function OverviewView() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const {
     accounts,
     transactions,
@@ -32,12 +46,106 @@ export function OverviewView() {
     refreshOverviewStats,
     refreshAccounts,
     refreshNetWorthHistory,
-    openQuickAdd,
+    openPayBill,
   } = useFinanceStore();
 
-  const [period, setPeriod] = useState<'this_month' | 'last_month' | 'last_3_months' | 'this_year' | 'custom'>('this_month');
+  // Read filters from URL search params
+  const presetParam = (searchParams.get('preset') as OverviewPreset) || null;
+  const fromParam = searchParams.get('from') || '';
+  const toParam = searchParams.get('to') || '';
+  const accountsParam = searchParams.get('accounts') || '';
 
-  // Net worth calculation
+  const activePreset: OverviewPreset =
+    presetParam || (fromParam && toParam ? 'custom' : 'this_month');
+
+  // Local state for custom date inputs
+  const [customFromInput, setCustomFromInput] = useState<string | null>(null);
+  const [customToInput, setCustomToInput] = useState<string | null>(null);
+
+  const customFrom = customFromInput ?? fromParam;
+  const customTo = customToInput ?? toParam;
+
+  // Determine active date range string
+  const activeRange = overviewStats?.activePeriod
+    ? {
+        from: overviewStats.activePeriod.from,
+        to: overviewStats.activePeriod.to,
+      }
+    : fromParam && toParam
+      ? { from: fromParam, to: toParam }
+      : getPresetDateRange(activePreset);
+
+  // Trigger refetch whenever URL filter params change
+  useEffect(() => {
+    refreshOverviewStats({
+      preset: activePreset,
+      from: fromParam || undefined,
+      to: toParam || undefined,
+      accounts: accountsParam || undefined,
+    });
+  }, [activePreset, fromParam, toParam, accountsParam, refreshOverviewStats]);
+
+  // URL updating helper
+  const updateFilters = (updates: {
+    preset?: OverviewPreset;
+    from?: string;
+    to?: string;
+    accounts?: string;
+  }) => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (updates.preset !== undefined) {
+      if (updates.preset === 'this_month') {
+        params.delete('preset');
+        params.delete('from');
+        params.delete('to');
+      } else if (updates.preset === 'custom') {
+        params.set('preset', 'custom');
+        if (updates.from) params.set('from', updates.from);
+        if (updates.to) params.set('to', updates.to);
+      } else {
+        params.set('preset', updates.preset);
+        params.delete('from');
+        params.delete('to');
+      }
+    }
+
+    if (updates.from !== undefined) {
+      if (updates.from) params.set('from', updates.from);
+      else params.delete('from');
+    }
+
+    if (updates.to !== undefined) {
+      if (updates.to) params.set('to', updates.to);
+      else params.delete('to');
+    }
+
+    if (updates.accounts !== undefined) {
+      if (!updates.accounts || updates.accounts === 'all') {
+        params.delete('accounts');
+      } else {
+        params.set('accounts', updates.accounts);
+      }
+    }
+
+    const qs = params.toString();
+    router.push(qs ? `/finance/overview?${qs}` : '/finance/overview');
+  };
+
+  const handleReset = () => {
+    setCustomFromInput(null);
+    setCustomToInput(null);
+    router.push('/finance/overview');
+  };
+
+  const isFiltered = Boolean(
+    (presetParam && presetParam !== 'this_month') ||
+      fromParam ||
+      toParam ||
+      accountsParam
+  );
+
+  // Net worth calculation (ALWAYS as of today, ignores filters)
   const totalAssets = useMemo(() => {
     return accounts
       .filter((a) => a.class === 'asset')
@@ -52,14 +160,14 @@ export function OverviewView() {
 
   const netWorth = totalAssets - totalLiabilities;
 
-  // Upcoming card dues
+  // Upcoming card dues (as of today)
   const upcomingCardDues = useMemo(() => {
     return accounts
       .filter((a) => a.kind === 'credit_card' && a.outstanding > 0)
       .sort((a, b) => (a.dueDay || 31) - (b.dueDay || 31));
   }, [accounts]);
 
-  // Balances by account kind
+  // Balances by account kind (as of today)
   const balancesByKind = useMemo(() => {
     const kinds = {
       bank: { label: 'Cash & Bank', balance: 0, icon: WalletIcon, color: '#10b981' },
@@ -86,7 +194,12 @@ export function OverviewView() {
     return kinds;
   }, [accounts]);
 
-  // Net worth sparkline data
+  // Category Color Map
+  const categoryColorMap = useMemo(() => {
+    return getCategoryColorMap(categories);
+  }, [categories]);
+
+  // Net worth sparkline data (trend)
   const sparklineData = useMemo(() => {
     return netWorthHistory.map((p) => ({
       date: p.date,
@@ -111,13 +224,17 @@ export function OverviewView() {
     ],
   };
 
-  // Spend by Category Donut Data
+  // Spend by Category Donut Data (respects period and accounts)
   const spendByCategoryData = useMemo(() => {
     if (overviewStats?.spendByCategory && overviewStats.spendByCategory.length > 0) {
       return overviewStats.spendByCategory.map((c) => ({
         category: c.categoryName,
         amount: Math.round(c.amount / 100),
       }));
+    }
+
+    if (overviewStats?.spendByCategory && overviewStats.spendByCategory.length === 0) {
+      return [];
     }
 
     const categoryTotals: Record<string, number> = {};
@@ -148,7 +265,7 @@ export function OverviewView() {
     showLegend: true,
   };
 
-  // Month-over-month calculations
+  // Period stats & deltas
   const currentIncome = overviewStats?.monthlyIncome ?? 0;
   const prevIncome = overviewStats?.previousPeriod?.income ?? 0;
   const incomeDeltaPct = prevIncome > 0
@@ -176,16 +293,16 @@ export function OverviewView() {
     return pct;
   }, [netWorthHistory]);
 
-  // Recent transactions (latest 6)
-  const recentTransactions = useMemo(() => {
-    return transactions.slice(0, 6);
-  }, [transactions]);
+  // Recent transactions (respects period and account filter)
+  const recentTransactions = overviewStats?.recentTransactions
+    ? overviewStats.recentTransactions.slice(0, 6)
+    : transactions.slice(0, 6);
 
-  if (overviewStatus === 'loading' || overviewStatus === 'idle') {
-    return <FinancePageSkeleton title="Loading Overview..." />;
+  if (overviewStatus === 'loading' && !overviewStats) {
+    return <FinancePageSkeleton title="Loading Financial Overview..." />;
   }
 
-  if (overviewStatus === 'error') {
+  if (overviewStatus === 'error' && !overviewStats) {
     return (
       <div className="flex-1 min-h-[400px] flex items-center justify-center">
         <div className="p-8 text-center border rounded-xl bg-card space-y-4 max-w-md mx-auto shadow-xs">
@@ -208,75 +325,179 @@ export function OverviewView() {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col gap-6 w-full pb-10">
-      {/* Top Header & Period Selector */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold tracking-tight">Financial Overview</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Holistic view of assets, liabilities, savings rate, and recent transactions
-          </p>
+      {/* Top Header & Overview Filter Bar */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold tracking-tight">Financial Overview</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Holistic view of assets, liabilities, savings rate, and recent transactions
+            </p>
+          </div>
+
+          {/* Active Range Display & Reset Button */}
+          <div className="flex items-center gap-2 self-start sm:self-center">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border bg-card text-xs font-medium text-foreground shadow-xs">
+              <CalendarIcon className="size-3.5 text-muted-foreground shrink-0" />
+              <span>{formatDateRangeDisplay(activeRange.from, activeRange.to)}</span>
+            </div>
+
+            {isFiltered && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                onClick={handleReset}
+                title="Reset filters to this month and all accounts"
+              >
+                <RotateCcwIcon className="size-3" />
+                <span>Reset</span>
+              </Button>
+            )}
+          </div>
         </div>
 
-        {/* Period Selector Tabs */}
-        <div className="flex items-center gap-1.5 p-1 bg-muted/60 rounded-lg text-xs font-medium overflow-x-auto">
-          <button
-            type="button"
-            className={cn(
-              'px-2.5 py-1 rounded-md transition-colors shrink-0',
-              period === 'this_month'
-                ? 'bg-background text-foreground shadow-xs font-semibold'
-                : 'text-muted-foreground hover:text-foreground'
+        {/* Filter Controls Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 p-2 rounded-xl border bg-muted/40 text-xs">
+          {/* Preset Buttons */}
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+            <button
+              type="button"
+              className={cn(
+                'px-2.5 py-1 rounded-md transition-colors shrink-0 font-medium',
+                activePreset === 'this_month'
+                  ? 'bg-background text-foreground shadow-xs font-semibold'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+              onClick={() => updateFilters({ preset: 'this_month' })}
+            >
+              This month
+            </button>
+            <button
+              type="button"
+              className={cn(
+                'px-2.5 py-1 rounded-md transition-colors shrink-0 font-medium',
+                activePreset === 'last_month'
+                  ? 'bg-background text-foreground shadow-xs font-semibold'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+              onClick={() => updateFilters({ preset: 'last_month' })}
+            >
+              Last month
+            </button>
+            <button
+              type="button"
+              className={cn(
+                'px-2.5 py-1 rounded-md transition-colors shrink-0 font-medium',
+                activePreset === 'last_3_months'
+                  ? 'bg-background text-foreground shadow-xs font-semibold'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+              onClick={() => updateFilters({ preset: 'last_3_months' })}
+            >
+              Last 3 months
+            </button>
+            <button
+              type="button"
+              className={cn(
+                'px-2.5 py-1 rounded-md transition-colors shrink-0 font-medium',
+                activePreset === 'this_year'
+                  ? 'bg-background text-foreground shadow-xs font-semibold'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+              onClick={() => updateFilters({ preset: 'this_year' })}
+            >
+              This year
+            </button>
+            <button
+              type="button"
+              className={cn(
+                'px-2.5 py-1 rounded-md transition-colors shrink-0 font-medium',
+                activePreset === 'custom'
+                  ? 'bg-background text-foreground shadow-xs font-semibold'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+              onClick={() => {
+                if (activePreset !== 'custom') {
+                  const defaultRange = getPresetDateRange('this_month');
+                  setCustomFromInput(defaultRange.from);
+                  setCustomToInput(defaultRange.to);
+                  updateFilters({
+                    preset: 'custom',
+                    from: defaultRange.from,
+                    to: defaultRange.to,
+                  });
+                }
+              }}
+            >
+              Custom range
+            </button>
+          </div>
+
+          {/* Account Filter & Custom Range Inputs */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {activePreset === 'custom' && (
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="date"
+                  className="h-8 text-xs bg-card w-32 px-2"
+                  value={customFrom}
+                  onChange={(e) => {
+                    setCustomFromInput(e.target.value);
+                    if (e.target.value && customTo) {
+                      updateFilters({ from: e.target.value, to: customTo, preset: 'custom' });
+                    }
+                  }}
+                  aria-label="Filter from date"
+                />
+                <span className="text-muted-foreground text-xs">to</span>
+                <Input
+                  type="date"
+                  className="h-8 text-xs bg-card w-32 px-2"
+                  value={customTo}
+                  onChange={(e) => {
+                    setCustomToInput(e.target.value);
+                    if (customFrom && e.target.value) {
+                      updateFilters({ from: customFrom, to: e.target.value, preset: 'custom' });
+                    }
+                  }}
+                  aria-label="Filter to date"
+                />
+              </div>
             )}
-            onClick={() => setPeriod('this_month')}
-          >
-            This Month
-          </button>
-          <button
-            type="button"
-            className={cn(
-              'px-2.5 py-1 rounded-md transition-colors shrink-0',
-              period === 'last_month'
-                ? 'bg-background text-foreground shadow-xs font-semibold'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-            onClick={() => setPeriod('last_month')}
-          >
-            Last Month
-          </button>
-          <button
-            type="button"
-            className={cn(
-              'px-2.5 py-1 rounded-md transition-colors shrink-0',
-              period === 'last_3_months'
-                ? 'bg-background text-foreground shadow-xs font-semibold'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-            onClick={() => setPeriod('last_3_months')}
-          >
-            Last 3M
-          </button>
-          <button
-            type="button"
-            className={cn(
-              'px-2.5 py-1 rounded-md transition-colors shrink-0',
-              period === 'this_year'
-                ? 'bg-background text-foreground shadow-xs font-semibold'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-            onClick={() => setPeriod('this_year')}
-          >
-            This Year
-          </button>
+
+            {/* Account Selector */}
+            <div className="flex items-center gap-1">
+              <FilterIcon className="size-3 text-muted-foreground shrink-0 hidden sm:inline" />
+              <select
+                className="h-8 rounded-md border border-input bg-card px-2 text-xs text-foreground focus:outline-hidden"
+                value={accountsParam || 'all'}
+                onChange={(e) => updateFilters({ accounts: e.target.value })}
+                aria-label="Filter by account"
+              >
+                <option value="all">All Accounts</option>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Hero: Net Worth Card with Sparkline */}
+      {/* Hero: Net Worth Card with Sparkline (EXPLICITLY IGNORES PERIOD, ALWAYS AS OF TODAY) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-5 rounded-2xl border bg-card shadow-xs">
         <div className="lg:col-span-1 flex flex-col justify-between space-y-4">
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Total Net Worth
+              </span>
+              <span className="text-[10px] text-muted-foreground font-medium">
+                (as of today)
               </span>
               {netWorthChange !== null && (
                 <Badge
@@ -288,7 +509,7 @@ export function OverviewView() {
                       : 'text-destructive'
                   )}
                 >
-                  {netWorthChange >= 0 ? `+${netWorthChange}% this month` : `${netWorthChange}% this month`}
+                  {netWorthChange >= 0 ? `+${netWorthChange}%` : `${netWorthChange}%`}
                 </Badge>
               )}
             </div>
@@ -299,13 +520,17 @@ export function OverviewView() {
 
           <div className="grid grid-cols-2 gap-3 pt-3 border-t">
             <div>
-              <span className="text-[11px] text-muted-foreground font-medium">Assets</span>
+              <span className="text-[11px] text-muted-foreground font-medium">
+                Assets (as of today)
+              </span>
               <div className="text-base font-bold text-emerald-600 dark:text-emerald-400">
                 {formatINR(totalAssets)}
               </div>
             </div>
             <div>
-              <span className="text-[11px] text-muted-foreground font-medium">Liabilities</span>
+              <span className="text-[11px] text-muted-foreground font-medium">
+                Liabilities (as of today)
+              </span>
               <div className="text-base font-bold text-destructive">
                 {formatINR(totalLiabilities)}
               </div>
@@ -313,7 +538,7 @@ export function OverviewView() {
           </div>
         </div>
 
-        {/* Sparkline Trend Chart */}
+        {/* Sparkline Trend Chart (Historical as of today) */}
         <div className="lg:col-span-2 h-48 w-full pt-2">
           <ChartRenderer
             type="area"
@@ -325,12 +550,12 @@ export function OverviewView() {
         </div>
       </div>
 
-      {/* Month-over-Month Comparison Cards (Income, Expense, Savings Rate) */}
+      {/* Period-based Comparison Cards (Income, Expense, Savings Rate) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* Income */}
         <div className="p-4 rounded-xl border bg-card flex flex-col justify-between shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Monthly Income</span>
+            <span className="text-xs font-medium text-muted-foreground">Period Income</span>
             <div className="size-6 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
               <TrendingUpIcon className="size-3.5" />
             </div>
@@ -352,10 +577,10 @@ export function OverviewView() {
                   >
                     {incomeDeltaPct >= 0 ? `+${incomeDeltaPct}%` : `${incomeDeltaPct}%`}
                   </span>
-                  <span>vs last month ({formatINR(prevIncome)})</span>
+                  <span>vs prior period ({formatINR(prevIncome)})</span>
                 </>
               ) : (
-                <span>No prior month data</span>
+                <span>No prior period data</span>
               )}
             </div>
           </div>
@@ -364,7 +589,7 @@ export function OverviewView() {
         {/* Expense */}
         <div className="p-4 rounded-xl border bg-card flex flex-col justify-between shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Monthly Expenses</span>
+            <span className="text-xs font-medium text-muted-foreground">Period Expenses</span>
             <div className="size-6 rounded-md bg-destructive/10 text-destructive flex items-center justify-center">
               <TrendingDownIcon className="size-3.5" />
             </div>
@@ -386,10 +611,10 @@ export function OverviewView() {
                   >
                     {expenseDeltaPct >= 0 ? `+${expenseDeltaPct}%` : `${expenseDeltaPct}%`}
                   </span>
-                  <span>vs last month ({formatINR(prevExpense)})</span>
+                  <span>vs prior period ({formatINR(prevExpense)})</span>
                 </>
               ) : (
-                <span>No prior month data</span>
+                <span>No prior period data</span>
               )}
             </div>
           </div>
@@ -398,7 +623,7 @@ export function OverviewView() {
         {/* Savings Rate */}
         <div className="p-4 rounded-xl border bg-card flex flex-col justify-between shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Savings Rate</span>
+            <span className="text-xs font-medium text-muted-foreground">Period Savings Rate</span>
             <div className="size-6 rounded-md bg-primary/10 text-primary flex items-center justify-center">
               <CoinsIcon className="size-3.5" />
             </div>
@@ -420,10 +645,10 @@ export function OverviewView() {
                   >
                     {savingsRateDelta >= 0 ? `+${savingsRateDelta}%` : `${savingsRateDelta}%`}
                   </span>
-                  <span>vs last month ({formatPercent(prevSavingsRate)})</span>
+                  <span>vs prior period ({formatPercent(prevSavingsRate)})</span>
                 </>
               ) : (
-                <span>No prior month data</span>
+                <span>No prior period data</span>
               )}
             </div>
           </div>
@@ -432,12 +657,17 @@ export function OverviewView() {
 
       {/* Two Column Layout: Balances by Kind & Spend by Category Donut */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Balances by Account Kind */}
+        {/* Balances by Account Kind (as of today) */}
         <div className="p-4 rounded-xl border bg-card space-y-4 shadow-xs">
           <div className="flex items-center justify-between border-b pb-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Balances by Account Kind
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Balances by Account Kind
+              </h3>
+              <span className="text-[10px] text-muted-foreground font-medium">
+                (as of today)
+              </span>
+            </div>
             <Link
               href="/finance/accounts"
               className="text-xs text-primary font-medium hover:underline flex items-center gap-1"
@@ -460,10 +690,11 @@ export function OverviewView() {
                   >
                     <item.icon className="size-3.5" />
                   </div>
-                  <span className="text-xs font-semibold text-foreground">
-                    {item.label}
-                  </span>
+                  <div>
+                    <div className="font-semibold text-xs text-foreground">{item.label}</div>
+                  </div>
                 </div>
+
                 <span
                   className={cn(
                     'text-xs font-bold',
@@ -479,7 +710,7 @@ export function OverviewView() {
           </div>
         </div>
 
-        {/* Spend by Category Donut Chart */}
+        {/* Spend by Category Donut Chart (Respects period and categoryColorMap) */}
         <div className="p-4 rounded-xl border bg-card space-y-3 shadow-xs">
           <div className="flex items-center justify-between border-b pb-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -492,7 +723,7 @@ export function OverviewView() {
 
           {spendByCategoryData.length === 0 ? (
             <div className="h-64 w-full flex items-center justify-center text-xs text-muted-foreground">
-              No expenses this month
+              No transactions in this period
             </div>
           ) : (
             <div className="h-64 w-full">
@@ -500,6 +731,7 @@ export function OverviewView() {
                 type="donut"
                 config={donutConfig}
                 data={spendByCategoryData}
+                categoryColorMap={categoryColorMap}
                 showTitle={false}
                 className="h-full"
               />
@@ -510,7 +742,7 @@ export function OverviewView() {
 
       {/* Two Column Layout: Upcoming Card Dues & Recent Transactions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Upcoming Card Dues */}
+        {/* Upcoming Card Dues (as of today) */}
         <div className="p-4 rounded-xl border bg-card space-y-3 shadow-xs">
           <div className="flex items-center justify-between border-b pb-2">
             <div className="flex items-center gap-2">
@@ -518,6 +750,9 @@ export function OverviewView() {
               <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Upcoming Card Dues
               </h3>
+              <span className="text-[10px] text-muted-foreground font-medium">
+                (as of today)
+              </span>
             </div>
             <span className="text-xs text-muted-foreground">
               {upcomingCardDues.length} card{upcomingCardDues.length === 1 ? '' : 's'} with balance
@@ -544,20 +779,14 @@ export function OverviewView() {
 
                   <div className="flex items-center gap-3">
                     <span className="font-bold text-destructive">
-                      {formatINR(card.outstanding)}
+                      Owes {formatINR(card.outstanding)}
                     </span>
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
                       className="h-7 text-xs font-medium"
-                      onClick={() =>
-                        openQuickAdd({
-                          type: 'transfer',
-                          toAccountId: card.id,
-                          amount: card.outstanding,
-                        })
-                      }
+                      onClick={() => openPayBill(card.id)}
                     >
                       Pay Bill
                     </Button>
@@ -568,7 +797,7 @@ export function OverviewView() {
           )}
         </div>
 
-        {/* Recent Transactions */}
+        {/* Recent Transactions (Respects period and category colors) */}
         <div className="p-4 rounded-xl border bg-card space-y-3 shadow-xs">
           <div className="flex items-center justify-between border-b pb-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -585,12 +814,14 @@ export function OverviewView() {
 
           {recentTransactions.length === 0 ? (
             <div className="py-8 text-center text-xs text-muted-foreground">
-              No recent transactions yet.
+              No transactions in this period
             </div>
           ) : (
             <div className="divide-y divide-border/60">
               {recentTransactions.map((tx) => {
                 const cat = categories.find((c) => c.id === tx.categoryId);
+                const catColor = cat?.color || (cat?.name ? categoryColorMap[cat.name] : null);
+
                 return (
                   <div
                     key={tx.id}
@@ -605,7 +836,13 @@ export function OverviewView() {
                         {cat && (
                           <>
                             <span>•</span>
-                            <span>{cat.name}</span>
+                            <span className="flex items-center gap-1">
+                              <span
+                                className="size-1.5 rounded-full inline-block shrink-0"
+                                style={{ backgroundColor: catColor || '#94a3b8' }}
+                              />
+                              <span>{cat.name}</span>
+                            </span>
                           </>
                         )}
                       </div>

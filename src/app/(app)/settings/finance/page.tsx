@@ -20,6 +20,7 @@ import {
   GlobeIcon,
 } from 'lucide-react';
 import { DataHealthPanel } from '@src/components/finance/settings/data-health-panel';
+import { FinanceFeaturesPanel } from '@src/components/finance/settings/finance-features-panel';
 
 async function FinanceSettingsContent() {
   const user = await requireUser('/settings/finance');
@@ -132,6 +133,9 @@ async function FinanceSettingsContent() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Finance Features Overview */}
+      <FinanceFeaturesPanel />
 
       {/* Data Health Diagnostics */}
       <DataHealthPanel />

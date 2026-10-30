@@ -622,7 +622,10 @@ export class MockFinanceService implements FinanceService {
   // Stats & Overview
   // ============================================================================
 
-  async getOverviewStats(_userId: string): Promise<OverviewStatsDTO> {
+  async getOverviewStats(
+    _userId: string,
+    _query?: import('../contract').OverviewStatsQuery
+  ): Promise<OverviewStatsDTO> {
     const activeTxns = Array.from(this.transactions.values()).filter(
       (t) => !t.deletedAt && t.date <= this.anchorDate
     );

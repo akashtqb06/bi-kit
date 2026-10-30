@@ -80,7 +80,7 @@ async function WorkbookLayoutContent({ children, params }: WorkbookLayoutProps) 
                     <Suspense fallback={<header className="h-12 border-b bg-background shrink-0" />}>
                         <WorkbookHeader />
                     </Suspense>
-                    <div className="flex flex-1 min-h-0 overflow-hidden">
+                    <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
                         <Suspense fallback={<WorkbookSidebarSkeleton />}>
                             <WorkbookSidebar />
                         </Suspense>

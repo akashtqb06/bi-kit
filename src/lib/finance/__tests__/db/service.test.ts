@@ -301,6 +301,83 @@ describe('DbFinanceService Integration Tests on PGlite', () => {
       expect(manualFound?.value).toBe(10400000);
       expect(manualFound?.note).toBe('Manual bank certificate valuation');
     });
+
+    it('computes RD valuations with quarterly compounding and verifies idempotency', async () => {
+      // 5,000 INR/month, 6.8%, 12 months, started 12 months ago
+      const rd = await service.createAccount(USER_A, {
+        name: 'SBI Recurring Deposit',
+        kind: 'recurring_deposit',
+        metadata: {
+          installment: 500000, // 5,000 INR
+          interestRate: 6.8,
+          compoundingFrequency: 'quarterly',
+          startDate: '2025-10-30',
+          tenureMonths: 12,
+          installmentDay: 30,
+        },
+      });
+
+      // 1. First recompute
+      const res1 = await service.recomputeDepositValuations(USER_A, rd.id);
+      expect(res1.valuationsWritten).toBe(1);
+
+      const vals1 = await service.listValuations(USER_A, { accountId: rd.id });
+      expect(vals1.length).toBe(1);
+      // Expected RD value: ~62,245.54 INR (6,224,554 paise, within Rs 2 of 62,243.64 due to Feb day-count)
+      expect(vals1[0].value).toBe(6224554);
+
+      // 2. Second recompute (idempotency: recalculating twice gives identical numbers and no extra rows)
+      const res2 = await service.recomputeDepositValuations(USER_A, rd.id);
+      expect(res2.valuationsWritten).toBe(1);
+
+      const vals2 = await service.listValuations(USER_A, { accountId: rd.id });
+      expect(vals2.length).toBe(1);
+      expect(vals2[0].value).toBe(6224554);
+    });
+
+    it('verifies credit card bill payments do not count towards spending in overview stats', async () => {
+      const bank = await service.createAccount(USER_A, {
+        name: 'HDFC Bank',
+        kind: 'bank',
+      });
+      const card = await service.createAccount(USER_A, {
+        name: 'Amazon ICICI Card',
+        kind: 'credit_card',
+        creditLimit: 10000000,
+      });
+
+      // Spends on card: 2,159 INR
+      await service.createTransaction(USER_A, {
+        accountId: card.id,
+        type: 'expense',
+        amount: 215900,
+        date: '2026-10-15',
+        payee: 'Amazon Spends',
+      });
+
+      // Check stats: monthly expense is 2,159 INR
+      const statsBefore = await service.getOverviewStats(USER_A);
+      expect(statsBefore.monthlyExpense).toBe(215900);
+
+      // System category for CC payment
+      const ccCategory = await service.getOrCreateCreditCardPaymentCategory(USER_A);
+
+      // Pay bill: Transfer from Bank -> Card
+      await service.createTransaction(USER_A, {
+        accountId: bank.id,
+        toAccountId: card.id,
+        type: 'transfer',
+        amount: 215900,
+        categoryId: ccCategory.id,
+        date: '2026-10-28',
+        payee: 'Card Bill Payment',
+      });
+
+      // Check stats after: monthly expense is STILL 2,159 INR (transfers never count in spend totals!)
+      const statsAfter = await service.getOverviewStats(USER_A);
+      expect(statsAfter.monthlyExpense).toBe(215900);
+      expect(statsAfter.monthlyExpense).toBe(statsBefore.monthlyExpense);
+    });
   });
 
   describe('Budgets & Progress', () => {
@@ -437,6 +514,89 @@ describe('DbFinanceService Integration Tests on PGlite', () => {
       expect(history[0].assets).toBe(10000000);
       expect(history[0].liabilities).toBe(2000000);
       expect(history[0].netWorth).toBe(8000000);
+    });
+
+    it('filters overview stats by custom range and account ID', async () => {
+      const bank1 = await service.createAccount(USER_A, {
+        name: 'Filter Bank 1',
+        kind: 'bank',
+        currency: 'INR',
+      });
+      const bank2 = await service.createAccount(USER_A, {
+        name: 'Filter Bank 2',
+        kind: 'bank',
+        currency: 'INR',
+      });
+
+      const catFood = await service.createCategory(USER_A, {
+        name: 'Test Food Range',
+        type: 'expense',
+      });
+
+      // Income transaction on bank1
+      await service.createTransaction(USER_A, {
+        accountId: bank1.id,
+        type: 'income',
+        amount: 500000, // 5000 INR
+        date: '2026-05-01',
+      });
+
+      // Transaction in bank1 on 2026-05-10
+      await service.createTransaction(USER_A, {
+        accountId: bank1.id,
+        categoryId: catFood.id,
+        type: 'expense',
+        amount: 10000, // 100 INR
+        date: '2026-05-10',
+      });
+
+      // Transaction in bank2 on 2026-05-15
+      await service.createTransaction(USER_A, {
+        accountId: bank2.id,
+        categoryId: catFood.id,
+        type: 'expense',
+        amount: 25000, // 250 INR
+        date: '2026-05-15',
+      });
+
+      // Transaction outside range on 2026-06-01
+      await service.createTransaction(USER_A, {
+        accountId: bank1.id,
+        categoryId: catFood.id,
+        type: 'expense',
+        amount: 50000,
+        date: '2026-06-01',
+      });
+
+      // 1. Custom range 2026-05-01 to 2026-05-31 (both banks)
+      const rangeStats = await service.getOverviewStats(USER_A, {
+        from: '2026-05-01',
+        to: '2026-05-31',
+        preset: 'custom',
+      });
+      expect(rangeStats.monthlyExpense).toBe(35000);
+      expect(rangeStats.activePeriod?.from).toBe('2026-05-01');
+      expect(rangeStats.activePeriod?.to).toBe('2026-05-31');
+      expect(rangeStats.spendByCategory?.[0]?.categoryColor).toBeDefined();
+
+      // 2. Filter restricted to bank1 only
+      const bank1Stats = await service.getOverviewStats(USER_A, {
+        from: '2026-05-01',
+        to: '2026-05-31',
+        accounts: bank1.id,
+      });
+      expect(bank1Stats.monthlyExpense).toBe(10000);
+
+      // 3. Filter restricted to bank2 only
+      const bank2Stats = await service.getOverviewStats(USER_A, {
+        from: '2026-05-01',
+        to: '2026-05-31',
+        accounts: bank2.id,
+      });
+      expect(bank2Stats.monthlyExpense).toBe(25000);
+
+      // 4. Net worth remains as of today and is not filtered by historical date
+      expect(bank1Stats.netWorth).toBeGreaterThan(0);
     });
   });
 });

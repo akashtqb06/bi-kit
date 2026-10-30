@@ -11,13 +11,19 @@ import {
   PiggyBankIcon,
   Trash2Icon,
   AlertCircleIcon,
+  RefreshCwIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useFinanceStore } from '../shared/finance-store';
-import { formatINR, formatPercent } from '../shared/format';
+import {
+  formatINR,
+  formatPercent,
+  formatGain,
+  formatLiabilityBalance,
+} from '../shared/format';
 import { UpdateValuationDialog } from './update-valuation-dialog';
 import { EditAccountOpeningDialog } from './edit-account-opening-dialog';
 import { TransactionTable } from '../transactions/transaction-table';
@@ -33,15 +39,31 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
     valuations,
     deleteAccount,
     openQuickAdd,
+    openPayBill,
+    recalculateAccount,
   } = useFinanceStore();
 
   const [valuationOpen, setValuationOpen] = useState(false);
   const [editOpeningOpen, setEditOpeningOpen] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false);
 
   const account = useMemo(
     () => accounts.find((a) => a.id === accountId),
     [accounts, accountId]
   );
+
+  const handleRecalculate = async () => {
+    if (!account) return;
+    try {
+      setIsRecalculating(true);
+      await recalculateAccount(account.id);
+      toast.success('Valuations recalculated');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Recalculation failed');
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
 
   const accountValuations = useMemo(
     () => valuations[accountId] || [],
@@ -170,13 +192,7 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
                 type="button"
                 size="sm"
                 className="gap-1.5 text-xs font-semibold shadow-xs"
-                onClick={() =>
-                  openQuickAdd({
-                    type: 'transfer',
-                    toAccountId: account.id,
-                    amount: account.outstanding,
-                  })
-                }
+                onClick={() => openPayBill(account.id)}
               >
                 <CreditCardIcon className="size-3.5" />
                 <span>Pay Bill ({formatINR(account.outstanding)})</span>
@@ -193,6 +209,20 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
               >
                 <TrendingUpIcon className="size-3.5 text-primary" />
                 <span>Update Value</span>
+              </Button>
+            )}
+
+            {isDeposit && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={isRecalculating}
+                className="gap-1.5 text-xs font-semibold"
+                onClick={handleRecalculate}
+              >
+                <RefreshCwIcon className={cn('size-3.5 text-primary', isRecalculating && 'animate-spin')} />
+                <span>{isRecalculating ? 'Recalculating...' : 'Recalculate'}</span>
               </Button>
             )}
 
@@ -250,9 +280,20 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="p-3 rounded-lg bg-muted/40 border">
-              <span className="text-[11px] text-muted-foreground">Outstanding Debt</span>
-              <div className="text-xl font-bold text-destructive mt-0.5">
-                {formatINR(account.outstanding)}
+              <span className="text-[11px] text-muted-foreground">
+                {account.balance < 0 ? 'Outstanding Debt' : account.balance > 0 ? 'Credit Balance' : 'Card Balance'}
+              </span>
+              <div
+                className={cn(
+                  'text-xl font-bold mt-0.5',
+                  account.balance < 0
+                    ? 'text-destructive'
+                    : account.balance > 0
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-foreground'
+                )}
+              >
+                {formatLiabilityBalance(account.balance)}
               </div>
             </div>
 
@@ -333,14 +374,28 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
 
             <div className="p-3 rounded-lg bg-muted/40 border">
               <span className="text-[11px] text-muted-foreground">Total Returns (Gain)</span>
-              <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                +{formatINR(account.gain || 0)}
+              <div
+                className={cn(
+                  'text-xl font-bold mt-0.5',
+                  (account.gain || 0) >= 0
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-rose-600 dark:text-rose-400'
+                )}
+              >
+                {formatGain(account.gain || 0).text}
               </div>
             </div>
 
             <div className="p-3 rounded-lg bg-muted/40 border">
               <span className="text-[11px] text-muted-foreground">Return Rate</span>
-              <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+              <div
+                className={cn(
+                  'text-xl font-bold mt-0.5',
+                  (account.gainPct || 0) >= 0
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-rose-600 dark:text-rose-400'
+                )}
+              >
                 {formatPercent(account.gainPct || 0, true)}
               </div>
             </div>
@@ -368,27 +423,155 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
         </div>
       )}
 
-      {isDeposit && (
+      {account.kind === 'recurring_deposit' && (
         <div className="p-4 rounded-xl border bg-card space-y-4">
-          <div className="flex items-center gap-2">
-            <PiggyBankIcon className="size-4 text-amber-500" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Deposit Details
-            </h3>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <PiggyBankIcon className="size-4 text-amber-500" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Recurring Deposit Details
+              </h3>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={isRecalculating}
+              className="h-7 text-xs gap-1.5"
+              onClick={handleRecalculate}
+            >
+              <RefreshCwIcon
+                className={cn('size-3 text-primary', isRecalculating && 'animate-spin')}
+              />
+              <span>{isRecalculating ? 'Recalculating...' : 'Recalculate'}</span>
+            </Button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div className="p-3 rounded-lg bg-muted/40 border">
-              <span className="text-[11px] text-muted-foreground">Accrued Current Value</span>
+              <span className="text-[11px] text-muted-foreground">Current Value</span>
               <div className="text-xl font-bold text-foreground mt-0.5">
-                {formatINR(account.accruedValue || account.balance)}
+                {formatINR(account.accruedValue ?? account.balance)}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-muted/40 border">
+              <span className="text-[11px] text-muted-foreground">Interest Accrued</span>
+              <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                +{formatINR(account.interestEarned ?? 0)}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-muted/40 border">
+              <span className="text-[11px] text-muted-foreground">Total Deposited</span>
+              <div className="text-xl font-bold text-foreground mt-0.5">
+                {formatINR(account.totalDeposited ?? account.balance)}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-muted/40 border">
+              <span className="text-[11px] text-muted-foreground">Projected Maturity Amount</span>
+              <div className="text-xl font-bold text-primary mt-0.5">
+                {formatINR(account.projectedMaturityAmount ?? account.balance)}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-muted/40 border">
+              <span className="text-[11px] text-muted-foreground">Installment Amount</span>
+              <div className="text-xl font-bold text-foreground mt-0.5">
+                {account.monthlyInstallment ? `${formatINR(account.monthlyInstallment)} / mo` : '—'}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-muted/40 border">
+              <span className="text-[11px] text-muted-foreground">Installments Paid</span>
+              <div className="text-xl font-bold text-foreground mt-0.5">
+                {account.installmentsPaid ?? 0}{' '}
+                {account.totalInstallments ? `of ${account.totalInstallments}` : ''}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-muted/40 border">
+              <span className="text-[11px] text-muted-foreground">Next Installment Date</span>
+              <div className="text-base font-semibold text-foreground mt-1">
+                {account.nextInstallmentDate || '—'}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-muted/40 border">
+              <span className="text-[11px] text-muted-foreground">Maturity Date</span>
+              <div className="text-base font-semibold text-foreground mt-1">
+                {account.maturityDate || '—'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {account.kind === 'fixed_deposit' && (
+        <div className="p-4 rounded-xl border bg-card space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <PiggyBankIcon className="size-4 text-amber-500" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Fixed Deposit Details
+              </h3>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={isRecalculating}
+              className="h-7 text-xs gap-1.5"
+              onClick={handleRecalculate}
+            >
+              <RefreshCwIcon
+                className={cn('size-3 text-primary', isRecalculating && 'animate-spin')}
+              />
+              <span>{isRecalculating ? 'Recalculating...' : 'Recalculate'}</span>
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div className="p-3 rounded-lg bg-muted/40 border">
+              <span className="text-[11px] text-muted-foreground">Accrued Value</span>
+              <div className="text-xl font-bold text-foreground mt-0.5">
+                {formatINR(account.accruedValue ?? account.balance)}
               </div>
             </div>
 
             <div className="p-3 rounded-lg bg-muted/40 border">
               <span className="text-[11px] text-muted-foreground">Interest Earned</span>
               <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                +{formatINR(account.interestEarned || 0)}
+                +{formatINR(account.interestEarned ?? 0)}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-muted/40 border">
+              <span className="text-[11px] text-muted-foreground">Principal</span>
+              <div className="text-xl font-bold text-foreground mt-0.5">
+                {formatINR(account.principal ?? account.balance)}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-muted/40 border">
+              <span className="text-[11px] text-muted-foreground">Projected Maturity</span>
+              <div className="text-xl font-bold text-primary mt-0.5">
+                {formatINR(account.projectedMaturityAmount ?? account.balance)}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-muted/40 border">
+              <span className="text-[11px] text-muted-foreground">Interest Rate</span>
+              <div className="text-xl font-bold text-foreground mt-0.5">
+                {account.interestRate !== undefined ? `${account.interestRate}% p.a.` : '—'}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg bg-muted/40 border">
+              <span className="text-[11px] text-muted-foreground">Compounding</span>
+              <div className="text-base font-semibold capitalize text-foreground mt-1">
+                {account.compoundingFrequency || 'Quarterly'}
               </div>
             </div>
 
@@ -400,9 +583,9 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
             </div>
 
             <div className="p-3 rounded-lg bg-muted/40 border">
-              <span className="text-[11px] text-muted-foreground">Projected Maturity Amount</span>
-              <div className="text-xl font-bold text-primary mt-0.5">
-                {formatINR(account.projectedMaturityAmount || account.balance)}
+              <span className="text-[11px] text-muted-foreground">Maturity Date</span>
+              <div className="text-base font-semibold text-foreground mt-1">
+                {account.maturityDate || '—'}
               </div>
             </div>
           </div>

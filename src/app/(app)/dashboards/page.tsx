@@ -997,7 +997,7 @@ function DashboardsContent() {
 
     return (
         <TooltipProvider>
-            <div className="h-full min-h-0 flex flex-col gap-4 p-6 overflow-hidden">
+            <div className="h-full min-h-0 min-w-0 flex flex-col gap-4 p-6 overflow-hidden">
                 {/* Header row: Title + New Dashboard */}
                 <div className="flex items-center justify-between shrink-0">
                     <div>
@@ -1488,7 +1488,7 @@ function DashboardsContent() {
 
 function DashboardsSkeleton() {
     return (
-        <div className="h-full min-h-0 flex flex-col gap-4 p-6 overflow-hidden">
+        <div className="h-full min-h-0 min-w-0 flex flex-col gap-4 p-6 overflow-hidden">
             <div className="flex items-center justify-between shrink-0">
                 <div className="space-y-1">
                     <Skeleton className="h-6 w-36" />

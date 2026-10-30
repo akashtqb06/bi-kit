@@ -5,6 +5,7 @@ import { PlusIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFinanceStore } from '../shared/finance-store';
 import { QuickAddDialog } from './quick-add-dialog';
+import { PayBillDialog } from '../accounts/pay-bill-dialog';
 
 const emptySubscribe = () => () => {};
 
@@ -78,6 +79,9 @@ export function QuickAddSlot() {
 
       {/* Quick Add Dialog / Drawer */}
       <QuickAddDialog />
+
+      {/* Dedicated Pay Credit Card Bill Dialog */}
+      <PayBillDialog />
     </>
   );
 }

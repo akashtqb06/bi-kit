@@ -229,7 +229,11 @@ export function SyncDialog({
                             {loadingSources ? (
                                 <div className="h-8 bg-muted animate-pulse rounded" />
                             ) : (
-                                <Select value={selectedSourceId} onValueChange={(val) => handleSourceChange(val || '')}>
+                                <Select
+                                    value={selectedSourceId}
+                                    items={dataSources.map((ds) => ({ value: ds.id, label: ds.name }))}
+                                    onValueChange={(val) => handleSourceChange(val || '')}
+                                >
                                     <SelectTrigger className="h-8 text-xs">
                                         <SelectValue placeholder="Choose data source..." />
                                     </SelectTrigger>
@@ -256,6 +260,12 @@ export function SyncDialog({
                                 <Label className="text-xs">Schedule</Label>
                                 <Select
                                     value={schedule}
+                                    items={[
+                                        { value: 'manual', label: 'Manual' },
+                                        { value: 'hourly', label: 'Hourly' },
+                                        { value: 'daily', label: 'Daily' },
+                                        { value: 'weekly', label: 'Weekly' },
+                                    ]}
                                     onValueChange={(val) => setSchedule(val as typeof schedule)}
                                 >
                                     <SelectTrigger className="h-8 text-xs">
@@ -274,6 +284,10 @@ export function SyncDialog({
                                 <Label className="text-xs">Sync Mode</Label>
                                 <Select
                                     value={syncMode}
+                                    items={[
+                                        { value: 'full', label: 'Full Refresh' },
+                                        { value: 'incremental', label: 'Incremental' },
+                                    ]}
                                     onValueChange={(val) => setSyncMode(val as typeof syncMode)}
                                 >
                                     <SelectTrigger className="h-8 text-xs">

@@ -206,6 +206,12 @@ export function TableSettingsSheet({
                                 <Label className="text-xs">Sync Schedule</Label>
                                 <Select
                                     value={schedule}
+                                    items={[
+                                        { value: 'manual', label: 'Manual (sync on demand)' },
+                                        { value: 'hourly', label: 'Hourly' },
+                                        { value: 'daily', label: 'Daily' },
+                                        { value: 'weekly', label: 'Weekly' },
+                                    ]}
                                     onValueChange={(val) => setSchedule(val as typeof schedule)}
                                 >
                                     <SelectTrigger className="h-8 text-xs">
@@ -225,6 +231,10 @@ export function TableSettingsSheet({
                                 <Label className="text-xs">Sync Mode</Label>
                                 <Select
                                     value={syncMode}
+                                    items={[
+                                        { value: 'full', label: 'Full Refresh (atomic swap)' },
+                                        { value: 'incremental', label: 'Incremental (upsert by cursor)' },
+                                    ]}
                                     onValueChange={(val) => setSyncMode(val as typeof syncMode)}
                                 >
                                     <SelectTrigger className="h-8 text-xs">
@@ -243,6 +253,10 @@ export function TableSettingsSheet({
                                     <Label className="text-xs">Cursor Column</Label>
                                     <Select
                                         value={cursorColumn || '__none__'}
+                                        items={[
+                                            { value: '__none__', label: 'None' },
+                                            ...allColumns.map((c) => ({ value: c.name, label: `${c.name} (${c.type})` })),
+                                        ]}
                                         onValueChange={(val) => setCursorColumn(val === '__none__' ? null : val)}
                                     >
                                         <SelectTrigger className="h-8 text-xs font-mono">

@@ -36,21 +36,33 @@ export interface FinanceState {
   valuations: Record<string, ValuationDTO[]>;
   netWorthHistory: NetWorthPointDTO[];
   overviewStats: OverviewStatsDTO | null;
+  overviewCache: Record<string, OverviewStatsDTO>;
 
   quickAddOpen: boolean;
   quickAddInitialData: Partial<CreateTransactionDTO> | null;
   lastUsedAccountId: string;
 
+  payBillOpen: boolean;
+  payBillCardId: string | null;
+
   // Actions
   initialize: (userId?: string) => Promise<void>;
   reset: () => void;
   refreshAccounts: () => Promise<void>;
-  refreshOverviewStats: () => Promise<void>;
+  refreshOverviewStats: (params?: {
+    from?: string;
+    to?: string;
+    preset?: string;
+    accounts?: string;
+  }) => Promise<void>;
   refreshNetWorthHistory: () => Promise<void>;
   refreshTransactions: () => Promise<void>;
   refreshCategories: () => Promise<void>;
   openQuickAdd: (initialData?: Partial<CreateTransactionDTO>) => void;
   closeQuickAdd: () => void;
+  openPayBill: (cardId?: string) => void;
+  closePayBill: () => void;
+  recalculateAccount: (accountId: string) => Promise<void>;
   setLastUsedAccountId: (id: string) => void;
 
   addTransaction: (
@@ -101,10 +113,13 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
     valuations: {},
     netWorthHistory: [],
     overviewStats: null,
+    overviewCache: {},
 
     quickAddOpen: false,
     quickAddInitialData: null,
     lastUsedAccountId: '',
+    payBillOpen: false,
+    payBillCardId: null,
 
   reset: () => {
     set({
@@ -121,9 +136,12 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
       valuations: {},
       netWorthHistory: [],
       overviewStats: null,
+      overviewCache: {},
       quickAddOpen: false,
       quickAddInitialData: null,
       lastUsedAccountId: '',
+      payBillOpen: false,
+      payBillCardId: null,
     });
   },
 
@@ -143,16 +161,36 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
     }
   },
 
-  refreshOverviewStats: async () => {
+  refreshOverviewStats: async (params?: {
+    from?: string;
+    to?: string;
+    preset?: string;
+    accounts?: string;
+  }) => {
+    const sp = new URLSearchParams();
+    if (params?.from) sp.set('from', params.from);
+    if (params?.to) sp.set('to', params.to);
+    if (params?.preset) sp.set('preset', params.preset);
+    if (params?.accounts) sp.set('accounts', params.accounts);
+
+    const filterKey = sp.toString() || 'default';
     set({ overviewStatus: 'loading' });
     try {
-      const res = await fetch('/api/finance/stats/overview');
+      const url =
+        filterKey === 'default'
+          ? '/api/finance/stats/overview'
+          : `/api/finance/stats/overview?${sp.toString()}`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`Overview stats request failed: ${res.status}`);
       const data = await res.json();
-      set({
+      set((state) => ({
         overviewStats: data,
+        overviewCache: {
+          ...state.overviewCache,
+          [filterKey]: data,
+        },
         overviewStatus: 'ready',
-      });
+      }));
     } catch (err) {
       console.error('Failed to load overview stats:', err);
       set({ overviewStatus: 'error' });
@@ -255,6 +293,24 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
 
   closeQuickAdd: () => {
     set({ quickAddOpen: false, quickAddInitialData: null });
+  },
+
+  openPayBill: (cardId) => {
+    set({ payBillOpen: true, payBillCardId: cardId || null, quickAddOpen: false });
+  },
+
+  closePayBill: () => {
+    set({ payBillOpen: false, payBillCardId: null });
+  },
+
+  recalculateAccount: async (accountId: string) => {
+    const res = await fetch(`/api/finance/accounts/${accountId}/recalculate`, {
+      method: 'POST',
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to recalculate account valuations (${res.status})`);
+    }
+    await Promise.all([get().refreshAccounts(), get().refreshOverviewStats()]);
   },
 
   setLastUsedAccountId: (id) => {

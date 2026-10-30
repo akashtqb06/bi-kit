@@ -1,6 +1,7 @@
 import { and, eq, gte, isNull, lte, sql } from 'drizzle-orm';
 import { db, finBudgets, finCategories, finTransactions } from '@src/lib/db';
 import { NotFoundError } from '@src/app/api/utils';
+import { getDeterministicCategoryColor } from '../colors';
 import {
   type BudgetDTO,
   type BudgetFilters,
@@ -80,6 +81,7 @@ export async function listBudgets(
     .select({
       budget: finBudgets,
       categoryName: finCategories.name,
+      categoryColor: finCategories.color,
     })
     .from(finBudgets)
     .innerJoin(finCategories, eq(finBudgets.categoryId, finCategories.id))
@@ -89,7 +91,7 @@ export async function listBudgets(
   const budgets: BudgetDTO[] = [];
   const progress: BudgetProgressDTO[] = [];
 
-  for (const { budget, categoryName } of budgetRows) {
+  for (const { budget, categoryName, categoryColor } of budgetRows) {
     budgets.push(mapBudgetToDTO(budget));
 
     const boundaries = getPeriodBoundaries(budget.period as 'monthly' | 'quarterly' | 'yearly');
@@ -122,6 +124,7 @@ export async function listBudgets(
       budgetId: budget.id,
       categoryId: budget.categoryId,
       categoryName,
+      categoryColor: categoryColor || getDeterministicCategoryColor(categoryName),
       period: budget.period as BudgetProgressDTO['period'],
       budgetedAmount,
       spentAmount,

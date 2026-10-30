@@ -124,7 +124,8 @@ describe('Finance API Routes (Authentication & 501 Stubs Enforced)', () => {
   describe('Overview Stats API (/api/finance/stats/overview)', () => {
     it('returns 401 unauthenticated and 501 authenticated', async () => {
       const { GET } = await import('./stats/overview/route');
-      const unauthRes = await GET();
+      const req = new NextRequest('http://localhost/api/finance/stats/overview');
+      const unauthRes = await GET(req);
       expect(unauthRes.status).toBe(401);
 
       const { setTestUser } = (await import('@src/lib/auth/dal')) as unknown as {
@@ -132,7 +133,7 @@ describe('Finance API Routes (Authentication & 501 Stubs Enforced)', () => {
       };
       setTestUser(testUser);
 
-      const authRes = await GET();
+      const authRes = await GET(req);
       expect(authRes.status).toBe(501);
     });
   });

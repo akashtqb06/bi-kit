@@ -6,6 +6,7 @@ import {
   DEFAULT_EXPENSE_CATEGORIES,
   DEFAULT_INCOME_CATEGORIES,
 } from '@src/lib/finance/constants';
+import { getDeterministicCategoryColor } from '@src/lib/finance/colors';
 
 /**
  * Idempotently seeds default system categories into fin_categories.
@@ -30,6 +31,7 @@ export async function seedSystemCategories(): Promise<{ seeded: number; existing
         userId: null,
         name,
         type: 'expense',
+        color: getDeterministicCategoryColor(name),
         isSystem: true,
         createdAt: now,
         updatedAt: now,
@@ -54,6 +56,7 @@ export async function seedSystemCategories(): Promise<{ seeded: number; existing
         userId: null,
         name,
         type: 'income',
+        color: getDeterministicCategoryColor(name),
         isSystem: true,
         createdAt: now,
         updatedAt: now,

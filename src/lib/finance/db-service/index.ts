@@ -16,6 +16,7 @@ import type {
   NetWorthHistoryQuery,
   NetWorthPointDTO,
   OverviewStatsDTO,
+  OverviewStatsQuery,
   PaginatedTransactionsResponse,
   RecurringRuleDTO,
   TransactionDTO,
@@ -107,6 +108,10 @@ export class DbFinanceService implements FinanceService {
 
   async deleteCategory(userId: string, categoryId: string): Promise<void> {
     return categories.deleteCategory(userId, categoryId);
+  }
+
+  async getOrCreateCreditCardPaymentCategory(_userId?: string): Promise<CategoryDTO> {
+    return categories.getOrCreateCreditCardPaymentCategory();
   }
 
   // ============================================================================
@@ -239,8 +244,11 @@ export class DbFinanceService implements FinanceService {
   // ============================================================================
   // Stats / Dashboard & History
   // ============================================================================
-  async getOverviewStats(userId: string): Promise<OverviewStatsDTO> {
-    return stats.getOverviewStats(userId);
+  async getOverviewStats(
+    userId: string,
+    query?: OverviewStatsQuery
+  ): Promise<OverviewStatsDTO> {
+    return stats.getOverviewStats(userId, query);
   }
 
   async getNetWorthHistory(

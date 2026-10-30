@@ -483,8 +483,16 @@ function DataStoreContent() {
 
     // Filter controls for source
     const sourceFilterControl = useMemo(() => {
+        const filterItems = [
+            { value: '__all__', label: 'All Data Sources' },
+            ...dataSources.map((ds) => ({ value: ds.id, label: ds.name })),
+        ];
         return (
-            <Select value={selectedSourceFilter} onValueChange={(val) => { if (val) setSelectedSourceFilter(val); }}>
+            <Select
+                value={selectedSourceFilter}
+                items={filterItems}
+                onValueChange={(val) => { if (val) setSelectedSourceFilter(val); }}
+            >
                 <SelectTrigger className="h-8 text-xs w-[180px]">
                     <SelectValue placeholder="All Sources" />
                 </SelectTrigger>
@@ -501,7 +509,7 @@ function DataStoreContent() {
     }, [selectedSourceFilter, dataSources]);
 
     return (
-        <div className="flex flex-1 flex-col h-full overflow-hidden p-6 gap-4">
+        <div className="flex flex-1 min-w-0 flex-col h-full overflow-hidden p-6 gap-4">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
                 <div>
@@ -533,7 +541,7 @@ function DataStoreContent() {
             <ResyncBanner needsResync={needsResync} onResynced={fetchTables} />
 
             {/* Main DataTable view */}
-            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
                 <DataTable
                     columns={columns}
                     data={tables}

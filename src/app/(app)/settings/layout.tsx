@@ -13,7 +13,7 @@ export default function SettingsLayout({
     children: React.ReactNode;
 }) {
     return (
-        <div className="flex flex-1 flex-col min-h-0 h-full overflow-hidden">
+        <div className="flex flex-1 min-w-0 flex-col min-h-0 h-full overflow-hidden">
             {/* Fixed header */}
             <div className="shrink-0 border-b bg-background px-6 py-4">
                 <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
@@ -23,7 +23,7 @@ export default function SettingsLayout({
             </div>
 
             {/* Single scroll area */}
-            <div className="flex-1 min-h-0 overflow-y-auto p-6">
+            <div className="flex-1 min-h-0 min-w-0 overflow-y-auto p-6">
                 <div className="flex flex-col md:flex-row gap-8 max-w-5xl">
                     <Suspense fallback={<SettingsNav isAdmin={false} />}>
                         <SettingsNavWrapper />

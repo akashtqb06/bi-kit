@@ -15,4 +15,13 @@ export interface AccountWithBalance extends AccountDTO {
   statementDay?: number; // for cards (1-31)
   dueDay?: number; // for cards (1-31)
   nextDueDate?: string; // YYYY-MM-DD
+  monthlyInstallment?: number; // in paise (for RD)
+  installmentsPaid?: number; // for RD
+  totalInstallments?: number; // for RD
+  totalDeposited?: number; // in paise (for RD)
+  principal?: number; // in paise (for FD)
+  interestRate?: number; // percentage (e.g. 6.8)
+  compoundingFrequency?: string; // for FD
+  maturityDate?: string; // YYYY-MM-DD
+  nextInstallmentDate?: string; // YYYY-MM-DD
 }

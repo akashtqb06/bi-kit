@@ -28,11 +28,15 @@ export const DEFAULT_ENABLED_FEATURES: readonly FinanceFeature[] = [
   'transactions',
   'accounts',
   'setup',
+  'recurring',
   'import',
 ] as const;
 
-export function getEnabledFinanceFeatures(): Set<FinanceFeature> {
-  const envVal = process.env.FINANCE_FEATURES;
+export function enabledFeatures(): Set<FinanceFeature> {
+  const envVal =
+    (typeof process !== 'undefined' &&
+      (process.env.NEXT_PUBLIC_FINANCE_FEATURES || process.env.FINANCE_FEATURES)) ||
+    '';
   if (!envVal || !envVal.trim()) {
     return new Set(DEFAULT_ENABLED_FEATURES);
   }
@@ -45,12 +49,16 @@ export function getEnabledFinanceFeatures(): Set<FinanceFeature> {
   return new Set(parsed);
 }
 
-export function isFinanceFeatureEnabled(feature: FinanceFeature): boolean {
-  return getEnabledFinanceFeatures().has(feature);
+export const getEnabledFinanceFeatures = enabledFeatures;
+
+export function isFeatureEnabled(feature: FinanceFeature): boolean {
+  return enabledFeatures().has(feature);
 }
 
+export const isFinanceFeatureEnabled = isFeatureEnabled;
+
 export function isAnyFinanceFeatureEnabled(): boolean {
-  return getEnabledFinanceFeatures().size > 0;
+  return enabledFeatures().size > 0;
 }
 
 /**
@@ -58,7 +66,7 @@ export function isAnyFinanceFeatureEnabled(): boolean {
  * returns a 501 Not Implemented response; otherwise returns null.
  */
 export function checkFeatureGatedApi(feature: FinanceFeature): NextResponse | null {
-  if (!isFinanceFeatureEnabled(feature)) {
+  if (!isFeatureEnabled(feature)) {
     return NextResponse.json(
       {
         error: 'not_implemented',

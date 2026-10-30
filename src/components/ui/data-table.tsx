@@ -208,7 +208,7 @@ export function DataTable<TData extends RowData>({
     const totalDataCount = data.length;
 
     return (
-        <div className={cn('flex-1 min-h-0 flex flex-col gap-4 w-full', className)}>
+        <div className={cn('flex-1 min-h-0 min-w-0 flex flex-col gap-4 w-full', className)}>
             {!hideToolbar && (
                 <div className="shrink-0">
                     <DataTableToolbar
@@ -228,7 +228,7 @@ export function DataTable<TData extends RowData>({
                 </div>
             )}
 
-            <div className="flex-1 min-h-0 flex flex-col rounded-lg border bg-card overflow-hidden">
+            <div className="flex-1 min-h-0 min-w-0 flex flex-col rounded-lg border bg-card overflow-hidden">
                 <Table
                     containerRef={scrollAreaRef}
                     containerClassName="flex-1 min-h-0 overflow-auto"

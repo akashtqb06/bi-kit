@@ -39,7 +39,8 @@ describe('Finance API Routes with FINANCE_BACKEND=mock', () => {
 
   it('GET /api/finance/stats/overview returns mock overview stats', async () => {
     const { GET } = await import('@src/app/api/finance/stats/overview/route');
-    const res = await GET();
+    const req = new NextRequest('http://localhost:3000/api/finance/stats/overview');
+    const res = await GET(req);
 
     expect(res.status).toBe(200);
     const body = await res.json();

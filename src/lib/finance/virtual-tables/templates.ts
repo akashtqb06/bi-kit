@@ -31,6 +31,7 @@ export function getVirtualTableTemplate(
     t.to_account_id,
     t.category_id,
     COALESCE(c.name, 'Uncategorized') AS category,
+    c.color AS category_color,
     pc.name AS parent_category,
     t.payee,
     t.note,
@@ -319,6 +320,7 @@ ORDER BY vd.date ASC`;
     c.id,
     c.name,
     c.type,
+    c.color AS category_color,
     c.parent_id,
     c.is_system
 FROM fin_categories c
@@ -340,6 +342,7 @@ WHERE b.user_id = ${userIdParam}`;
         b.id AS budget_id,
         b.category_id,
         c.name AS category_name,
+        c.color AS category_color,
         b.period,
         ROUND(b.amount::numeric / 100.0, 2) AS budgeted_amount,
         b.start_date,
@@ -376,6 +379,7 @@ SELECT
     ub.budget_id,
     ub.category_id,
     ub.category_name,
+    ub.category_color,
     ub.period,
     ub.budgeted_amount,
     COALESCE(s.spent_amount, 0.0) AS spent_amount,

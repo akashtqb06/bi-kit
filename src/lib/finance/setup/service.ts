@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { db } from '@src/lib/db';
 import {
   finAccounts,
@@ -14,10 +14,12 @@ import {
   DEFAULT_EXPENSE_CATEGORIES,
   DEFAULT_INCOME_CATEGORIES,
 } from '../constants';
+import { getDeterministicCategoryColor } from '../colors';
 import {
   calculateFDAccruedValue,
   calculateRDAccruedValue,
 } from '../domain/deposits';
+import { recomputeDepositValuations } from '../db-service/valuations';
 import {
   completeSetupPayloadSchema,
   setupDraftStateSchema,
@@ -195,6 +197,7 @@ export async function completeSetup(
             userId,
             name,
             type: 'expense',
+            color: getDeterministicCategoryColor(name),
             isSystem: false,
             createdAt: now,
             updatedAt: now,
@@ -218,6 +221,7 @@ export async function completeSetup(
             userId,
             name,
             type: 'income',
+            color: getDeterministicCategoryColor(name),
             isSystem: false,
             createdAt: now,
             updatedAt: now,
@@ -240,6 +244,7 @@ export async function completeSetup(
           userId,
           name: custom.name,
           type: custom.type,
+          color: getDeterministicCategoryColor(custom.name),
           isSystem: false,
           createdAt: now,
           updatedAt: now,
@@ -436,6 +441,12 @@ export async function completeSetup(
     }
   });
 
+  try {
+    await recomputeDepositValuations(userId);
+  } catch (err) {
+    console.warn(`[completeSetup] recomputeDepositValuations failed for ${userId}:`, err);
+  }
+
   return { success: true, accountsCreated };
 }
 
@@ -550,3 +561,26 @@ export async function updateAccountOpeningData(
     }
   });
 }
+
+/**
+ * Idempotently assigns deterministic palette colors to any existing categories with null color.
+ * Preserves user-assigned colors.
+ */
+export async function backfillCategoryColors(): Promise<number> {
+  const nullCategories = await db
+    .select({ id: finCategories.id, name: finCategories.name })
+    .from(finCategories)
+    .where(isNull(finCategories.color));
+
+  let updated = 0;
+  for (const cat of nullCategories) {
+    const color = getDeterministicCategoryColor(cat.name);
+    await db
+      .update(finCategories)
+      .set({ color, updatedAt: new Date() })
+      .where(and(eq(finCategories.id, cat.id), isNull(finCategories.color)));
+    updated++;
+  }
+  return updated;
+}
+
