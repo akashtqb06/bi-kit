@@ -1,4 +1,4 @@
-export const SHELL_CACHE_NAME = 'bikit-finance-shell-v1';
+export const SHELL_CACHE_NAME = 'bikit-finance-shell-v2';
 export const SESSION_CACHE_NAME = 'bikit-finance-session-ephemeral';
 
 export const APP_SHELL_URLS = [
@@ -252,28 +252,8 @@ self.addEventListener('fetch', (event) => {
 
   if (req.method !== 'GET') return;
 
-  // API calls: Network-first, NO persistent caching of authenticated responses beyond session
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(
-      fetch(req).then((res) => {
-        if (res.ok && url.pathname.startsWith('/api/finance/')) {
-          // Ephemeral in-memory clone for active session only
-          res.clone().text().then((body) => {
-            sessionCache.set(url.href, { body, status: res.status, headers: Array.from(res.headers.entries()) });
-          }).catch(() => {});
-        }
-        return res;
-      }).catch(() => {
-        const cached = sessionCache.get(url.href);
-        if (cached) {
-          return new Response(cached.body, { status: cached.status, headers: new Headers(cached.headers) });
-        }
-        return new Response(JSON.stringify({ offline: true, error: 'Offline - pending changes will sync on reconnect' }), {
-          status: 503,
-          headers: { 'Content-Type': 'application/json', 'X-Offline': '1' }
-        });
-      })
-    );
+    // Do not intercept API requests — let browser handle them directly
     return;
   }
 
@@ -313,6 +293,12 @@ self.addEventListener('message', (event) => {
   }
   if (event.data?.type === 'CLEAR_SESSION') {
     sessionCache.clear();
+  }
+  if (event.data?.type === 'KILL_SWITCH') {
+    event.waitUntil(
+      caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
+        .then(() => self.registration.unregister())
+    );
   }
 });
 `.trim();

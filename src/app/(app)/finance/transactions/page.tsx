@@ -4,6 +4,8 @@ import { TransactionTable } from '@src/components/finance/transactions/transacti
 import { FinancePageSkeleton } from '@src/components/finance/shared/finance-skeleton';
 import { isFinanceFeatureEnabled } from '@src/lib/finance/flags';
 
+export const dynamic = 'force-dynamic';
+
 export default function TransactionsPage() {
   if (!isFinanceFeatureEnabled('transactions')) {
     notFound();

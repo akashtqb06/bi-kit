@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserApi } from '@src/lib/auth/dal';
 import { handleApiError } from '@src/app/api/utils';
+import { jsonNoStore } from '../utils';
 import { checkFeatureGatedApi } from '@src/lib/finance/flags';
 import {
   checkSetupRedirect,
@@ -24,7 +25,7 @@ export async function GET() {
     const settings = await getUserSettings(user.id);
     const redirectInfo = await checkSetupRedirect(user.id);
 
-    return NextResponse.json({
+    return jsonNoStore({
       settings,
       draft: settings?.draft || null,
       redirectInfo,

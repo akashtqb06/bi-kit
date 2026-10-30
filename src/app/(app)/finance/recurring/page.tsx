@@ -6,6 +6,8 @@ import { isFinanceFeatureEnabled } from '@src/lib/finance/flags';
 import { getRecurringPageDataAction } from './actions';
 import type { RecurringPageData } from './actions';
 
+export const dynamic = 'force-dynamic';
+
 async function RecurringContent() {
   if (!isFinanceFeatureEnabled('recurring')) {
     notFound();

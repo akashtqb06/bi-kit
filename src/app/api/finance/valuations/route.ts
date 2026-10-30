@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserApi } from '@src/lib/auth/dal';
 import { handleApiError } from '@src/app/api/utils';
+import { jsonNoStore } from '../utils';
 import { createValuationSchema, valuationFiltersSchema } from '@src/lib/finance/contract';
 import { getFinanceService } from '@src/lib/finance/service';
 
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
 
     const service = getFinanceService();
     const valuations = await service.listValuations(user.id, filters);
-    return NextResponse.json({ valuations });
+    return jsonNoStore({ valuations });
   } catch (err) {
     return handleApiError(err);
   }

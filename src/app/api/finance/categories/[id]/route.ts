@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserApi } from '@src/lib/auth/dal';
 import { handleApiError } from '@src/app/api/utils';
+import { jsonNoStore } from '../../utils';
 import { updateCategorySchema } from '@src/lib/finance/contract';
 import { getFinanceService } from '@src/lib/finance/service';
 
@@ -12,7 +13,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     const { id } = await context.params;
     const service = getFinanceService();
     const category = await service.getCategory(user.id, id);
-    return NextResponse.json({ category });
+    return jsonNoStore({ category });
   } catch (err) {
     return handleApiError(err);
   }

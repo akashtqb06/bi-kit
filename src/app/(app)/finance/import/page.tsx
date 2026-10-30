@@ -9,6 +9,8 @@ export const metadata = {
   description: 'Upload bank and credit card statement CSVs, preview column mappings, auto-categorize, and import transactions.',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default function ImportPage() {
   if (!isFinanceFeatureEnabled('import')) {
     notFound();

@@ -2,6 +2,8 @@ import React, { Suspense } from 'react';
 import { AccountDetailView } from '@src/components/finance/accounts/account-detail-view';
 import { FinancePageSkeleton } from '@src/components/finance/shared/finance-skeleton';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AccountDetailPage({
   params,
 }: {

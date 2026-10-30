@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { requireUserApi } from '@src/lib/auth/dal';
 import { handleApiError } from '@src/app/api/utils';
+import { jsonNoStore } from '../../utils';
 import { netWorthHistoryQuerySchema } from '@src/lib/finance/contract';
 import { getFinanceService } from '@src/lib/finance/service';
 
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
 
     const service = getFinanceService();
     const history = await service.getNetWorthHistory(user.id, query);
-    return NextResponse.json({ history });
+    return jsonNoStore({ history });
   } catch (err) {
     return handleApiError(err);
   }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserApi } from '@src/lib/auth/dal';
 import { handleApiError } from '@src/app/api/utils';
+import { jsonNoStore } from '../utils';
 import { budgetFiltersSchema, createBudgetSchema } from '@src/lib/finance/contract';
 import { getFinanceService } from '@src/lib/finance/service';
 import { checkFeatureGatedApi } from '@src/lib/finance/flags';
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     const service = getFinanceService();
     const result = await service.listBudgets(user.id, filters);
-    return NextResponse.json(result);
+    return jsonNoStore(result);
   } catch (err) {
     return handleApiError(err);
   }

@@ -6,6 +6,8 @@ import {
 } from '@src/components/finance/shared/finance-skeleton';
 import { isFinanceFeatureEnabled } from '@src/lib/finance/flags';
 
+export const dynamic = 'force-dynamic';
+
 async function BudgetsContent() {
   if (!isFinanceFeatureEnabled('budgets')) {
     notFound();

@@ -1,7 +1,7 @@
 import 'server-only';
-import { NextResponse } from 'next/server';
 import { requireUserApi } from '@src/lib/auth/dal';
 import { handleApiError } from '@src/app/api/utils';
+import { jsonNoStore } from '../../utils';
 import { and, desc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { db, finAccounts, finTransactions, finValuations } from '@src/lib/db';
 import { mapAccountToDTO } from '@src/lib/finance/db-service/accounts';
@@ -111,9 +111,7 @@ export async function GET() {
       };
     });
 
-    const response = NextResponse.json({ accounts: result });
-    response.headers.set('Cache-Control', 'no-store');
-    return response;
+    return jsonNoStore({ accounts: result });
   } catch (err) {
     return handleApiError(err);
   }
