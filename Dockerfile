@@ -35,7 +35,7 @@ ENV NODE_ENV=production
 # Dummy placeholder to satisfy build-time module evaluation
 ENV DATABASE_URL=postgres://placeholder:placeholder@localhost:5432/bikit
 
-RUN pnpm build
+RUN --mount=type=cache,target=/app/.next/cache pnpm build
 RUN [ -f dist/migrate.cjs ] && [ -f dist/bootstrap.cjs ] && [ -f dist/validate-env.cjs ] || pnpm run build:scripts
 
 # =============================================================================

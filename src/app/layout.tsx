@@ -34,7 +34,6 @@ const fontInter = Inter({
 });
 
 const fontRoboto = Roboto({
-  weight: ["400", "500", "700"],
   variable: "--font-roboto",
   subsets: ["latin"],
   display: "swap",
@@ -64,7 +63,6 @@ const fontLora = Lora({
 });
 
 const fontMerriweather = Merriweather({
-  weight: ["400", "700"],
   variable: "--font-merriweather",
   subsets: ["latin"],
   display: "swap",
