@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { db, finAccounts, finCategories, finTransactions, finValuations } from '@src/lib/db';
 import { calculateNetWorth } from '../domain/net-worth';
 import { isCardDueWithinDays } from '../domain/credit-card';
@@ -44,15 +44,18 @@ export async function getOverviewStats(userId: string): Promise<ExtendedOverview
     .where(and(eq(finAccounts.userId, userId), eq(finAccounts.isActive, true)));
 
   // 2. Fetch latest valuations for investment accounts
-  const valuations = await db
-    .select({
-      accountId: finValuations.accountId,
-      date: finValuations.date,
-      value: finValuations.value,
-    })
-    .from(finValuations)
-    .where(lte(finValuations.date, today))
-    .orderBy(desc(finValuations.date));
+  const accountIds = accounts.map((a) => a.id);
+  const valuations = accountIds.length > 0
+    ? await db
+        .select({
+          accountId: finValuations.accountId,
+          date: finValuations.date,
+          value: finValuations.value,
+        })
+        .from(finValuations)
+        .where(and(inArray(finValuations.accountId, accountIds), lte(finValuations.date, today)))
+        .orderBy(desc(finValuations.date))
+    : [];
 
   // Map latest valuation per account
   const latestValuations = new Map<string, number>();
@@ -62,44 +65,44 @@ export async function getOverviewStats(userId: string): Promise<ExtendedOverview
     }
   }
 
-  // 3. Compute balances per account from transactions
+  // 3. Compute balances per account from transactions in batch (N+1 query fix)
+  const sourceSums = await db
+    .select({
+      accountId: finTransactions.accountId,
+      total: sql<string>`COALESCE(SUM(${finTransactions.signedAmount}), 0)`,
+    })
+    .from(finTransactions)
+    .where(and(eq(finTransactions.userId, userId), isNull(finTransactions.deletedAt)))
+    .groupBy(finTransactions.accountId);
+
+  const targetSums = await db
+    .select({
+      accountId: finTransactions.toAccountId,
+      total: sql<string>`COALESCE(SUM(${finTransactions.amount}), 0)`,
+    })
+    .from(finTransactions)
+    .where(
+      and(
+        eq(finTransactions.userId, userId),
+        eq(finTransactions.type, 'transfer'),
+        isNull(finTransactions.deletedAt)
+      )
+    )
+    .groupBy(finTransactions.toAccountId);
+
+  const sourceMap = new Map<string, number>();
+  for (const r of sourceSums) sourceMap.set(r.accountId, Number(r.total));
+  const targetMap = new Map<string, number>();
+  for (const r of targetSums) {
+    if (r.accountId) targetMap.set(r.accountId, Number(r.total));
+  }
+
   const accountsForNetWorth = [];
   const accountsByKind: Record<string, { count: number; totalBalance: number }> = {};
   const cardsDueSoon: ExtendedOverviewStats['cardsDueSoon'] = [];
 
   for (const acc of accounts) {
-    // Ledger balance from all non-deleted transactions
-    // Source side (decreases on expense/transfer, increases on income)
-    const [sourceSum] = await db
-      .select({
-        total: sql<string>`COALESCE(SUM(${finTransactions.signedAmount}), 0)`,
-      })
-      .from(finTransactions)
-      .where(
-        and(
-          eq(finTransactions.userId, userId),
-          eq(finTransactions.accountId, acc.id),
-          isNull(finTransactions.deletedAt)
-        )
-      );
-
-    // Target side (incoming transfers)
-    const [targetSum] = await db
-      .select({
-        total: sql<string>`COALESCE(SUM(${finTransactions.amount}), 0)`,
-      })
-      .from(finTransactions)
-      .where(
-        and(
-          eq(finTransactions.userId, userId),
-          eq(finTransactions.toAccountId, acc.id),
-          eq(finTransactions.type, 'transfer'),
-          isNull(finTransactions.deletedAt)
-        )
-      );
-
-    const balance = Number(sourceSum?.total || 0) + Number(targetSum?.total || 0);
-
+    const balance = (sourceMap.get(acc.id) ?? 0) + (targetMap.get(acc.id) ?? 0);
     const currentValue = latestValuations.get(acc.id);
 
     accountsForNetWorth.push({
