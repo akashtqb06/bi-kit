@@ -5,6 +5,7 @@ import { isCardDueWithinDays } from '../domain/credit-card';
 import type { OverviewStatsDTO, TransactionDTO } from '../contract';
 import type { AccountKind, AccountClass } from '../constants';
 import { mapTransactionToDTO } from './transactions';
+import { todayInTz, currentMonthStartInTz, currentMonthEndInTz, previousMonthRangeInTz, DEFAULT_TZ } from '../timezone';
 
 export interface ExtendedOverviewStats extends OverviewStatsDTO {
   previousPeriod?: {
@@ -30,23 +31,11 @@ export interface ExtendedOverviewStats extends OverviewStatsDTO {
 }
 
 export async function getOverviewStats(userId: string): Promise<ExtendedOverviewStats> {
-  const today = new Date().toISOString().slice(0, 10);
-  const now = new Date();
-  const currentYear = now.getUTCFullYear();
-  const currentMonth = now.getUTCMonth(); // 0-indexed
-
-  // Month date ranges
-  const currentMonthStart = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
-  const lastDayCurMonth = new Date(Date.UTC(currentYear, currentMonth + 1, 0)).getUTCDate();
-  const currentMonthEnd = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(lastDayCurMonth).padStart(2, '0')}`;
-
-  // Previous month range
-  const prevMonthDate = new Date(Date.UTC(currentYear, currentMonth - 1, 1));
-  const prevYear = prevMonthDate.getUTCFullYear();
-  const prevMonth = prevMonthDate.getUTCMonth();
-  const prevMonthStart = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-01`;
-  const lastDayPrevMonth = new Date(Date.UTC(prevYear, prevMonth + 1, 0)).getUTCDate();
-  const prevMonthEnd = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(lastDayPrevMonth).padStart(2, '0')}`;
+  const userTz = DEFAULT_TZ; // TODO: query fin_user_settings.timezone for userId
+  const today = todayInTz(userTz);
+  const currentMonthStart = currentMonthStartInTz(userTz);
+  const currentMonthEnd = currentMonthEndInTz(userTz);
+  const { start: prevMonthStart, end: prevMonthEnd } = previousMonthRangeInTz(userTz);
 
   // 1. Fetch all active accounts for user
   const accounts = await db

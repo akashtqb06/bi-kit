@@ -13,6 +13,7 @@ import {
   createValuationSchema,
   valuationFiltersSchema,
 } from '../contract';
+import { todayInTz, DEFAULT_TZ } from '../timezone';
 
 export function mapValuationToDTO(row: typeof finValuations.$inferSelect): ValuationDTO {
   return {
@@ -127,7 +128,7 @@ export async function recomputeDepositValuations(
     .where(and(...accountConditions));
 
   let valuationsWritten = 0;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInTz(DEFAULT_TZ);
 
   for (const account of accounts) {
     const meta = (account.metadata || {}) as Record<string, unknown>;
