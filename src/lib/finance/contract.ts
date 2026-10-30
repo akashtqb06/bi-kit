@@ -401,6 +401,23 @@ export const overviewStatsSchema = z.object({
   monthlyIncome: moneyPaiseSchema,
   monthlyExpense: moneyPaiseSchema,
   savingsRate: z.number(),
+  previousPeriod: z.object({
+    income: moneyPaiseSchema,
+    expense: moneyPaiseSchema,
+    savingsRate: z.number(),
+  }).optional(),
+  spendByCategory: z.array(z.object({
+    categoryId: z.string(),
+    categoryName: z.string(),
+    amount: moneyPaiseSchema,
+    percentage: z.number(),
+  })).optional(),
+  accountsByKind: z.record(z.string(), z.object({
+    count: z.number(),
+    totalBalance: moneyPaiseSchema,
+  })).optional(),
+  recentTransactions: z.array(z.any()).optional(),
+  cardsDueSoon: z.array(z.any()).optional(),
 });
 
 export type OverviewStatsDTO = z.infer<typeof overviewStatsSchema>;

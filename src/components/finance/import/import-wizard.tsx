@@ -11,7 +11,7 @@ import {
   Building2Icon,
   CheckIcon,
 } from 'lucide-react';
-import { useFinanceStore } from '@src/components/finance/shared/finance-store';
+import { useFinanceStore } from '../shared/finance-store';
 import { formatINR } from '@src/components/finance/shared/format';
 import { SAMPLE_FIXTURES, type SampleFixture } from '@src/lib/finance/import/sample-fixtures';
 import {

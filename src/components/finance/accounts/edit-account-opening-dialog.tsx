@@ -32,7 +32,8 @@ export function EditAccountOpeningDialog({
   onOpenChange,
   account,
 }: EditAccountOpeningDialogProps) {
-  const initializeStore = useFinanceStore((s) => s.initialize);
+  const refreshAccounts = useFinanceStore((s) => s.refreshAccounts);
+  const refreshOverviewStats = useFinanceStore((s) => s.refreshOverviewStats);
 
   const initialOpeningPaise =
     typeof account.metadata?.openingBalancePaise === 'number'
@@ -80,7 +81,7 @@ export function EditAccountOpeningDialog({
       }
 
       toast.success('Starting balance and date updated successfully.');
-      await initializeStore();
+      await Promise.all([refreshAccounts(), refreshOverviewStats()]);
       setShowConfirm(false);
       onOpenChange(false);
     } catch (err) {

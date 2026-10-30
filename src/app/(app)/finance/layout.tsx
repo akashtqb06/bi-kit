@@ -14,6 +14,7 @@ import {
   TagsIcon,
 } from 'lucide-react';
 import { SetupBanner } from '@src/components/finance/setup/setup-banner';
+import { FinanceInitializer } from '@src/components/finance/shared/finance-initializer';
 import { isFinanceFeatureEnabled, type FinanceFeature } from '@src/lib/finance/flags';
 
 interface FinanceTabItem {
@@ -41,11 +42,17 @@ export default function FinanceLayout({
   const pathname = usePathname();
 
   if (pathname.startsWith('/finance/setup')) {
-    return <div className="flex flex-1 flex-col min-h-0 h-full overflow-y-auto bg-background">{children}</div>;
+    return (
+      <>
+        <FinanceInitializer />
+        <div className="flex flex-1 flex-col min-h-0 h-full overflow-y-auto bg-background">{children}</div>
+      </>
+    );
   }
 
   return (
     <div className="flex flex-1 flex-col min-h-0 overflow-hidden bg-background">
+      <FinanceInitializer />
       <SetupBanner />
       <header className="border-b bg-card/50 px-6 py-3 shrink-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

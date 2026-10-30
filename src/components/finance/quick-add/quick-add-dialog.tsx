@@ -33,8 +33,8 @@ export function QuickAddForm({
   const {
     accounts,
     categories,
+    transactions,
     lastUsedAccountId,
-    payeeCategoryMap,
     addTransaction,
   } = useFinanceStore();
 
@@ -116,7 +116,9 @@ export function QuickAddForm({
     setPayee(val);
     if (!val.trim()) return;
 
-    const matchedCatId = payeeCategoryMap[val.trim().toLowerCase()];
+    const matchedCatId = transactions.find(
+      (t) => t.payee?.trim().toLowerCase() === val.trim().toLowerCase() && t.categoryId
+    )?.categoryId;
     if (matchedCatId && (!categoryId || categoryId === '')) {
       const exists = categories.some((c) => c.id === matchedCatId);
       if (exists) {

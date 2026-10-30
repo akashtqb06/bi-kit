@@ -6,14 +6,43 @@ import { ColumnMappingStep } from './column-mapping-step';
 import { TransactionReviewStep } from './transaction-review-step';
 import { ImportSummaryContent } from './import-summary-dialog';
 import { useFinanceStore } from '../shared/finance-store';
-import { FIXTURE_ACCOUNTS, FIXTURE_CATEGORIES } from '../shared/fixtures';
+import type { AccountWithBalance } from '../shared/fixtures';
+import type { CategoryDTO } from '@src/lib/finance/contract';
 import type { ParsedImportRow } from '@src/lib/finance/import/types';
+
+const TEST_CATEGORIES: CategoryDTO[] = [
+  { id: 'cat-food', userId: null, name: 'Food & Dining', type: 'expense', parentId: null, icon: 'Utensils', color: '#f97316', isSystem: true, createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+  { id: 'cat-groceries', userId: null, name: 'Groceries', type: 'expense', parentId: null, icon: 'ShoppingCart', color: '#10b981', isSystem: true, createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+  { id: 'cat-transport', userId: null, name: 'Transport', type: 'expense', parentId: null, icon: 'Car', color: '#3b82f6', isSystem: true, createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+  { id: 'cat-fuel', userId: null, name: 'Fuel', type: 'expense', parentId: null, icon: 'Fuel', color: '#ef4444', isSystem: true, createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+  { id: 'cat-salary', userId: null, name: 'Salary', type: 'income', parentId: null, icon: 'Briefcase', color: '#22c55e', isSystem: true, createdAt: '2026-01-01', updatedAt: '2026-01-01' },
+];
+
+const TEST_ACCOUNTS: AccountWithBalance[] = [
+  {
+    id: 'acc-hdfc-salary',
+    userId: 'usr-1',
+    name: 'HDFC Salary Account',
+    kind: 'bank',
+    class: 'asset',
+    currency: 'INR',
+    creditLimit: null,
+    isActive: true,
+    metadata: { accountNumber: '••••5892', branch: 'Indiranagar' },
+    balance: 18542000,
+    outstanding: 0,
+    utilization: 0,
+    currentValue: 18542000,
+    createdAt: '2025-01-01',
+    updatedAt: '2026-10-28',
+  },
+];
 
 describe('Statement Import UI Components (S6c)', () => {
   beforeEach(() => {
     useFinanceStore.setState({
-      accounts: FIXTURE_ACCOUNTS,
-      categories: FIXTURE_CATEGORIES,
+      accounts: TEST_ACCOUNTS,
+      categories: TEST_CATEGORIES,
       lastUsedAccountId: 'acc-hdfc-salary',
     });
   });

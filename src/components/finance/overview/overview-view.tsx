@@ -147,15 +147,15 @@ export function OverviewView() {
   };
 
   // Month-over-month calculations (Mock deltas for demo/fidelity)
-  const currentIncome = overviewStats.monthlyIncome;
+  const currentIncome = overviewStats?.monthlyIncome ?? 0;
   const prevIncome = 19500000; // ₹1,95,000
   const incomeDeltaPct = Math.round(((currentIncome - prevIncome) / prevIncome) * 1000) / 10;
 
-  const currentExpense = overviewStats.monthlyExpense;
+  const currentExpense = overviewStats?.monthlyExpense ?? 0;
   const prevExpense = 7850000; // ₹78,500
   const expenseDeltaPct = Math.round(((currentExpense - prevExpense) / prevExpense) * 1000) / 10;
 
-  const currentSavingsRate = overviewStats.savingsRate;
+  const currentSavingsRate = overviewStats?.savingsRate ?? 0;
   const prevSavingsRate = 59.7;
   const savingsRateDelta = Math.round((currentSavingsRate - prevSavingsRate) * 10) / 10;
 
