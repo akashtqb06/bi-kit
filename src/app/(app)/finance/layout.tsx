@@ -77,6 +77,7 @@ export default function FinanceLayout({
               <Link
                 key={tab.href}
                 href={tab.href}
+                prefetch={false}
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors shrink-0',
                   isActive

@@ -5,7 +5,15 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useFinanceStore } from '../shared/finance-store';
 import { parseAmountExpression } from '../shared/expression-parser';
 import { formatAccountDisplayBalance } from '../shared/format';
@@ -108,12 +116,12 @@ export function TransactionEditDialog({
             <Label htmlFor="edit-date" className="text-xs font-medium text-muted-foreground">
               Date
             </Label>
-            <Input
+            <DatePicker
               id="edit-date"
-              type="date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={setDate}
               className="h-9 text-xs"
+              placeholder="Select date"
             />
           </div>
 
@@ -122,18 +130,21 @@ export function TransactionEditDialog({
             <Label htmlFor="edit-account" className="text-xs font-medium text-muted-foreground">
               Account
             </Label>
-            <select
-              id="edit-account"
-              className="w-full h-9 rounded-md border border-input bg-card px-3 text-xs"
+            <Select
               value={accountId}
-              onChange={(e) => setAccountId(e.target.value)}
+              onValueChange={(val) => setAccountId(val || '')}
             >
-              {accounts.map((acc) => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.name} ({formatAccountDisplayBalance(acc)})
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="edit-account" className="w-full h-9 bg-card px-3 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.map((acc) => (
+                  <SelectItem key={acc.id} value={acc.id} className="text-xs">
+                    {acc.name} ({formatAccountDisplayBalance(acc)})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Category */}
@@ -160,19 +171,22 @@ export function TransactionEditDialog({
                   })()
                 )}
               </div>
-              <select
-                id="edit-category"
-                className="w-full h-9 rounded-md border border-input bg-card px-3 text-xs"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
+              <Select
+                value={categoryId || '__uncategorized__'}
+                onValueChange={(val) => setCategoryId((!val || val === '__uncategorized__') ? '' : val)}
               >
-                <option value="">Uncategorized</option>
-                {filteredCategories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="edit-category" className="w-full h-9 bg-card px-3 text-xs">
+                  <SelectValue placeholder="Uncategorized" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__uncategorized__" className="text-xs">Uncategorized</SelectItem>
+                  {filteredCategories.map((c) => (
+                    <SelectItem key={c.id} value={c.id} className="text-xs">
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 

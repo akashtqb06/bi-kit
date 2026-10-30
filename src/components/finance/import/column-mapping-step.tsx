@@ -3,6 +3,13 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ArrowLeftIcon, ArrowRightIcon, CheckCircle2Icon, SlidersHorizontalIcon } from 'lucide-react';
 import type { ColumnMapping, DateFormat, NumberFormatConfig } from '@src/lib/finance/import/types';
 
@@ -116,19 +123,21 @@ export function ColumnMappingStep({
             <label htmlFor="select-date-col" className="text-xs font-semibold">Date Column *</label>
             <Badge variant="outline" className="text-[10px] text-primary">Required</Badge>
           </div>
-          <select
-            id="select-date-col"
-            className="w-full h-8 text-xs rounded-md border border-input bg-background px-2.5 focus:ring-1 focus:ring-primary focus:outline-hidden"
-            value={mapping.dateColumn}
-            onChange={(e) => onMappingChange({ ...mapping, dateColumn: e.target.value })}
+          <Select
+            value={mapping.dateColumn || undefined}
+            onValueChange={(val) => onMappingChange({ ...mapping, dateColumn: val || '' })}
           >
-            <option value="">-- Select Date Column --</option>
-            {headers.map((h) => (
-              <option key={h} value={h}>
-                {h}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id="select-date-col" className="w-full h-8 text-xs bg-background">
+              <SelectValue placeholder="-- Select Date Column --" />
+            </SelectTrigger>
+            <SelectContent>
+              {headers.map((h) => (
+                <SelectItem key={h} value={h} className="text-xs">
+                  {h}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <p className="text-[11px] text-muted-foreground">Column containing transaction date</p>
         </div>
 
@@ -138,19 +147,21 @@ export function ColumnMappingStep({
             <label htmlFor="select-desc-col" className="text-xs font-semibold">Description / Narration *</label>
             <Badge variant="outline" className="text-[10px] text-primary">Required</Badge>
           </div>
-          <select
-            id="select-desc-col"
-            className="w-full h-8 text-xs rounded-md border border-input bg-background px-2.5 focus:ring-1 focus:ring-primary focus:outline-hidden"
-            value={mapping.descriptionColumn}
-            onChange={(e) => onMappingChange({ ...mapping, descriptionColumn: e.target.value })}
+          <Select
+            value={mapping.descriptionColumn || undefined}
+            onValueChange={(val) => onMappingChange({ ...mapping, descriptionColumn: val || '' })}
           >
-            <option value="">-- Select Description Column --</option>
-            {headers.map((h) => (
-              <option key={h} value={h}>
-                {h}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id="select-desc-col" className="w-full h-8 text-xs bg-background">
+              <SelectValue placeholder="-- Select Description Column --" />
+            </SelectTrigger>
+            <SelectContent>
+              {headers.map((h) => (
+                <SelectItem key={h} value={h} className="text-xs">
+                  {h}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <p className="text-[11px] text-muted-foreground">Column containing merchant or narration details</p>
         </div>
 
@@ -160,16 +171,19 @@ export function ColumnMappingStep({
             <label htmlFor="select-amount-mode" className="text-xs font-semibold">Amount Layout *</label>
             <SlidersHorizontalIcon className="h-3.5 w-3.5 text-muted-foreground" />
           </div>
-          <select
-            id="select-amount-mode"
-            className="w-full h-8 text-xs rounded-md border border-input bg-background px-2.5 focus:ring-1 focus:ring-primary focus:outline-hidden"
+          <Select
             value={mapping.amountMode}
-            onChange={(e) => onMappingChange({ ...mapping, amountMode: e.target.value as ColumnMapping['amountMode'] })}
+            onValueChange={(val) => onMappingChange({ ...mapping, amountMode: val as ColumnMapping['amountMode'] })}
           >
-            <option value="separate_debit_credit">Separate Debit & Credit Columns</option>
-            <option value="single_signed">Single Signed Amount Column</option>
-            <option value="type_and_amount">Type Column (CR/DR) + Amount Column</option>
-          </select>
+            <SelectTrigger id="select-amount-mode" className="w-full h-8 text-xs bg-background">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="separate_debit_credit" className="text-xs">Separate Debit & Credit Columns</SelectItem>
+              <SelectItem value="single_signed" className="text-xs">Single Signed Amount Column</SelectItem>
+              <SelectItem value="type_and_amount" className="text-xs">Type Column (CR/DR) + Amount Column</SelectItem>
+            </SelectContent>
+          </Select>
           <p className="text-[11px] text-muted-foreground">How amounts are presented in the statement</p>
         </div>
 
@@ -178,37 +192,43 @@ export function ColumnMappingStep({
           <>
             <div className="rounded-lg border p-3.5 space-y-2 bg-card">
               <label htmlFor="select-debit-col" className="text-xs font-semibold">Debit / Withdrawal Column</label>
-              <select
-                id="select-debit-col"
-                className="w-full h-8 text-xs rounded-md border border-input bg-background px-2.5 focus:ring-1 focus:ring-primary focus:outline-hidden"
-                value={mapping.debitColumn || ''}
-                onChange={(e) => onMappingChange({ ...mapping, debitColumn: e.target.value || undefined })}
+              <Select
+                value={mapping.debitColumn || '__none__'}
+                onValueChange={(val) => onMappingChange({ ...mapping, debitColumn: (!val || val === '__none__') ? undefined : val })}
               >
-                <option value="">-- None / Select Column --</option>
-                {headers.map((h) => (
-                  <option key={h} value={h}>
-                    {h}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="select-debit-col" className="w-full h-8 text-xs bg-background">
+                  <SelectValue placeholder="-- None / Select Column --" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__" className="text-xs">-- None / Select Column --</SelectItem>
+                  {headers.map((h) => (
+                    <SelectItem key={h} value={h} className="text-xs">
+                      {h}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <p className="text-[11px] text-muted-foreground">Expenses and money withdrawn</p>
             </div>
 
             <div className="rounded-lg border p-3.5 space-y-2 bg-card">
               <label htmlFor="select-credit-col" className="text-xs font-semibold">Credit / Deposit Column</label>
-              <select
-                id="select-credit-col"
-                className="w-full h-8 text-xs rounded-md border border-input bg-background px-2.5 focus:ring-1 focus:ring-primary focus:outline-hidden"
-                value={mapping.creditColumn || ''}
-                onChange={(e) => onMappingChange({ ...mapping, creditColumn: e.target.value || undefined })}
+              <Select
+                value={mapping.creditColumn || '__none__'}
+                onValueChange={(val) => onMappingChange({ ...mapping, creditColumn: (!val || val === '__none__') ? undefined : val })}
               >
-                <option value="">-- None / Select Column --</option>
-                {headers.map((h) => (
-                  <option key={h} value={h}>
-                    {h}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="select-credit-col" className="w-full h-8 text-xs bg-background">
+                  <SelectValue placeholder="-- None / Select Column --" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__" className="text-xs">-- None / Select Column --</SelectItem>
+                  {headers.map((h) => (
+                    <SelectItem key={h} value={h} className="text-xs">
+                      {h}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <p className="text-[11px] text-muted-foreground">Income, salary and deposits received</p>
             </div>
           </>
@@ -216,56 +236,63 @@ export function ColumnMappingStep({
           <>
             <div className="rounded-lg border p-3.5 space-y-2 bg-card">
               <label htmlFor="select-type-col" className="text-xs font-semibold">Type Column (CR / DR)</label>
-              <select
-                id="select-type-col"
-                className="w-full h-8 text-xs rounded-md border border-input bg-background px-2.5 focus:ring-1 focus:ring-primary focus:outline-hidden"
-                value={mapping.typeColumn || ''}
-                onChange={(e) => onMappingChange({ ...mapping, typeColumn: e.target.value || undefined })}
+              <Select
+                value={mapping.typeColumn || '__none__'}
+                onValueChange={(val) => onMappingChange({ ...mapping, typeColumn: (!val || val === '__none__') ? undefined : val })}
               >
-                <option value="">-- Select Type Column --</option>
-                {headers.map((h) => (
-                  <option key={h} value={h}>
-                    {h}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="select-type-col" className="w-full h-8 text-xs bg-background">
+                  <SelectValue placeholder="-- Select Type Column --" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__" className="text-xs">-- Select Type Column --</SelectItem>
+                  {headers.map((h) => (
+                    <SelectItem key={h} value={h} className="text-xs">
+                      {h}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <p className="text-[11px] text-muted-foreground">Indicator for Credit (CR) vs Debit (DR)</p>
             </div>
 
             <div className="rounded-lg border p-3.5 space-y-2 bg-card">
               <label htmlFor="select-amount-col-1" className="text-xs font-semibold">Amount Column</label>
-              <select
-                id="select-amount-col-1"
-                className="w-full h-8 text-xs rounded-md border border-input bg-background px-2.5 focus:ring-1 focus:ring-primary focus:outline-hidden"
-                value={mapping.amountColumn || ''}
-                onChange={(e) => onMappingChange({ ...mapping, amountColumn: e.target.value || undefined })}
+              <Select
+                value={mapping.amountColumn || undefined}
+                onValueChange={(val) => onMappingChange({ ...mapping, amountColumn: val || undefined })}
               >
-                <option value="">-- Select Amount Column --</option>
-                {headers.map((h) => (
-                  <option key={h} value={h}>
-                    {h}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="select-amount-col-1" className="w-full h-8 text-xs bg-background">
+                  <SelectValue placeholder="-- Select Amount Column --" />
+                </SelectTrigger>
+                <SelectContent>
+                  {headers.map((h) => (
+                    <SelectItem key={h} value={h} className="text-xs">
+                      {h}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <p className="text-[11px] text-muted-foreground">Numerical value of the transaction</p>
             </div>
           </>
         ) : (
           <div className="rounded-lg border p-3.5 space-y-2 bg-card">
             <label htmlFor="select-amount-col-2" className="text-xs font-semibold">Signed Amount Column</label>
-            <select
-              id="select-amount-col-2"
-              className="w-full h-8 text-xs rounded-md border border-input bg-background px-2.5 focus:ring-1 focus:ring-primary focus:outline-hidden"
-              value={mapping.amountColumn || ''}
-              onChange={(e) => onMappingChange({ ...mapping, amountColumn: e.target.value || undefined })}
+            <Select
+              value={mapping.amountColumn || undefined}
+              onValueChange={(val) => onMappingChange({ ...mapping, amountColumn: val || undefined })}
             >
-              <option value="">-- Select Amount Column --</option>
-              {headers.map((h) => (
-                <option key={h} value={h}>
-                  {h}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="select-amount-col-2" className="w-full h-8 text-xs bg-background">
+                <SelectValue placeholder="-- Select Amount Column --" />
+              </SelectTrigger>
+              <SelectContent>
+                {headers.map((h) => (
+                  <SelectItem key={h} value={h} className="text-xs">
+                    {h}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <p className="text-[11px] text-muted-foreground">Negative for outflow, positive for inflow</p>
           </div>
         )}
@@ -273,19 +300,22 @@ export function ColumnMappingStep({
         {/* Balance Column (Optional) */}
         <div className="rounded-lg border p-3.5 space-y-2 bg-card">
           <label htmlFor="select-balance-col" className="text-xs font-semibold">Closing Balance Column (Optional)</label>
-          <select
-            id="select-balance-col"
-            className="w-full h-8 text-xs rounded-md border border-input bg-background px-2.5 focus:ring-1 focus:ring-primary focus:outline-hidden"
-            value={mapping.balanceColumn || ''}
-            onChange={(e) => onMappingChange({ ...mapping, balanceColumn: e.target.value || undefined })}
+          <Select
+            value={mapping.balanceColumn || '__none__'}
+            onValueChange={(val) => onMappingChange({ ...mapping, balanceColumn: (!val || val === '__none__') ? undefined : val })}
           >
-            <option value="">-- None / Do not map --</option>
-            {headers.map((h) => (
-              <option key={h} value={h}>
-                {h}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id="select-balance-col" className="w-full h-8 text-xs bg-background">
+              <SelectValue placeholder="-- None / Do not map --" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__" className="text-xs">-- None / Do not map --</SelectItem>
+              {headers.map((h) => (
+                <SelectItem key={h} value={h} className="text-xs">
+                  {h}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <p className="text-[11px] text-muted-foreground">Running account balance after transaction</p>
         </div>
       </div>
@@ -301,38 +331,44 @@ export function ColumnMappingStep({
           {/* Date Format */}
           <div className="space-y-1.5">
             <label htmlFor="select-date-format" className="text-xs font-medium text-muted-foreground">Date Format</label>
-            <select
-              id="select-date-format"
-              className="w-full h-8 text-xs rounded-md border border-input bg-background px-2.5 focus:ring-1 focus:ring-primary focus:outline-hidden"
+            <Select
               value={dateFormat}
-              onChange={(e) => onDateFormatChange(e.target.value as DateFormat)}
+              onValueChange={(val) => onDateFormatChange(val as DateFormat)}
             >
-              <option value="DD/MM/YYYY">DD/MM/YYYY (e.g. 01/10/2026)</option>
-              <option value="DD-MM-YYYY">DD-MM-YYYY (e.g. 01-10-2026)</option>
-              <option value="YYYY-MM-DD">YYYY-MM-DD (e.g. 2026-10-01)</option>
-              <option value="MM/DD/YYYY">MM/DD/YYYY (e.g. 10/01/2026)</option>
-              <option value="YYYY/MM/DD">YYYY/MM/DD (e.g. 2026/10/01)</option>
-              <option value="DD MMM YYYY">DD MMM YYYY (e.g. 01 Oct 2026)</option>
-            </select>
+              <SelectTrigger id="select-date-format" className="w-full h-8 text-xs bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="DD/MM/YYYY" className="text-xs">DD/MM/YYYY (e.g. 01/10/2026)</SelectItem>
+                <SelectItem value="DD-MM-YYYY" className="text-xs">DD-MM-YYYY (e.g. 01-10-2026)</SelectItem>
+                <SelectItem value="YYYY-MM-DD" className="text-xs">YYYY-MM-DD (e.g. 2026-10-01)</SelectItem>
+                <SelectItem value="MM/DD/YYYY" className="text-xs">MM/DD/YYYY (e.g. 10/01/2026)</SelectItem>
+                <SelectItem value="YYYY/MM/DD" className="text-xs">YYYY/MM/DD (e.g. 2026/10/01)</SelectItem>
+                <SelectItem value="DD MMM YYYY" className="text-xs">DD MMM YYYY (e.g. 01 Oct 2026)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Decimal & Thousands */}
           <div className="space-y-1.5">
             <label htmlFor="select-decimal-separator" className="text-xs font-medium text-muted-foreground">Number Format</label>
-            <select
-              id="select-decimal-separator"
-              className="w-full h-8 text-xs rounded-md border border-input bg-background px-2.5 focus:ring-1 focus:ring-primary focus:outline-hidden"
+            <Select
               value={numberFormat.decimalSeparator}
-              onChange={(e) =>
+              onValueChange={(val) =>
                 onNumberFormatChange({
-                  decimalSeparator: e.target.value as '.' | ',',
-                  thousandsSeparator: e.target.value === '.' ? ',' : '.',
+                  decimalSeparator: val as '.' | ',',
+                  thousandsSeparator: val === '.' ? ',' : '.',
                 })
               }
             >
-              <option value=".">Dot Decimal (1,25,000.00 / 125,000.00)</option>
-              <option value=",">Comma Decimal (125.000,00)</option>
-            </select>
+              <SelectTrigger id="select-decimal-separator" className="w-full h-8 text-xs bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="." className="text-xs">Dot Decimal (1,25,000.00 / 125,000.00)</SelectItem>
+                <SelectItem value="," className="text-xs">Comma Decimal (125.000,00)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Credit Card Convention */}

@@ -48,7 +48,7 @@ services:
     environment:
       HOSTNAME: "0.0.0.0"
       FINANCE_BACKEND: "db"
-      FINANCE_FEATURES: ${FINANCE_FEATURES:-overview,transactions,accounts,setup,recurring,import}
+      FINANCE_FEATURES: ${FINANCE_FEATURES:-overview,transactions,accounts,setup,budgets,recurring,import}
     ports:
       - "127.0.0.1:${APP_PORT:-3100}:3000"
     read_only: true

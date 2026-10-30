@@ -21,6 +21,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     Table,
     TableBody,
     TableCell,
@@ -387,25 +394,33 @@ export function UsersAdminTable() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <select
+                    <Select
                         value={roleFilter}
-                        onChange={(e) => setRoleFilter(e.target.value as 'all' | 'admin' | 'member')}
-                        className="h-9 rounded-md border border-input bg-background px-2.5 text-xs font-medium text-foreground outline-none"
+                        onValueChange={(val) => setRoleFilter(val as 'all' | 'admin' | 'member')}
                     >
-                        <option value="all">All Roles</option>
-                        <option value="admin">Admins</option>
-                        <option value="member">Members</option>
-                    </select>
+                        <SelectTrigger className="h-9 bg-background px-2.5 text-xs font-medium">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all" className="text-xs">All Roles</SelectItem>
+                            <SelectItem value="admin" className="text-xs">Admins</SelectItem>
+                            <SelectItem value="member" className="text-xs">Members</SelectItem>
+                        </SelectContent>
+                    </Select>
 
-                    <select
+                    <Select
                         value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'disabled')}
-                        className="h-9 rounded-md border border-input bg-background px-2.5 text-xs font-medium text-foreground outline-none"
+                        onValueChange={(val) => setStatusFilter(val as 'all' | 'active' | 'disabled')}
                     >
-                        <option value="all">All Statuses</option>
-                        <option value="active">Active</option>
-                        <option value="disabled">Disabled</option>
-                    </select>
+                        <SelectTrigger className="h-9 bg-background px-2.5 text-xs font-medium">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all" className="text-xs">All Statuses</SelectItem>
+                            <SelectItem value="active" className="text-xs">Active</SelectItem>
+                            <SelectItem value="disabled" className="text-xs">Disabled</SelectItem>
+                        </SelectContent>
+                    </Select>
 
                     <Button
                         variant="outline"
@@ -676,15 +691,18 @@ export function UsersAdminTable() {
 
                         <div className="space-y-1.5">
                             <Label htmlFor="create-role">System Role</Label>
-                            <select
-                                id="create-role"
+                            <Select
                                 value={createRole}
-                                onChange={(e) => setCreateRole(e.target.value as 'member' | 'admin')}
-                                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none"
+                                onValueChange={(val) => setCreateRole(val as 'member' | 'admin')}
                             >
-                                <option value="member">Member (Workbooks, Charts, Queries, Personal Finance)</option>
-                                <option value="admin">Administrator (Platform settings, User admin, Workspace management)</option>
-                            </select>
+                                <SelectTrigger id="create-role" className="w-full h-9 bg-background px-3 text-sm">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="member" className="text-xs">Member (Workbooks, Charts, Queries, Personal Finance)</SelectItem>
+                                    <SelectItem value="admin" className="text-xs">Administrator (Platform settings, User admin, Workspace management)</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
 
                         <div className="flex items-center space-x-2 pt-1">

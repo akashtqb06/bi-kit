@@ -175,4 +175,144 @@ describe('OverviewView Component & API Integration', () => {
     // Spend by category name from API
     expect(html).toContain('Groceries');
   });
+
+  it('immediately reflects new transaction in overview stats and accounts when added', async () => {
+    let mockAccountBalance = 5000000; // ₹50,000
+    let mockMonthlyExpense = 100000; // ₹1,000
+
+    globalThis.fetch = vi.fn().mockImplementation((url: string | URL | Request, init?: RequestInit) => {
+      const urlStr = String(url);
+      const method = init?.method || 'GET';
+
+      if (urlStr.includes('/api/finance/transactions') && method === 'POST') {
+        mockAccountBalance -= 200000; // -₹2,000
+        mockMonthlyExpense += 200000; // +₹2,000
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              transaction: {
+                id: 'tx-new-1',
+                userId: 'usr-test',
+                accountId: 'acc_bank_1',
+                amount: 200000,
+                type: 'expense',
+                date: '2026-10-30',
+              },
+            }),
+            { status: 201 }
+          )
+        );
+      }
+
+      if (urlStr.includes('/api/finance/accounts/balances')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              accounts: [
+                {
+                  id: 'acc_bank_1',
+                  name: 'Salary Account',
+                  kind: 'bank',
+                  class: 'asset',
+                  currency: 'INR',
+                  balance: mockAccountBalance,
+                  outstanding: 0,
+                  utilization: 0,
+                  currentValue: mockAccountBalance,
+                  isActive: true,
+                  createdAt: '2026-10-01',
+                  updatedAt: '2026-10-01',
+                },
+              ],
+            }),
+            { status: 200 }
+          )
+        );
+      }
+
+      if (urlStr.includes('/api/finance/stats/overview')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              netWorth: mockAccountBalance,
+              totalAssets: mockAccountBalance,
+              totalLiabilities: 0,
+              monthlyIncome: 10000000,
+              monthlyExpense: mockMonthlyExpense,
+              savingsRate: 90,
+              spendByCategory: [
+                {
+                  categoryId: 'cat-food',
+                  categoryName: 'Dining',
+                  amount: mockMonthlyExpense,
+                  percentage: 100,
+                },
+              ],
+              accountsByKind: {
+                bank: { count: 1, totalBalance: mockAccountBalance },
+              },
+              recentTransactions: [],
+              cardsDueSoon: [],
+            }),
+            { status: 200 }
+          )
+        );
+      }
+
+      if (urlStr.includes('/api/finance/stats/net-worth-history')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              history: [
+                {
+                  date: '2026-10-30',
+                  netWorth: mockAccountBalance,
+                  assets: mockAccountBalance,
+                  liabilities: 0,
+                },
+              ],
+            }),
+            { status: 200 }
+          )
+        );
+      }
+
+      if (urlStr.includes('/api/finance/transactions')) {
+        return Promise.resolve(new Response(JSON.stringify({ transactions: [], total: 0 }), { status: 200 }));
+      }
+      if (urlStr.includes('/api/finance/categories')) {
+        return Promise.resolve(new Response(JSON.stringify({ categories: [] }), { status: 200 }));
+      }
+      if (urlStr.includes('/api/finance/budgets')) {
+        return Promise.resolve(new Response(JSON.stringify({ budgets: [], progress: [] }), { status: 200 }));
+      }
+
+      return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }));
+    });
+
+    // Initialize
+    await useFinanceStore.getState().initialize('usr-test');
+
+    // Initial Overview render before adding transaction
+    const initialHtml = renderToString(<OverviewView />);
+    // Total assets was ₹50,000
+    expect(initialHtml).toContain('₹50,000');
+    // Monthly expense was ₹1,000
+    expect(initialHtml).toContain('₹1,000');
+
+    // Add transaction
+    await useFinanceStore.getState().addTransaction({
+      accountId: 'acc_bank_1',
+      amount: 200000, // ₹2,000
+      type: 'expense',
+      date: '2026-10-30',
+    });
+
+    // Overview render AFTER adding transaction - reflects immediately without refresh!
+    const updatedHtml = renderToString(<OverviewView />);
+    // Total assets reduced to ₹48,000 (50k - 2k)
+    expect(updatedHtml).toContain('₹48,000');
+    // Monthly expense increased to ₹3,000 (1k + 2k)
+    expect(updatedHtml).toContain('₹3,000');
+  });
 });

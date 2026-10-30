@@ -178,9 +178,12 @@ export async function getOverviewStats(
     // Credit card due check
     if (acc.kind === 'credit_card' && balance < 0) {
       const meta = (acc.metadata || {}) as Record<string, unknown>;
-      const statementDay = Number(meta.statementDay || 15);
-      const dueDay = Number(meta.dueDay || 5);
-      const isOffset = Boolean(meta.isOffsetDays);
+      const statementDay = Number(meta.statementDay || 21);
+      const dueDay = Number(meta.dueDays || meta.dueDay || 20);
+      const isOffset =
+        meta.isOffsetDays !== undefined
+          ? Boolean(meta.isOffsetDays)
+          : (meta.dueDays !== undefined || (meta.dueDay !== undefined && Number(meta.dueDay) > 0));
 
       const dueInfo = isCardDueWithinDays(statementDay, dueDay, today, 10, { isOffsetDays: isOffset });
       if (dueInfo.isDue) {

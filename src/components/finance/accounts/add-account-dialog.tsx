@@ -5,7 +5,15 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useFinanceStore } from '../shared/finance-store';
 import { rupeesToPaise } from '../shared/format';
 import type { AccountKind } from '@src/lib/finance/constants';
@@ -30,8 +38,8 @@ export function AddAccountForm({
   // Card fields
   const [creditLimitRupees, setCreditLimitRupees] = useState('');
   const [currentOutstandingRupees, setCurrentOutstandingRupees] = useState('');
-  const [statementDay, setStatementDay] = useState('15');
-  const [dueDay, setDueDay] = useState('5');
+  const [statementDay, setStatementDay] = useState('21');
+  const [dueDays, setDueDays] = useState('20');
 
   // Deposit fields (FD/RD)
   const [principalRupees, setPrincipalRupees] = useState('');
@@ -81,9 +89,13 @@ export function AddAccountForm({
         metadata.openingDate = openingDate;
       } else if (kind === 'credit_card') {
         limitPaise = creditLimitRupees ? rupeesToPaise(parseFloat(creditLimitRupees)) : 0;
-        openingPaise = currentOutstandingRupees ? rupeesToPaise(parseFloat(currentOutstandingRupees)) : 0;
-        metadata.statementDay = parseInt(statementDay, 10);
-        metadata.dueDay = parseInt(dueDay, 10);
+        openingPaise = currentOutstandingRupees ? -Math.abs(rupeesToPaise(parseFloat(currentOutstandingRupees))) : 0;
+        const stmt = parseInt(statementDay, 10) || 21;
+        const due = parseInt(dueDays, 10) || 20;
+        metadata.statementDay = stmt;
+        metadata.dueDay = due;
+        metadata.dueDays = due;
+        metadata.isOffsetDays = true;
       } else if (kind === 'fixed_deposit') {
         openingPaise = principalRupees ? rupeesToPaise(parseFloat(principalRupees)) : 0;
         metadata.principal = openingPaise;
@@ -101,7 +113,7 @@ export function AddAccountForm({
         openingPaise = initialValueRupees ? rupeesToPaise(parseFloat(initialValueRupees)) : 0;
         metadata.costBasis = openingPaise;
       } else if (kind === 'loan' || kind === 'other_liability') {
-        openingPaise = loanAmountRupees ? rupeesToPaise(parseFloat(loanAmountRupees)) : 0;
+        openingPaise = loanAmountRupees ? -Math.abs(rupeesToPaise(parseFloat(loanAmountRupees))) : 0;
         metadata.interestRate = parseFloat(loanRate) || 0;
         metadata.emiAmount = emiRupees ? rupeesToPaise(parseFloat(emiRupees)) : 0;
       }
@@ -113,8 +125,8 @@ export function AddAccountForm({
         creditLimit: limitPaise,
         openingBalance: openingPaise,
         openingDate,
-        statementDay: kind === 'credit_card' ? parseInt(statementDay, 10) : undefined,
-        dueDay: kind === 'credit_card' ? parseInt(dueDay, 10) : undefined,
+        statementDay: kind === 'credit_card' ? (parseInt(statementDay, 10) || 21) : undefined,
+        dueDay: kind === 'credit_card' ? (parseInt(dueDays, 10) || 20) : undefined,
         metadata,
       });
 
@@ -134,24 +146,30 @@ export function AddAccountForm({
         <Label htmlFor="account-kind" className="text-xs font-medium text-muted-foreground">
           Account Kind
         </Label>
-        <select
-          id="account-kind"
-          data-testid="account-kind-select"
-          className="w-full h-9 rounded-md border border-input bg-card px-3 text-xs focus:ring-1 focus:ring-primary focus:outline-hidden"
+        <Select
           value={kind}
-          onChange={(e) => setKind(e.target.value as AccountKind)}
+          onValueChange={(val) => setKind(val as AccountKind)}
         >
-          <option value="bank">Bank Account (Checking / Savings)</option>
-          <option value="cash">Cash / Physical Wallet</option>
-          <option value="credit_card">Credit Card</option>
-          <option value="fixed_deposit">Fixed Deposit (FD)</option>
-          <option value="recurring_deposit">Recurring Deposit (RD)</option>
-          <option value="mutual_fund">Mutual Funds Portfolio</option>
-          <option value="stocks">Demat / Stocks</option>
-          <option value="loan">Loan (Home, Auto, Personal)</option>
-          <option value="other_asset">Other Asset</option>
-          <option value="other_liability">Other Liability</option>
-        </select>
+          <SelectTrigger
+            id="account-kind"
+            data-testid="account-kind-select"
+            className="w-full h-9 bg-card px-3 text-xs"
+          >
+            <SelectValue placeholder="Select account type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="bank">Bank Account (Checking / Savings)</SelectItem>
+            <SelectItem value="cash">Cash / Physical Wallet</SelectItem>
+            <SelectItem value="credit_card">Credit Card</SelectItem>
+            <SelectItem value="fixed_deposit">Fixed Deposit (FD)</SelectItem>
+            <SelectItem value="recurring_deposit">Recurring Deposit (RD)</SelectItem>
+            <SelectItem value="mutual_fund">Mutual Funds Portfolio</SelectItem>
+            <SelectItem value="stocks">Demat / Stocks</SelectItem>
+            <SelectItem value="loan">Loan (Home, Auto, Personal)</SelectItem>
+            <SelectItem value="other_asset">Other Asset</SelectItem>
+            <SelectItem value="other_liability">Other Liability</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Account Name */}
@@ -203,12 +221,12 @@ export function AddAccountForm({
             <Label htmlFor="opening-date" className="text-xs font-medium text-muted-foreground">
               Opening Date
             </Label>
-            <Input
+            <DatePicker
               id="opening-date"
-              type="date"
               className="h-9 text-xs bg-card"
               value={openingDate}
-              onChange={(e) => setOpeningDate(e.target.value)}
+              onChange={setOpeningDate}
+              placeholder="Select opening date"
             />
           </div>
         </div>
@@ -256,26 +274,28 @@ export function AddAccountForm({
                 type="number"
                 min="1"
                 max="31"
-                placeholder="15"
+                placeholder="21"
                 className="h-9 text-xs bg-card"
                 value={statementDay}
                 onChange={(e) => setStatementDay(e.target.value)}
               />
+              <p className="text-[10px] text-muted-foreground">Bill generation date (1-31)</p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="due-day" className="text-xs font-medium text-muted-foreground">
-                Payment Due Day of Month
+              <Label htmlFor="due-days" className="text-xs font-medium text-muted-foreground">
+                Payment Due (Days after bill)
               </Label>
               <Input
-                id="due-day"
+                id="due-days"
                 type="number"
                 min="1"
-                max="31"
-                placeholder="5"
+                max="60"
+                placeholder="20"
                 className="h-9 text-xs bg-card"
-                value={dueDay}
-                onChange={(e) => setDueDay(e.target.value)}
+                value={dueDays}
+                onChange={(e) => setDueDays(e.target.value)}
               />
+              <p className="text-[10px] text-muted-foreground">Days for payment due (e.g. 20)</p>
             </div>
           </div>
         </div>
@@ -319,39 +339,42 @@ export function AddAccountForm({
               <Label htmlFor="fd-compounding" className="text-xs font-medium text-muted-foreground">
                 Compounding
               </Label>
-              <select
-                id="fd-compounding"
-                className="w-full h-9 rounded-md border border-input bg-card px-2 text-xs"
+              <Select
                 value={compounding}
-                onChange={(e) => setCompounding(e.target.value as typeof compounding)}
+                onValueChange={(val) => setCompounding(val as typeof compounding)}
               >
-                <option value="quarterly">Quarterly (Bank Default)</option>
-                <option value="monthly">Monthly</option>
-                <option value="yearly">Yearly</option>
-              </select>
+                <SelectTrigger id="fd-compounding" className="w-full h-9 bg-card px-2 text-xs">
+                  <SelectValue placeholder="Select compounding" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="quarterly">Quarterly (Bank Default)</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="yearly">Yearly</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="fd-start" className="text-xs font-medium text-muted-foreground">
                 Start Date
               </Label>
-              <Input
+              <DatePicker
                 id="fd-start"
-                type="date"
                 className="h-9 text-xs bg-card"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={setStartDate}
+                placeholder="Select start date"
               />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="fd-maturity" className="text-xs font-medium text-muted-foreground">
                 Maturity Date
               </Label>
-              <Input
+              <DatePicker
                 id="fd-maturity"
-                type="date"
                 className="h-9 text-xs bg-card"
                 value={maturityDate}
-                onChange={(e) => setMaturityDate(e.target.value)}
+                onChange={setMaturityDate}
+                placeholder="Select maturity date"
               />
             </div>
           </div>
@@ -396,12 +419,12 @@ export function AddAccountForm({
               <Label htmlFor="rd-start" className="text-xs font-medium text-muted-foreground">
                 Start Date
               </Label>
-              <Input
+              <DatePicker
                 id="rd-start"
-                type="date"
                 className="h-9 text-xs bg-card"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={setStartDate}
+                placeholder="Select start date"
               />
             </div>
             <div className="space-y-1.5">

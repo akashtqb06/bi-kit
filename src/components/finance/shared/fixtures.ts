@@ -14,6 +14,11 @@ export interface AccountWithBalance extends AccountDTO {
   daysToMaturity?: number; // for FD/RD
   statementDay?: number; // for cards (1-31)
   dueDay?: number; // for cards (1-31)
+  dueDays?: number; // for cards (offset days)
+  isOffsetDays?: boolean;
+  lastStatementDate?: string; // YYYY-MM-DD
+  nextStatementDate?: string; // YYYY-MM-DD (next bill date)
+  currentDueDate?: string; // YYYY-MM-DD
   nextDueDate?: string; // YYYY-MM-DD
   monthlyInstallment?: number; // in paise (for RD)
   installmentsPaid?: number; // for RD

@@ -93,6 +93,22 @@ If a manual valuation exists at anchor date $D_{\text{anchor}}$:
 - **Overpayment Notice**:
   If payment amount exceeds current outstanding debt, the surplus creates a positive credit balance on the card.
 
+### 3.3 Billing Cycles & Payment Due Dates
+- **Statement Day (Billing Cycle Day)**: The calendar day of month $S$ (1–31) on which the monthly statement is generated.
+- **Payment Due Offset ($D_{\text{offset}}$)**: The number of days after statement generation before payment is due (standard default: 20 days).
+- **As-of Date Evaluation ($asOf$)**:
+  - If current day of month $d < S$:
+    - Last statement: Previous month on day $S$.
+    - Next statement generates on: Current month on day $S$.
+    - Next due date: Next statement date $+ D_{\text{offset}}$ days.
+  - If current day of month $d \ge S$ (e.g. statement day is 21, current day is 30):
+    - Last statement: Current month on day $S$ (e.g. Oct 21).
+    - Current due date: Last statement date $+ D_{\text{offset}}$ days (e.g. Oct 21 + 20 days = Nov 10).
+    - Next statement generates on: Next month on day $S$ (e.g. Nov 21).
+    - Next due date: Next statement date $+ D_{\text{offset}}$ days (e.g. Nov 21 + 20 days = Dec 11, in December).
+- **Opening Balance / Current Due**:
+  - When opening an account, current outstanding debt is recorded as a negative adjustment in the ledger so $\text{outstanding} = -\text{balance} > 0$.
+
 ---
 
 ## 4. Investment Portfolio Conventions

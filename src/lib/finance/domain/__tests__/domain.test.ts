@@ -160,6 +160,19 @@ describe('Finance Domain Logic: Credit Cards & Liabilities', () => {
     const febDates = calculateCardDates(31, 31, '2026-02-10');
     expect(febDates.nextStatementDate).toBe('2026-02-28');
   });
+
+  it('computes credit card due dates when opening on day 30 with statement day 21 and payment due days', () => {
+    // Current day is 30, statement date is 21, payment due is 20 days after statement
+    const dates = calculateCardDates(21, 20, '2026-10-30', { isOffsetDays: true });
+    // Next bill generates on 21 of next month (November 21)
+    expect(dates.nextStatementDate).toBe('2026-11-21');
+    // Due date for next bill will be on Dec based on number of days for payment due (Nov 21 + 20 days = Dec 11)
+    expect(dates.nextDueDate).toBe('2026-12-11');
+    // Last statement was generated on Oct 21
+    expect(dates.lastStatementDate).toBe('2026-10-21');
+    // Current bill due date from Oct 21 statement was Oct 21 + 20 days = Nov 10
+    expect(dates.currentDueDate).toBe('2026-11-10');
+  });
 });
 
 describe('Finance Domain Logic: Investment Calculations', () => {

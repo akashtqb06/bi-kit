@@ -224,7 +224,11 @@ export function AccountsView() {
                         <ArrowUpRightIcon className="size-3 text-muted-foreground" />
                       </h4>
                       <div className="text-[11px] text-muted-foreground mt-0.5">
-                        {acc.nextDueDate ? `Due on ${acc.nextDueDate}` : 'Credit Card'}
+                        {acc.nextStatementDate && acc.nextDueDate
+                          ? `Bill: ${acc.nextStatementDate} • Due: ${acc.nextDueDate}`
+                          : acc.nextDueDate
+                          ? `Due on ${acc.nextDueDate}`
+                          : 'Credit Card'}
                       </div>
                     </Link>
 

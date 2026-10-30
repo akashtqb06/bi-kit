@@ -19,6 +19,7 @@ import {
 import type { CompoundingFrequency } from '@src/lib/finance/constants';
 import { calculateCardDates } from '@src/lib/finance/domain/credit-card';
 
+
 export async function GET() {
   try {
     const user = await requireUserApi();
@@ -120,6 +121,11 @@ export async function GET() {
       let interestRate: number | undefined;
       let compoundingFrequency: string | undefined;
       let nextDueDate: string | undefined;
+      let currentDueDate: string | undefined;
+      let nextStatementDate: string | undefined;
+      let lastStatementDate: string | undefined;
+      let dueDays: number | undefined;
+      let isOffsetDays: boolean | undefined;
 
       if (dto.kind === 'fixed_deposit') {
         principal = Number(
@@ -219,11 +225,24 @@ export async function GET() {
         );
         nextInstallmentDate = getNextInstallmentDate(startDate, tenureMonths, today) || undefined;
       } else if (dto.kind === 'credit_card') {
-        const stmtDay = meta.statementDay !== undefined ? Number(meta.statementDay) : 15;
-        const dDay = meta.dueDay !== undefined ? Number(meta.dueDay) : 5;
-        const isOffset = Boolean(meta.isOffsetDays);
+        const stmtDay = meta.statementDay !== undefined ? Number(meta.statementDay) : 21;
+        const dDay =
+          meta.dueDays !== undefined
+            ? Number(meta.dueDays)
+            : meta.dueDay !== undefined
+            ? Number(meta.dueDay)
+            : 20;
+        const isOffset =
+          meta.isOffsetDays !== undefined
+            ? Boolean(meta.isOffsetDays)
+            : (meta.dueDays !== undefined || (meta.dueDay !== undefined && Number(meta.dueDay) > 0));
         const cardDates = calculateCardDates(stmtDay, dDay, today, { isOffsetDays: isOffset });
-        nextDueDate = cardDates.currentDueDate >= today ? cardDates.currentDueDate : cardDates.nextDueDate;
+        lastStatementDate = cardDates.lastStatementDate;
+        nextStatementDate = cardDates.nextStatementDate;
+        currentDueDate = cardDates.currentDueDate;
+        nextDueDate = cardDates.nextDueDate;
+        dueDays = isOffset ? dDay : undefined;
+        isOffsetDays = isOffset;
       }
 
       const currentValue =
@@ -256,6 +275,11 @@ export async function GET() {
         compoundingFrequency,
         statementDay: meta.statementDay !== undefined ? Number(meta.statementDay) : undefined,
         dueDay: meta.dueDay !== undefined ? Number(meta.dueDay) : undefined,
+        dueDays,
+        isOffsetDays,
+        lastStatementDate,
+        nextStatementDate,
+        currentDueDate,
         nextDueDate,
       };
     });

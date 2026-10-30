@@ -6,6 +6,7 @@ import { budgetFiltersSchema, createBudgetSchema } from '@src/lib/finance/contra
 import { getFinanceService } from '@src/lib/finance/service';
 import { checkFeatureGatedApi } from '@src/lib/finance/flags';
 
+
 export async function GET(request: NextRequest) {
   try {
     const user = await requireUserApi();

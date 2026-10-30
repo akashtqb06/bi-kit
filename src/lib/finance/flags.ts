@@ -28,6 +28,7 @@ export const DEFAULT_ENABLED_FEATURES: readonly FinanceFeature[] = [
   'transactions',
   'accounts',
   'setup',
+  'budgets',
   'recurring',
   'import',
 ] as const;

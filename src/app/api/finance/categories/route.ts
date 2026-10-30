@@ -5,6 +5,7 @@ import { jsonNoStore } from '../utils';
 import { categoryFiltersSchema, createCategorySchema } from '@src/lib/finance/contract';
 import { getFinanceService } from '@src/lib/finance/service';
 
+
 export async function GET(request: NextRequest) {
   try {
     const user = await requireUserApi();

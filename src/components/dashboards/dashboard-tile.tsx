@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import {
     DropdownMenu,
@@ -12,6 +13,13 @@ import {
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {
     MoreVerticalIcon,
     ExternalLinkIcon,
@@ -304,29 +312,31 @@ export function DashboardWidget({
                 return (
                     <div className="flex flex-col gap-2 justify-center h-full no-drag pointer-events-auto">
                         <div className="grid grid-cols-2 gap-1.5">
-                            <input
-                                type="date"
+                            <DatePicker
                                 value={rangeVal.from || ''}
-                                onChange={(e) =>
+                                onChange={(val) =>
                                     onFilterValueChange?.(filter?.id || '', {
                                         ...rangeVal,
-                                        from: e.target.value || undefined,
+                                        from: val || undefined,
                                     })
                                 }
-                                className="h-7 text-xs px-2 border rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-ring"
+                                className="h-7 text-xs px-2"
                                 aria-label="Start date"
+                                placeholder="Start date"
+                                clearable
                             />
-                            <input
-                                type="date"
+                            <DatePicker
                                 value={rangeVal.to || ''}
-                                onChange={(e) =>
+                                onChange={(val) =>
                                     onFilterValueChange?.(filter?.id || '', {
                                         ...rangeVal,
-                                        to: e.target.value || undefined,
+                                        to: val || undefined,
                                     })
                                 }
-                                className="h-7 text-xs px-2 border rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-ring"
+                                className="h-7 text-xs px-2"
                                 aria-label="End date"
+                                placeholder="End date"
+                                clearable
                             />
                         </div>
                     </div>
@@ -337,21 +347,24 @@ export function DashboardWidget({
             const curSelectVal = String(filterValue ?? '__all__');
             return (
                 <div className="flex flex-col justify-center h-full no-drag pointer-events-auto">
-                    <select
+                    <Select
                         value={curSelectVal}
-                        onChange={(e) => {
-                            const val = e.target.value;
+                        onValueChange={(val) => {
                             onFilterValueChange?.(filter?.id || '', val === '__all__' ? undefined : val);
                         }}
-                        className="h-8 w-full text-xs font-medium px-2 border rounded-md bg-background text-foreground outline-none focus:ring-1 focus:ring-ring cursor-pointer"
                     >
-                        <option value="__all__">All</option>
-                        {distinctValues.map((val) => (
-                            <option key={val} value={val}>
-                                {val}
-                            </option>
-                        ))}
-                    </select>
+                        <SelectTrigger className="h-8 w-full text-xs font-medium">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="__all__" className="text-xs">All</SelectItem>
+                            {distinctValues.map((val) => (
+                                <SelectItem key={val} value={val} className="text-xs">
+                                    {val}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
             );
         }

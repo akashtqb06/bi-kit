@@ -33,6 +33,13 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { formatRelativeTime } from '@src/lib/utils';
 import { toast } from 'sonner';
 
@@ -294,20 +301,24 @@ export function AuditLogTable() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <select
+                    <Select
                         value={selectedAction}
-                        onChange={(e) => {
-                            setSelectedAction(e.target.value);
+                        onValueChange={(val) => {
+                            setSelectedAction(val || 'all');
                             setPageIndex(0);
                         }}
-                        className="h-9 rounded-md border border-input bg-background px-2.5 text-xs font-medium text-foreground outline-none"
                     >
-                        {ACTION_GROUPS.map((g) => (
-                            <option key={g.value} value={g.value}>
-                                {g.label}
-                            </option>
-                        ))}
-                    </select>
+                        <SelectTrigger className="h-9 text-xs font-medium bg-background px-2.5">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {ACTION_GROUPS.map((g) => (
+                                <SelectItem key={g.value} value={g.value} className="text-xs">
+                                    {g.label}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
 
                     <Button
                         variant="outline"

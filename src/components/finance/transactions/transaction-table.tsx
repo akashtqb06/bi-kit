@@ -18,8 +18,16 @@ import {
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -324,31 +332,39 @@ export function TransactionTable() {
 
         <div className="flex items-center gap-1.5 overflow-x-auto">
           {/* Quick Date Presets */}
-          <select
-            className="h-9 rounded-md border border-input bg-card px-2.5 text-xs text-muted-foreground focus:text-foreground"
+          <Select
             value={datePreset}
-            onChange={(e) => setDatePreset(e.target.value as typeof datePreset)}
+            onValueChange={(val) => setDatePreset(val as typeof datePreset)}
           >
-            <option value="all">All Dates</option>
-            <option value="today">Today</option>
-            <option value="yesterday">Yesterday</option>
-            <option value="week">This Week</option>
-            <option value="month">This Month</option>
-            <option value="last30">Last 30 Days</option>
-            <option value="custom">Custom Range...</option>
-          </select>
+            <SelectTrigger className="h-9 bg-card px-2.5 text-xs text-muted-foreground focus:text-foreground">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs">All Dates</SelectItem>
+              <SelectItem value="today" className="text-xs">Today</SelectItem>
+              <SelectItem value="yesterday" className="text-xs">Yesterday</SelectItem>
+              <SelectItem value="week" className="text-xs">This Week</SelectItem>
+              <SelectItem value="month" className="text-xs">This Month</SelectItem>
+              <SelectItem value="last30" className="text-xs">Last 30 Days</SelectItem>
+              <SelectItem value="custom" className="text-xs">Custom Range...</SelectItem>
+            </SelectContent>
+          </Select>
 
           {/* Type Filter */}
-          <select
-            className="h-9 rounded-md border border-input bg-card px-2.5 text-xs text-muted-foreground focus:text-foreground"
+          <Select
             value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value as typeof selectedType)}
+            onValueChange={(val) => setSelectedType(val as typeof selectedType)}
           >
-            <option value="all">All Types</option>
-            <option value="expense">Expenses</option>
-            <option value="income">Income</option>
-            <option value="transfer">Transfers</option>
-          </select>
+            <SelectTrigger className="h-9 bg-card px-2.5 text-xs text-muted-foreground focus:text-foreground">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-xs">All Types</SelectItem>
+              <SelectItem value="expense" className="text-xs">Expenses</SelectItem>
+              <SelectItem value="income" className="text-xs">Income</SelectItem>
+              <SelectItem value="transfer" className="text-xs">Transfers</SelectItem>
+            </SelectContent>
+          </Select>
 
           {/* Toggle More Filters */}
           <Button
@@ -375,6 +391,16 @@ export function TransactionTable() {
               <span className="hidden sm:inline">Reset</span>
             </Button>
           )}
+
+          <Button
+            type="button"
+            size="sm"
+            className="h-9 text-xs gap-1.5 shrink-0"
+            onClick={() => openQuickAdd()}
+          >
+            <PlusIcon className="size-3.5" />
+            <span>Add Transaction</span>
+          </Button>
         </div>
       </div>
 
@@ -385,18 +411,22 @@ export function TransactionTable() {
             <label className="text-[11px] font-medium text-muted-foreground block mb-1">
               Account
             </label>
-            <select
-              className="w-full h-8 rounded-md border border-input bg-card px-2 text-xs"
+            <Select
               value={selectedAccountId}
-              onChange={(e) => setSelectedAccountId(e.target.value)}
+              onValueChange={(val) => setSelectedAccountId(val || 'all')}
             >
-              <option value="all">All Accounts</option>
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full h-8 bg-card px-2 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs">All Accounts</SelectItem>
+                {accounts.map((a) => (
+                  <SelectItem key={a.id} value={a.id} className="text-xs">
+                    {a.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
@@ -421,18 +451,22 @@ export function TransactionTable() {
                 })()
               )}
             </div>
-            <select
-              className="w-full h-8 rounded-md border border-input bg-card px-2 text-xs"
+            <Select
               value={selectedCategoryId}
-              onChange={(e) => setSelectedCategoryId(e.target.value)}
+              onValueChange={(val) => setSelectedCategoryId(val || 'all')}
             >
-              <option value="all">All Categories</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.type})
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full h-8 bg-card px-2 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs">All Categories</SelectItem>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id} className="text-xs">
+                    {c.name} ({c.type})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
@@ -467,22 +501,24 @@ export function TransactionTable() {
                 <label className="text-[11px] font-medium text-muted-foreground block mb-1">
                   Start Date
                 </label>
-                <Input
-                  type="date"
+                <DatePicker
                   className="h-8 text-xs bg-card"
                   value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  onChange={setCustomStartDate}
+                  placeholder="Start date"
+                  clearable
                 />
               </div>
               <div>
                 <label className="text-[11px] font-medium text-muted-foreground block mb-1">
                   End Date
                 </label>
-                <Input
-                  type="date"
+                <DatePicker
                   className="h-8 text-xs bg-card"
                   value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  onChange={setCustomEndDate}
+                  placeholder="End date"
+                  clearable
                 />
               </div>
             </div>
@@ -777,18 +813,21 @@ export function TransactionTable() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-3">
-            <select
-              className="w-full h-9 rounded-md border border-input bg-card px-3 text-xs"
-              value={bulkCategoryTarget}
-              onChange={(e) => setBulkCategoryTarget(e.target.value)}
+            <Select
+              value={bulkCategoryTarget || undefined}
+              onValueChange={(val) => setBulkCategoryTarget(val || '')}
             >
-              <option value="">Select category...</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.type})
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full h-9 bg-card px-3 text-xs">
+                <SelectValue placeholder="Select category..." />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id} className="text-xs">
+                    {c.name} ({c.type})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <DialogFooter>
             <Button variant="ghost" size="sm" onClick={() => setBulkCategoryOpen(false)}>
@@ -811,18 +850,21 @@ export function TransactionTable() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-3">
-            <select
-              className="w-full h-9 rounded-md border border-input bg-card px-3 text-xs"
-              value={bulkAccountTarget}
-              onChange={(e) => setBulkAccountTarget(e.target.value)}
+            <Select
+              value={bulkAccountTarget || undefined}
+              onValueChange={(val) => setBulkAccountTarget(val || '')}
             >
-              <option value="">Select account...</option>
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full h-9 bg-card px-3 text-xs">
+                <SelectValue placeholder="Select account..." />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.map((a) => (
+                  <SelectItem key={a.id} value={a.id} className="text-xs">
+                    {a.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <DialogFooter>
             <Button variant="ghost" size="sm" onClick={() => setBulkAccountOpen(false)}>

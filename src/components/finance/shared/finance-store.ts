@@ -2,8 +2,12 @@
 
 import { create } from 'zustand';
 import type {
+  BudgetDTO,
+  BudgetFilters,
+  BudgetProgressDTO,
   CategoryDTO,
   CreateAccountDTO,
+  CreateBudgetDTO,
   CreateCategoryDTO,
   CreateTransactionDTO,
   CreateValuationDTO,
@@ -11,6 +15,7 @@ import type {
   OverviewStatsDTO,
   TransactionDTO,
   UpdateAccountDTO,
+  UpdateBudgetDTO,
   UpdateCategoryDTO,
   UpdateTransactionDTO,
   ValuationDTO,
@@ -29,10 +34,13 @@ export interface FinanceState {
   transactionsStatus: SliceStatus;
   overviewStatus: SliceStatus;
   historyStatus: SliceStatus;
+  budgetsStatus: SliceStatus;
 
   accounts: AccountWithBalance[];
   categories: CategoryDTO[];
   transactions: TransactionDTO[];
+  budgets: BudgetDTO[];
+  budgetProgress: BudgetProgressDTO[];
   valuations: Record<string, ValuationDTO[]>;
   netWorthHistory: NetWorthPointDTO[];
   overviewStats: OverviewStatsDTO | null;
@@ -58,6 +66,7 @@ export interface FinanceState {
   refreshNetWorthHistory: () => Promise<void>;
   refreshTransactions: () => Promise<void>;
   refreshCategories: () => Promise<void>;
+  refreshBudgets: (filters?: BudgetFilters) => Promise<void>;
   openQuickAdd: (initialData?: Partial<CreateTransactionDTO>) => void;
   closeQuickAdd: () => void;
   openPayBill: (cardId?: string) => void;
@@ -93,6 +102,10 @@ export interface FinanceState {
   addCategory: (data: CreateCategoryDTO) => Promise<CategoryDTO>;
   updateCategory: (id: string, data: UpdateCategoryDTO) => Promise<CategoryDTO>;
   deleteCategory: (id: string) => Promise<void>;
+
+  addBudget: (data: CreateBudgetDTO) => Promise<BudgetDTO>;
+  updateBudget: (id: string, data: UpdateBudgetDTO) => Promise<BudgetDTO>;
+  deleteBudget: (id: string) => Promise<void>;
 }
 
 export const useFinanceStore = create<FinanceState>((set, get, api) => {
@@ -106,10 +119,13 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
     transactionsStatus: 'idle',
     overviewStatus: 'idle',
     historyStatus: 'idle',
+    budgetsStatus: 'idle',
 
     accounts: [],
     categories: [],
     transactions: [],
+    budgets: [],
+    budgetProgress: [],
     valuations: {},
     netWorthHistory: [],
     overviewStats: null,
@@ -130,9 +146,12 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
       transactionsStatus: 'idle',
       overviewStatus: 'idle',
       historyStatus: 'idle',
+      budgetsStatus: 'idle',
       accounts: [],
       categories: [],
       transactions: [],
+      budgets: [],
+      budgetProgress: [],
       valuations: {},
       netWorthHistory: [],
       overviewStats: null,
@@ -148,7 +167,10 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
   refreshAccounts: async () => {
     set({ accountsStatus: 'loading' });
     try {
-      const res = await fetch('/api/finance/accounts/balances');
+      const res = await fetch('/api/finance/accounts/balances', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+      });
       if (!res.ok) throw new Error(`Accounts request failed: ${res.status}`);
       const data = await res.json();
       set({
@@ -180,7 +202,10 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
         filterKey === 'default'
           ? '/api/finance/stats/overview'
           : `/api/finance/stats/overview?${sp.toString()}`;
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+      });
       if (!res.ok) throw new Error(`Overview stats request failed: ${res.status}`);
       const data = await res.json();
       set((state) => ({
@@ -200,7 +225,10 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
   refreshNetWorthHistory: async () => {
     set({ historyStatus: 'loading' });
     try {
-      const res = await fetch('/api/finance/stats/net-worth-history');
+      const res = await fetch('/api/finance/stats/net-worth-history', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+      });
       if (!res.ok) throw new Error(`Net worth history request failed: ${res.status}`);
       const data = await res.json();
       set({
@@ -216,7 +244,10 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
   refreshTransactions: async () => {
     set({ transactionsStatus: 'loading' });
     try {
-      const res = await fetch('/api/finance/transactions');
+      const res = await fetch('/api/finance/transactions', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+      });
       if (!res.ok) throw new Error(`Transactions request failed: ${res.status}`);
       const data = await res.json();
       set({
@@ -232,7 +263,10 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
   refreshCategories: async () => {
     set({ categoriesStatus: 'loading' });
     try {
-      const res = await fetch('/api/finance/categories');
+      const res = await fetch('/api/finance/categories', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+      });
       if (!res.ok) throw new Error(`Categories request failed: ${res.status}`);
       const data = await res.json();
       set({
@@ -242,6 +276,31 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
     } catch (err) {
       console.error('Failed to load categories:', err);
       set({ categoriesStatus: 'error' });
+    }
+  },
+
+  refreshBudgets: async (filters?: BudgetFilters) => {
+    set({ budgetsStatus: 'loading' });
+    try {
+      const sp = new URLSearchParams();
+      if (filters?.period) sp.set('period', filters.period);
+      if (filters?.activeOnly !== undefined) sp.set('activeOnly', String(filters.activeOnly));
+
+      const url = sp.toString() ? `/api/finance/budgets?${sp.toString()}` : '/api/finance/budgets';
+      const res = await fetch(url, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+      });
+      if (!res.ok) throw new Error(`Budgets request failed: ${res.status}`);
+      const data = await res.json();
+      set({
+        budgets: Array.isArray(data.budgets) ? data.budgets : [],
+        budgetProgress: Array.isArray(data.progress) ? data.progress : [],
+        budgetsStatus: 'ready',
+      });
+    } catch (err) {
+      console.error('Failed to load budgets:', err);
+      set({ budgetsStatus: 'error' });
     }
   },
 
@@ -257,7 +316,10 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
     let resolvedUserId = userId ?? current.userId;
     if (!resolvedUserId && typeof window !== 'undefined') {
       try {
-        const meRes = await fetch('/api/auth/me');
+        const meRes = await fetch('/api/auth/me', {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+        });
         if (meRes.ok) {
           const me = await meRes.json();
           if (me?.id) resolvedUserId = me.id;
@@ -274,6 +336,7 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
       transactionsStatus: 'loading',
       overviewStatus: 'loading',
       historyStatus: 'loading',
+      budgetsStatus: 'loading',
     });
 
     await Promise.all([
@@ -282,6 +345,7 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
       get().refreshTransactions(),
       get().refreshOverviewStats(),
       get().refreshNetWorthHistory(),
+      get().refreshBudgets(),
     ]);
 
     set({ isInitialized: true });
@@ -310,7 +374,11 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
     if (!res.ok) {
       throw new Error(`Failed to recalculate account valuations (${res.status})`);
     }
-    await Promise.all([get().refreshAccounts(), get().refreshOverviewStats()]);
+    await Promise.all([
+      get().refreshAccounts(),
+      get().refreshOverviewStats(),
+      get().refreshNetWorthHistory(),
+    ]);
   },
 
   setLastUsedAccountId: (id) => {
@@ -347,7 +415,9 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
     await Promise.all([
       get().refreshAccounts(),
       get().refreshOverviewStats(),
+      get().refreshNetWorthHistory(),
       get().refreshTransactions(),
+      get().refreshBudgets(),
     ]);
 
     return {
@@ -357,7 +427,9 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
         await Promise.all([
           get().refreshAccounts(),
           get().refreshOverviewStats(),
+          get().refreshNetWorthHistory(),
           get().refreshTransactions(),
+          get().refreshBudgets(),
         ]);
       },
     };
@@ -383,7 +455,9 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
     await Promise.all([
       get().refreshAccounts(),
       get().refreshOverviewStats(),
+      get().refreshNetWorthHistory(),
       get().refreshTransactions(),
+      get().refreshBudgets(),
     ]);
     return body.transaction;
   },
@@ -398,7 +472,13 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
           `Failed to delete transaction (${res.status})`
       );
     }
-    await Promise.all([get().refreshTransactions(), get().refreshOverviewStats()]);
+    await Promise.all([
+      get().refreshAccounts(),
+      get().refreshOverviewStats(),
+      get().refreshNetWorthHistory(),
+      get().refreshTransactions(),
+      get().refreshBudgets(),
+    ]);
   },
 
   bulkDeleteTransactions: async (ids) => {
@@ -407,7 +487,13 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
         fetch(`/api/finance/transactions/${id}`, { method: 'DELETE' })
       )
     );
-    await Promise.all([get().refreshTransactions(), get().refreshOverviewStats()]);
+    await Promise.all([
+      get().refreshAccounts(),
+      get().refreshOverviewStats(),
+      get().refreshNetWorthHistory(),
+      get().refreshTransactions(),
+      get().refreshBudgets(),
+    ]);
   },
 
   bulkUpdateTransactions: async (ids, update) => {
@@ -420,7 +506,58 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
         })
       )
     );
-    await Promise.all([get().refreshTransactions(), get().refreshOverviewStats()]);
+    await Promise.all([
+      get().refreshAccounts(),
+      get().refreshOverviewStats(),
+      get().refreshNetWorthHistory(),
+      get().refreshTransactions(),
+      get().refreshBudgets(),
+    ]);
+  },
+
+  addBudget: async (data: CreateBudgetDTO) => {
+    const res = await fetch('/api/finance/budgets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => null);
+      throw new Error(
+        errBody?.error?.message || errBody?.error || `Failed to create budget (${res.status})`
+      );
+    }
+    const body = await res.json();
+    await Promise.all([get().refreshBudgets(), get().refreshOverviewStats()]);
+    return body.budget;
+  },
+
+  updateBudget: async (id: string, data: UpdateBudgetDTO) => {
+    const res = await fetch(`/api/finance/budgets/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => null);
+      throw new Error(
+        errBody?.error?.message || errBody?.error || `Failed to update budget (${res.status})`
+      );
+    }
+    const body = await res.json();
+    await Promise.all([get().refreshBudgets(), get().refreshOverviewStats()]);
+    return body.budget;
+  },
+
+  deleteBudget: async (id: string) => {
+    const res = await fetch(`/api/finance/budgets/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => null);
+      throw new Error(
+        errBody?.error?.message || errBody?.error || `Failed to delete budget (${res.status})`
+      );
+    }
+    await Promise.all([get().refreshBudgets(), get().refreshOverviewStats()]);
   },
 
   addAccount: async (data) => {
@@ -464,15 +601,21 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
 
     await Promise.all([get().refreshAccounts(), get().refreshOverviewStats()]);
     const found = get().accounts.find((a) => a.id === account.id);
+    const isLiability = ['credit_card', 'loan', 'other_liability'].includes(data.kind);
     return (
       found ?? {
         ...account,
-        balance: data.openingBalance ?? 0,
-        outstanding: 0,
-        utilization: 0,
-        currentValue: data.openingBalance ?? 0,
+        balance: isLiability ? -Math.abs(data.openingBalance ?? 0) : data.openingBalance ?? 0,
+        outstanding: isLiability ? Math.abs(data.openingBalance ?? 0) : 0,
+        utilization:
+          isLiability && (data.creditLimit || 0) > 0
+            ? Math.min(1, Math.abs(data.openingBalance ?? 0) / data.creditLimit!)
+            : 0,
+        currentValue: isLiability ? 0 : (data.openingBalance ?? 0),
         statementDay: data.statementDay,
         dueDay: data.dueDay,
+        dueDays: (data.metadata?.dueDays as number) || data.dueDay,
+        isOffsetDays: true,
       }
     );
   },

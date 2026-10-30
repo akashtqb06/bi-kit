@@ -15,7 +15,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useFinanceStore } from '../shared/finance-store';
 import { parseAmountExpression } from '../shared/expression-parser';
@@ -372,19 +380,21 @@ export function QuickAddForm({
                 {showCardsAndLoans ? 'Hide cards & loans' : 'Show cards and loans'}
               </button>
             </div>
-            <select
-              id="from-account"
-              className="w-full h-9 rounded-md border border-input bg-card px-3 text-xs focus:ring-1 focus:ring-primary focus:outline-hidden"
-              value={accountId}
-              onChange={(e) => setAccountId(e.target.value)}
+            <Select
+              value={accountId || undefined}
+              onValueChange={(val) => setAccountId(val || '')}
             >
-              <option value="">Select source account...</option>
-              {(showCardsAndLoans ? accounts : accounts.filter((a) => a.class === 'asset')).map((acc) => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.name} ({formatAccountDisplayBalance(acc)})
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="from-account" className="w-full h-9 bg-card px-3 text-xs">
+                <SelectValue placeholder="Select source account..." />
+              </SelectTrigger>
+              <SelectContent>
+                {(showCardsAndLoans ? accounts : accounts.filter((a) => a.class === 'asset')).map((acc) => (
+                  <SelectItem key={acc.id} value={acc.id} className="text-xs">
+                    {acc.name} ({formatAccountDisplayBalance(acc)})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {accounts.find((a) => a.id === accountId)?.class === 'liability' && (
               <div className="flex items-center gap-1.5 p-2 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-[11px]">
                 <AlertTriangleIcon className="size-3.5 shrink-0" />
@@ -400,21 +410,23 @@ export function QuickAddForm({
             <Label htmlFor="to-account" className="text-xs font-medium text-muted-foreground">
               To Account
             </Label>
-            <select
-              id="to-account"
-              className="w-full h-9 rounded-md border border-input bg-card px-3 text-xs focus:ring-1 focus:ring-primary focus:outline-hidden"
-              value={toAccountId}
-              onChange={(e) => setToAccountId(e.target.value)}
+            <Select
+              value={toAccountId || undefined}
+              onValueChange={(val) => setToAccountId(val || '')}
             >
-              <option value="">Select destination...</option>
-              {accounts
-                .filter((a) => a.id !== accountId)
-                .map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.name} ({formatAccountDisplayBalance(acc)})
-                  </option>
-                ))}
-            </select>
+              <SelectTrigger id="to-account" className="w-full h-9 bg-card px-3 text-xs">
+                <SelectValue placeholder="Select destination..." />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts
+                  .filter((a) => a.id !== accountId)
+                  .map((acc) => (
+                    <SelectItem key={acc.id} value={acc.id} className="text-xs">
+                      {acc.name} ({formatAccountDisplayBalance(acc)})
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
             {errors.toAccountId && (
               <p className="text-xs font-medium text-destructive">{errors.toAccountId}</p>
             )}
@@ -425,19 +437,21 @@ export function QuickAddForm({
           <Label htmlFor="account-select" className="text-xs font-medium text-muted-foreground">
             Account
           </Label>
-          <select
-            id="account-select"
-            className="w-full h-9 rounded-md border border-input bg-card px-3 text-xs focus:ring-1 focus:ring-primary focus:outline-hidden"
-            value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
+          <Select
+            value={accountId || undefined}
+            onValueChange={(val) => setAccountId(val || '')}
           >
-            <option value="">Select account...</option>
-            {accounts.map((acc) => (
-              <option key={acc.id} value={acc.id}>
-                {acc.name} ({formatAccountDisplayBalance(acc)})
-              </option>
-            ))}
-          </select>
+            <SelectTrigger id="account-select" className="w-full h-9 bg-card px-3 text-xs">
+              <SelectValue placeholder="Select account..." />
+            </SelectTrigger>
+            <SelectContent>
+              {accounts.map((acc) => (
+                <SelectItem key={acc.id} value={acc.id} className="text-xs">
+                  {acc.name} ({formatAccountDisplayBalance(acc)})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {errors.accountId && (
             <p className="text-xs font-medium text-destructive">{errors.accountId}</p>
           )}
@@ -605,11 +619,11 @@ export function QuickAddForm({
           </button>
         </div>
         {dateSelection === 'custom' && (
-          <Input
-            type="date"
+          <DatePicker
             className="h-8 text-xs mt-1.5 bg-card"
             value={customDate}
-            onChange={(e) => setCustomDate(e.target.value)}
+            onChange={setCustomDate}
+            placeholder="Select date"
           />
         )}
       </div>

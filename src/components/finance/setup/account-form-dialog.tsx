@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -191,7 +192,9 @@ export function AccountFormDialog({
       owedPaise,
       creditLimitPaise,
       statementDay: stmtNum && stmtNum >= 1 && stmtNum <= 31 ? stmtNum : undefined,
-      dueDay: dueNum && dueNum >= 1 && dueNum <= 31 ? dueNum : undefined,
+      dueDay: dueNum && dueNum >= 1 && dueNum <= 60 ? dueNum : undefined,
+      dueDays: dueNum && dueNum >= 1 && dueNum <= 60 ? dueNum : undefined,
+      isOffsetDays: kind === 'credit_card' ? true : undefined,
       principalPaise,
       monthlyInstallmentPaise,
       interestRate: rateNum !== undefined && !Number.isNaN(rateNum) ? rateNum : undefined,
@@ -347,14 +350,14 @@ export function AccountFormDialog({
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="acc-due-day" className="text-[11px] text-muted-foreground">
-                    Due Day (1-31)
+                    Payment Due (Days)
                   </Label>
                   <Input
                     id="acc-due-day"
                     type="number"
                     min={1}
-                    max={31}
-                    placeholder="5"
+                    max={60}
+                    placeholder="20"
                     value={dueDay}
                     onChange={(e) => setDueDay(e.target.value)}
                     className="text-xs"
@@ -420,12 +423,12 @@ export function AccountFormDialog({
                   <Label htmlFor="acc-start" className="text-xs font-semibold">
                     Start Date
                   </Label>
-                  <Input
+                  <DatePicker
                     id="acc-start"
-                    type="date"
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                    onChange={setStartDate}
                     className="text-xs"
+                    placeholder="Select start date"
                   />
                 </div>
 
@@ -433,12 +436,12 @@ export function AccountFormDialog({
                   <Label htmlFor="acc-maturity" className="text-xs font-semibold">
                     Maturity Date
                   </Label>
-                  <Input
+                  <DatePicker
                     id="acc-maturity"
-                    type="date"
                     value={maturityDate}
-                    onChange={(e) => setMaturityDate(e.target.value)}
+                    onChange={setMaturityDate}
                     className="text-xs"
+                    placeholder="Select maturity date"
                   />
                 </div>
               </div>
@@ -509,12 +512,12 @@ export function AccountFormDialog({
                 <Label htmlFor="acc-rd-start" className="text-xs font-semibold">
                   Start Date
                 </Label>
-                <Input
+                <DatePicker
                   id="acc-rd-start"
-                  type="date"
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={setStartDate}
                   className="text-xs"
+                  placeholder="Select start date"
                 />
               </div>
 

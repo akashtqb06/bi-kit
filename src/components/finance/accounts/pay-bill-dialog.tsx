@@ -8,7 +8,6 @@ import {
   HelpCircleIcon,
   AlertTriangleIcon,
   InfoIcon,
-  CalendarIcon,
   CheckCircle2Icon,
 } from 'lucide-react';
 import {
@@ -30,7 +29,15 @@ import {
 } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useFinanceStore } from '../shared/finance-store';
 import {
@@ -262,18 +269,23 @@ export function PayBillForm() {
         <Label htmlFor="paybill-card" className="text-xs font-medium text-muted-foreground">
           Credit Card (To)
         </Label>
-        <select
-          id="paybill-card"
-          className="w-full h-9 rounded-md border border-input bg-card px-3 text-xs focus:ring-1 focus:ring-primary focus:outline-hidden"
+        <Select
           value={toCardId}
-          onChange={(e) => handleCardChange(e.target.value)}
+          onValueChange={(val) => {
+            if (val) handleCardChange(val);
+          }}
         >
-          {creditCards.map((card) => (
-            <option key={card.id} value={card.id}>
-              {card.name} ({formatLiabilityBalance(card.balance)})
-            </option>
-          ))}
-        </select>
+          <SelectTrigger id="paybill-card" className="w-full h-9 bg-card px-3 text-xs">
+            <SelectValue placeholder="Select credit card..." />
+          </SelectTrigger>
+          <SelectContent>
+            {creditCards.map((card) => (
+              <SelectItem key={card.id} value={card.id} className="text-xs">
+                {card.name} ({formatLiabilityBalance(card.balance)})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {errors.toCardId && (
           <p className="text-xs font-medium text-destructive">{errors.toCardId}</p>
         )}
@@ -284,19 +296,21 @@ export function PayBillForm() {
         <Label htmlFor="paybill-from" className="text-xs font-medium text-muted-foreground">
           Pay From Account
         </Label>
-        <select
-          id="paybill-from"
-          className="w-full h-9 rounded-md border border-input bg-card px-3 text-xs focus:ring-1 focus:ring-primary focus:outline-hidden"
-          value={fromAccountId}
-          onChange={(e) => setFromAccountId(e.target.value)}
+        <Select
+          value={fromAccountId || undefined}
+          onValueChange={(val) => setFromAccountId(val || '')}
         >
-          <option value="">Select bank or cash account...</option>
-          {bankAndCashAccounts.map((acc) => (
-            <option key={acc.id} value={acc.id}>
-              {acc.name} ({formatINR(acc.balance)})
-            </option>
-          ))}
-        </select>
+          <SelectTrigger id="paybill-from" className="w-full h-9 bg-card px-3 text-xs">
+            <SelectValue placeholder="Select bank or cash account..." />
+          </SelectTrigger>
+          <SelectContent>
+            {bankAndCashAccounts.map((acc) => (
+              <SelectItem key={acc.id} value={acc.id} className="text-xs">
+                {acc.name} ({formatINR(acc.balance)})
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {errors.fromAccountId && (
           <p className="text-xs font-medium text-destructive">{errors.fromAccountId}</p>
         )}
@@ -345,15 +359,13 @@ export function PayBillForm() {
         <Label htmlFor="paybill-date" className="text-xs font-medium text-muted-foreground">
           Payment Date
         </Label>
-        <div className="relative">
-          <Input
-            id="paybill-date"
-            type="date"
-            className="h-9 text-xs bg-card"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </div>
+        <DatePicker
+          id="paybill-date"
+          className="h-9 text-xs bg-card"
+          value={date}
+          onChange={setDate}
+          placeholder="Select payment date"
+        />
       </div>
 
       {/* Balance Impact & Status Card */}

@@ -8,6 +8,7 @@ import { checkFeatureGatedApi } from '@src/lib/finance/flags';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+
 export async function GET(_request: NextRequest, context: RouteContext) {
   try {
     const user = await requireUserApi();

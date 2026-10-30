@@ -18,7 +18,14 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useFinanceStore } from '../shared/finance-store';
 import { formatINR, formatPercent } from '../shared/format';
 import { FinancePageSkeleton } from '../shared/finance-skeleton';
@@ -46,6 +53,7 @@ export function OverviewView() {
     refreshOverviewStats,
     refreshAccounts,
     refreshNetWorthHistory,
+    refreshTransactions,
     openPayBill,
   } = useFinanceStore();
 
@@ -75,15 +83,29 @@ export function OverviewView() {
       ? { from: fromParam, to: toParam }
       : getPresetDateRange(activePreset);
 
-  // Trigger refetch whenever URL filter params change
+  // Trigger refetch whenever URL filter params change or component mounts (tab switch)
   useEffect(() => {
-    refreshOverviewStats({
-      preset: activePreset,
-      from: fromParam || undefined,
-      to: toParam || undefined,
-      accounts: accountsParam || undefined,
-    });
-  }, [activePreset, fromParam, toParam, accountsParam, refreshOverviewStats]);
+    void Promise.all([
+      refreshOverviewStats({
+        preset: activePreset,
+        from: fromParam || undefined,
+        to: toParam || undefined,
+        accounts: accountsParam || undefined,
+      }),
+      refreshAccounts(),
+      refreshNetWorthHistory(),
+      refreshTransactions(),
+    ]);
+  }, [
+    activePreset,
+    fromParam,
+    toParam,
+    accountsParam,
+    refreshOverviewStats,
+    refreshAccounts,
+    refreshNetWorthHistory,
+    refreshTransactions,
+  ]);
 
   // URL updating helper
   const updateFilters = (updates: {
@@ -439,30 +461,32 @@ export function OverviewView() {
           <div className="flex items-center gap-2 flex-wrap">
             {activePreset === 'custom' && (
               <div className="flex items-center gap-1.5">
-                <Input
-                  type="date"
-                  className="h-8 text-xs bg-card w-32 px-2"
+                <DatePicker
+                  className="h-8 text-xs bg-card w-36 px-2"
                   value={customFrom}
-                  onChange={(e) => {
-                    setCustomFromInput(e.target.value);
-                    if (e.target.value && customTo) {
-                      updateFilters({ from: e.target.value, to: customTo, preset: 'custom' });
+                  onChange={(val) => {
+                    setCustomFromInput(val);
+                    if (val && customTo) {
+                      updateFilters({ from: val, to: customTo, preset: 'custom' });
                     }
                   }}
                   aria-label="Filter from date"
+                  placeholder="From date"
+                  clearable
                 />
                 <span className="text-muted-foreground text-xs">to</span>
-                <Input
-                  type="date"
-                  className="h-8 text-xs bg-card w-32 px-2"
+                <DatePicker
+                  className="h-8 text-xs bg-card w-36 px-2"
                   value={customTo}
-                  onChange={(e) => {
-                    setCustomToInput(e.target.value);
-                    if (customFrom && e.target.value) {
-                      updateFilters({ from: customFrom, to: e.target.value, preset: 'custom' });
+                  onChange={(val) => {
+                    setCustomToInput(val);
+                    if (customFrom && val) {
+                      updateFilters({ from: customFrom, to: val, preset: 'custom' });
                     }
                   }}
                   aria-label="Filter to date"
+                  placeholder="To date"
+                  clearable
                 />
               </div>
             )}
@@ -470,20 +494,51 @@ export function OverviewView() {
             {/* Account Selector */}
             <div className="flex items-center gap-1">
               <FilterIcon className="size-3 text-muted-foreground shrink-0 hidden sm:inline" />
-              <select
-                className="h-8 rounded-md border border-input bg-card px-2 text-xs text-foreground focus:outline-hidden"
+              <Select
                 value={accountsParam || 'all'}
-                onChange={(e) => updateFilters({ accounts: e.target.value })}
-                aria-label="Filter by account"
+                onValueChange={(val) => updateFilters({ accounts: val || undefined })}
               >
-                <option value="all">All Accounts</option>
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger
+                  className="h-8 bg-card px-2 text-xs"
+                  aria-label="Filter by account"
+                >
+                  <SelectValue placeholder="All Accounts" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-xs">All Accounts</SelectItem>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id} className="text-xs">
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+
+            {/* Manual Refresh Button */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs gap-1.5"
+              onClick={() => {
+                void Promise.all([
+                  refreshOverviewStats({
+                    preset: activePreset,
+                    from: fromParam || undefined,
+                    to: toParam || undefined,
+                    accounts: accountsParam || undefined,
+                  }),
+                  refreshAccounts(),
+                  refreshNetWorthHistory(),
+                  refreshTransactions(),
+                ]);
+              }}
+              title="Refresh overview data"
+            >
+              <RotateCcwIcon className={cn('size-3', overviewStatus === 'loading' && 'animate-spin')} />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
           </div>
         </div>
       </div>
@@ -773,7 +828,11 @@ export function OverviewView() {
                   <div>
                     <h4 className="font-semibold text-foreground">{card.name}</h4>
                     <div className="text-[11px] text-muted-foreground mt-0.5">
-                      {card.nextDueDate ? `Due on ${card.nextDueDate}` : 'Due next cycle'}
+                      {card.currentDueDate
+                        ? `Due on ${card.currentDueDate}${card.nextStatementDate ? ` • Next bill: ${card.nextStatementDate}` : ''}`
+                        : card.nextDueDate
+                        ? `Due on ${card.nextDueDate}`
+                        : 'Due next cycle'}
                     </div>
                   </div>
 

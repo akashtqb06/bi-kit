@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { useFinanceStore } from '../shared/finance-store';
 import { rupeesToPaise } from '../shared/format';
@@ -122,13 +123,13 @@ export function UpdateValuationDialog({
             <Label htmlFor="val-date" className="text-xs font-medium text-muted-foreground">
               Valuation Date
             </Label>
-            <Input
+            <DatePicker
               id="val-date"
-              type="date"
               required
               className="h-9 text-xs"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={setDate}
+              placeholder="Select valuation date"
             />
           </div>
 

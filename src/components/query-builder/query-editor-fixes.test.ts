@@ -66,8 +66,8 @@ describe('Query Editor Fixes & SQL Mode Integration', () => {
         ];
         const items = toSelectItems(
             dsList,
-            (d) => d.id,
-            (d) => d.name
+            (d: { id: string; name: string }) => d.id,
+            (d: { id: string; name: string }) => d.name
         );
         expect(items).toEqual([
             { value: 'ds_1', label: 'Sales SQLite' },

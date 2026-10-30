@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { AlertTriangleIcon, InfoIcon, Loader2Icon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -132,13 +133,13 @@ export function EditAccountOpeningDialog({
               <Label htmlFor="edit-opening-date" className="text-xs font-semibold">
                 Opening Date (YYYY-MM-DD)
               </Label>
-              <Input
+              <DatePicker
                 id="edit-opening-date"
-                type="date"
                 value={openingDate}
-                onChange={(e) => setOpeningDate(e.target.value)}
+                onChange={setOpeningDate}
                 className="text-xs"
                 required
+                placeholder="Select opening date"
               />
             </div>
 

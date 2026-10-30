@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import { CalendarIcon, GlobeIcon, IndianRupeeIcon, InfoIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import type { SetupPreferences } from '@src/lib/finance/setup/types';
@@ -88,12 +89,12 @@ export function PreferencesStep({
             <CalendarIcon className="size-3.5 text-muted-foreground" />
             <span>Tracking starts on</span>
           </Label>
-          <Input
+          <DatePicker
             id="pref-start-date"
-            type="date"
             value={preferences.trackingStartDate}
-            onChange={(e) => onChange({ ...preferences, trackingStartDate: e.target.value })}
+            onChange={(val) => onChange({ ...preferences, trackingStartDate: val })}
             className="text-xs max-w-sm"
+            placeholder="Select tracking start date"
           />
           <div className="rounded-lg bg-primary/5 border border-primary/15 p-3 flex items-start gap-2.5 mt-2">
             <InfoIcon className="size-4 text-primary shrink-0 mt-0.5" />

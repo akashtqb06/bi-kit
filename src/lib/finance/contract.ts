@@ -274,6 +274,7 @@ export const budgetSchema = z.object({
 });
 
 export type BudgetDTO = z.infer<typeof budgetSchema>;
+export type BudgetPeriod = (typeof BUDGET_PERIODS)[number];
 
 export const createBudgetSchema = z.object({
   categoryId: z.string().min(1, 'Category is required'),

@@ -29,7 +29,9 @@ export const draftAccountSchema = z.object({
   owedPaise: z.number().int().min(0).optional().default(0), // For cards and loans (entered positive, stored negative)
   creditLimitPaise: z.number().int().min(0).optional(),
   statementDay: z.number().int().min(1).max(31).optional(),
-  dueDay: z.number().int().min(1).max(31).optional(),
+  dueDay: z.number().int().min(1).max(60).optional(),
+  dueDays: z.number().int().min(1).max(60).optional(),
+  isOffsetDays: z.boolean().optional(),
   // For FD / RD
   principalPaise: z.number().int().min(0).optional(),
   monthlyInstallmentPaise: z.number().int().min(0).optional(),

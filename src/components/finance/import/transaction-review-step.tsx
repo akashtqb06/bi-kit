@@ -5,6 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   ArrowLeftIcon,
   CheckCircle2Icon,
   CopyIcon,
@@ -409,20 +416,26 @@ export function TransactionReviewStep({
                   {/* Category Inline Dropdown */}
                   <td className="p-3">
                     <div className="flex flex-col gap-1.5">
-                      <select
-                        aria-label={`Category for ${row.description}`}
-                        value={row.selectedCategoryId || ''}
+                      <Select
+                        value={row.selectedCategoryId || '__uncategorized__'}
                         disabled={!row.isValid}
-                        onChange={(e) => handleCategoryChange(row.id, e.target.value)}
-                        className="w-full h-8 text-xs rounded-md border border-input bg-background px-2.5 focus:ring-1 focus:ring-primary focus:outline-hidden"
+                        onValueChange={(val) => handleCategoryChange(row.id, (!val || val === '__uncategorized__') ? '' : val)}
                       >
-                        <option value="">-- Uncategorized --</option>
-                        {categories.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name} ({c.type})
-                          </option>
-                        ))}
-                      </select>
+                        <SelectTrigger
+                          aria-label={`Category for ${row.description}`}
+                          className="w-full h-8 text-xs bg-background"
+                        >
+                          <SelectValue placeholder="-- Uncategorized --" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__uncategorized__" className="text-xs">-- Uncategorized --</SelectItem>
+                          {categories.map((c) => (
+                            <SelectItem key={c.id} value={c.id} className="text-xs">
+                              {c.name} ({c.type})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
 
                       {/* Rule Badge & Option to save rule */}
                       <div className="flex items-center gap-1.5 flex-wrap">

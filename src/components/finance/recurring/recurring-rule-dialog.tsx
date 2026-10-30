@@ -11,7 +11,15 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { paiseToRupees, rupeesToPaise } from '@src/components/finance/shared/format';
@@ -366,18 +374,21 @@ function RecurringRuleForm({
             <Label htmlFor="rule-frequency" className="text-xs font-medium">
               Frequency
             </Label>
-            <select
-              id="rule-frequency"
+            <Select
               value={frequency}
-              onChange={(e) => setFrequency(e.target.value as RecurringFrequency)}
-              className="h-8 w-full rounded-md border border-input bg-transparent px-2.5 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              onValueChange={(val) => setFrequency(val as RecurringFrequency)}
             >
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="quarterly">Quarterly</option>
-              <option value="yearly">Yearly</option>
-            </select>
+              <SelectTrigger id="rule-frequency" className="h-8 w-full text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="daily" className="text-xs">Daily</SelectItem>
+                <SelectItem value="weekly" className="text-xs">Weekly</SelectItem>
+                <SelectItem value="monthly" className="text-xs">Monthly</SelectItem>
+                <SelectItem value="quarterly" className="text-xs">Quarterly</SelectItem>
+                <SelectItem value="yearly" className="text-xs">Yearly</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1">
@@ -447,20 +458,21 @@ function RecurringRuleForm({
             <Label htmlFor="rule-account" className="text-xs font-medium">
               {type === 'transfer' ? 'From Account *' : 'Account *'}
             </Label>
-            <select
-              id="rule-account"
-              value={accountId}
-              onChange={(e) => setAccountId(e.target.value)}
-              className="h-8 w-full rounded-md border border-input bg-transparent px-2.5 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              required
+            <Select
+              value={accountId || undefined}
+              onValueChange={(val) => setAccountId(val || '')}
             >
-              <option value="">Select account</option>
-              {accounts.map((acc) => (
-                <option key={acc.id} value={acc.id}>
-                  {acc.name} ({acc.kind.replace('_', ' ')})
-                </option>
-              ))}
-            </select>
+              <SelectTrigger id="rule-account" className="h-8 w-full text-xs">
+                <SelectValue placeholder="Select account" />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.map((acc) => (
+                  <SelectItem key={acc.id} value={acc.id} className="text-xs">
+                    {acc.name} ({acc.kind.replace('_', ' ')})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {errors.accountId && <p className="text-[11px] text-destructive">{errors.accountId}</p>}
           </div>
 
@@ -469,22 +481,23 @@ function RecurringRuleForm({
               <Label htmlFor="rule-to-account" className="text-xs font-medium">
                 To Account *
               </Label>
-              <select
-                id="rule-to-account"
-                value={toAccountId}
-                onChange={(e) => setToAccountId(e.target.value)}
-                className="h-8 w-full rounded-md border border-input bg-transparent px-2.5 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                required
+              <Select
+                value={toAccountId || undefined}
+                onValueChange={(val) => setToAccountId(val || '')}
               >
-                <option value="">Select target account</option>
-                {accounts
-                  .filter((a) => a.id !== accountId)
-                  .map((acc) => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.name} ({acc.kind.replace('_', ' ')})
-                    </option>
-                  ))}
-              </select>
+                <SelectTrigger id="rule-to-account" className="h-8 w-full text-xs">
+                  <SelectValue placeholder="Select target account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts
+                    .filter((a) => a.id !== accountId)
+                    .map((acc) => (
+                      <SelectItem key={acc.id} value={acc.id} className="text-xs">
+                        {acc.name} ({acc.kind.replace('_', ' ')})
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
               {errors.toAccountId && <p className="text-[11px] text-destructive">{errors.toAccountId}</p>}
             </div>
           ) : (
@@ -492,19 +505,22 @@ function RecurringRuleForm({
               <Label htmlFor="rule-category" className="text-xs font-medium">
                 Category
               </Label>
-              <select
-                id="rule-category"
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="h-8 w-full rounded-md border border-input bg-transparent px-2.5 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              <Select
+                value={categoryId || '__none__'}
+                onValueChange={(val) => setCategoryId((!val || val === '__none__') ? '' : val)}
               >
-                <option value="">None / Uncategorized</option>
-                {filteredCategories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="rule-category" className="h-8 w-full text-xs">
+                  <SelectValue placeholder="None / Uncategorized" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__" className="text-xs">None / Uncategorized</SelectItem>
+                  {filteredCategories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id} className="text-xs">
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
         </div>
@@ -515,13 +531,13 @@ function RecurringRuleForm({
             <Label htmlFor="rule-start-date" className="text-xs font-medium">
               Start Date *
             </Label>
-            <Input
+            <DatePicker
               id="rule-start-date"
-              type="date"
               value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={setStartDate}
               className="h-8 text-xs"
               required
+              placeholder="Select start date"
             />
             {errors.startDate && <p className="text-[11px] text-destructive">{errors.startDate}</p>}
           </div>
@@ -530,12 +546,13 @@ function RecurringRuleForm({
             <Label htmlFor="rule-end-date" className="text-xs font-medium">
               End Date (Optional)
             </Label>
-            <Input
+            <DatePicker
               id="rule-end-date"
-              type="date"
               value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={setEndDate}
               className="h-8 text-xs"
+              placeholder="Select end date"
+              clearable
             />
             {errors.endDate && <p className="text-[11px] text-destructive">{errors.endDate}</p>}
           </div>

@@ -30,9 +30,11 @@ import { TransactionTable } from '../transactions/transaction-table';
 import { ChartRenderer } from '@src/components/charts/chart-renderer';
 import { defaultChartConfig, type ChartConfigData } from '@src/lib/schemas';
 import { cn } from '@/lib/utils';
+import { useAppModal } from '@/components/ui/app-modal';
 
 export function AccountDetailView({ accountId }: { accountId: string }) {
   const router = useRouter();
+  const { showConfirm } = useAppModal();
   const {
     accounts,
     transactions,
@@ -152,7 +154,13 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
   const isDeposit = account.kind === 'fixed_deposit' || account.kind === 'recurring_deposit';
 
   const handleDelete = async () => {
-    if (confirm(`Are you sure you want to delete ${account.name}?`)) {
+    const confirmed = await showConfirm({
+      title: `Delete ${account.name}?`,
+      description: `Are you sure you want to delete ${account.name}? This action cannot be undone.`,
+      confirmText: 'Delete Account',
+      variant: 'destructive',
+    });
+    if (confirmed) {
       await deleteAccount(account.id);
       toast.success('Account deleted');
       router.push('/finance/accounts');
@@ -271,11 +279,23 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
                 Card Information & Utilization
               </h3>
             </div>
-            {account.nextDueDate && (
-              <Badge variant="outline" className="text-xs font-medium">
-                Next Due: {account.nextDueDate}
-              </Badge>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {account.currentDueDate && account.outstanding > 0 && (
+                <Badge variant="destructive" className="text-xs font-medium">
+                  Current Due: {account.currentDueDate}
+                </Badge>
+              )}
+              {account.nextStatementDate && (
+                <Badge variant="outline" className="text-xs font-medium">
+                  Next Bill: {account.nextStatementDate}
+                </Badge>
+              )}
+              {account.nextDueDate && (
+                <Badge variant="secondary" className="text-xs font-medium">
+                  Next Due: {account.nextDueDate}
+                </Badge>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -333,6 +353,29 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
               />
             </div>
           )}
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t text-xs">
+            <div className="p-2 rounded-lg bg-muted/30">
+              <span className="text-[10px] text-muted-foreground block uppercase font-medium">Billing Cycle</span>
+              <p className="font-semibold text-foreground mt-0.5">
+                {account.statementDay ? `${account.statementDay}th of month` : '21st'}
+              </p>
+            </div>
+            <div className="p-2 rounded-lg bg-muted/30">
+              <span className="text-[10px] text-muted-foreground block uppercase font-medium">Payment Due Days</span>
+              <p className="font-semibold text-foreground mt-0.5">
+                {account.dueDays ? `${account.dueDays} days` : '20 days'}
+              </p>
+            </div>
+            <div className="p-2 rounded-lg bg-muted/30">
+              <span className="text-[10px] text-muted-foreground block uppercase font-medium">Next Bill Generates</span>
+              <p className="font-semibold text-foreground mt-0.5">{account.nextStatementDate || '—'}</p>
+            </div>
+            <div className="p-2 rounded-lg bg-muted/30">
+              <span className="text-[10px] text-muted-foreground block uppercase font-medium">Next Due Date</span>
+              <p className="font-semibold text-foreground mt-0.5">{account.nextDueDate || '—'}</p>
+            </div>
+          </div>
         </div>
       )}
 

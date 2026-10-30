@@ -335,8 +335,10 @@ export async function completeSetup(
       };
 
       if (acc.kind === 'credit_card') {
-        metadata.statementDay = acc.statementDay;
-        metadata.dueDay = acc.dueDay;
+        metadata.statementDay = acc.statementDay ?? 21;
+        metadata.dueDay = acc.dueDay ?? 20;
+        metadata.dueDays = acc.dueDay ?? 20;
+        metadata.isOffsetDays = true;
       } else if (acc.kind === 'fixed_deposit') {
         metadata.principalPaise = acc.principalPaise;
         metadata.interestRate = acc.interestRate;
@@ -501,6 +503,12 @@ export async function updateAccountOpeningData(
       )
       .limit(1);
 
+    const isLiability = ['credit_card', 'loan', 'other_liability'].includes(account.kind);
+    const effectiveSignedAmount =
+      isLiability && data.openingBalancePaise > 0
+        ? -data.openingBalancePaise
+        : data.openingBalancePaise;
+
     if (existingTx) {
       if (data.openingBalancePaise === 0) {
         // Delete if now zero
@@ -513,7 +521,7 @@ export async function updateAccountOpeningData(
           .set({
             date: data.openingDate,
             amount: Math.abs(data.openingBalancePaise),
-            signedAmount: data.openingBalancePaise,
+            signedAmount: effectiveSignedAmount,
             updatedAt: now,
           })
           .where(eq(finTransactions.id, existingTx.id));
@@ -526,7 +534,7 @@ export async function updateAccountOpeningData(
         date: data.openingDate,
         type: 'adjustment',
         amount: Math.abs(data.openingBalancePaise),
-        signedAmount: data.openingBalancePaise,
+        signedAmount: effectiveSignedAmount,
         payee: 'Opening Balance',
         note: `Opening balance updated on ${now.toISOString().slice(0, 10)}`,
         createdAt: now,

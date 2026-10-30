@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { useFinanceStore } from './finance-store';
 import { cn } from '@/lib/utils';
+import { useAppModal } from '@/components/ui/app-modal';
 import {
   CATEGORY_PALETTE_16,
   getDeterministicCategoryColor,
@@ -31,6 +32,7 @@ import type { CategoryDTO } from '@src/lib/finance/contract';
 
 export function CategoriesView() {
   const { categories, addCategory, updateCategory, deleteCategory } = useFinanceStore();
+  const { showConfirm } = useAppModal();
 
   const [activeTab, setActiveTab] = useState<'expense' | 'income'>('expense');
 
@@ -123,7 +125,13 @@ export function CategoriesView() {
   };
 
   const handleDelete = async (id: string, catName: string) => {
-    if (confirm(`Delete category "${catName}"?`)) {
+    const confirmed = await showConfirm({
+      title: 'Delete Category',
+      description: `Are you sure you want to delete category "${catName}"? This action cannot be undone.`,
+      confirmText: 'Delete',
+      variant: 'destructive',
+    });
+    if (confirmed) {
       await deleteCategory(id);
       toast.success('Category removed');
     }

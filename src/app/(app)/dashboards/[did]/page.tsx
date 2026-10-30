@@ -6,6 +6,13 @@ import { useRouter, useSearchParams, usePathname, notFound } from 'next/navigati
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
     DropdownMenu,
@@ -428,23 +435,27 @@ function DashboardViewerContent({ params }: { params: Promise<{ did: string }> }
                                             className="flex items-center gap-1 bg-muted/50 border rounded-md px-1.5 py-0.5 text-xs shrink-0"
                                         >
                                             <span className="text-[11px] text-muted-foreground">{f.name}:</span>
-                                            <select
+                                            <Select
                                                 value={curVal}
-                                                onChange={(e) =>
+                                                onValueChange={(val) =>
                                                     handleFilterValueChange(
                                                         f.id,
-                                                        e.target.value === '__all__' ? undefined : e.target.value
+                                                        val === '__all__' ? undefined : val
                                                     )
                                                 }
-                                                className="bg-transparent text-xs font-medium outline-none cursor-pointer text-foreground"
                                             >
-                                                <option value="__all__">All</option>
-                                                {(distinctValuesMap[f.column] || []).map((val) => (
-                                                    <option key={val} value={val}>
-                                                        {val}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                                <SelectTrigger className="h-6 border-0 bg-transparent px-1 py-0 text-xs font-medium shadow-none focus-visible:ring-0">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="__all__" className="text-xs">All</SelectItem>
+                                                    {(distinctValuesMap[f.column] || []).map((val) => (
+                                                        <SelectItem key={val} value={val} className="text-xs">
+                                                            {val}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                         </div>
                                     );
                                 }
