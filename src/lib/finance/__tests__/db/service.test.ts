@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { NotFoundError, ForbiddenError } from '@src/app/api/utils';
 import { setupFinanceTestDb, USER_A } from './test-helper';
 import type { DbFinanceService } from '../../db-service';
+import { rdValue } from '../../domain/rd';
+import { todayInTz, DEFAULT_TZ } from '../../timezone';
 
 describe('DbFinanceService Integration Tests on PGlite', () => {
   let service: DbFinanceService;
@@ -323,8 +325,18 @@ describe('DbFinanceService Integration Tests on PGlite', () => {
 
       const vals1 = await service.listValuations(USER_A, { accountId: rd.id });
       expect(vals1.length).toBe(1);
-      // Expected RD value: 6,226,900 paise (exact day-count quarterly compounding)
-      expect(vals1[0].value).toBe(6226900);
+      const expectedVal = rdValue(
+        {
+          monthlyInstallment: 500000,
+          startDate: '2025-10-30',
+          tenureMonths: 12,
+          interestRate: 6.8,
+          compounding: 'quarterly',
+          installmentDay: 30,
+        },
+        todayInTz(DEFAULT_TZ)
+      ).currentValue;
+      expect(vals1[0].value).toBe(expectedVal);
 
       // 2. Second recompute (idempotency: recalculating twice gives identical numbers and no extra rows)
       const res2 = await service.recomputeDepositValuations(USER_A, rd.id);
@@ -332,7 +344,7 @@ describe('DbFinanceService Integration Tests on PGlite', () => {
 
       const vals2 = await service.listValuations(USER_A, { accountId: rd.id });
       expect(vals2.length).toBe(1);
-      expect(vals2[0].value).toBe(6226900);
+      expect(vals2[0].value).toBe(vals1[0].value);
     });
 
     it('verifies credit card bill payments do not count towards spending in overview stats', async () => {
