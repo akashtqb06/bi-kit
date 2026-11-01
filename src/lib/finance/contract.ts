@@ -67,6 +67,30 @@ export const accountFiltersSchema = z.object({
 
 export type AccountFilters = z.infer<typeof accountFiltersSchema>;
 
+export const accountHistoryPointSchema = z.object({
+  date: dateStringSchema,
+  balance: moneyPaiseSchema,
+  outstanding: moneyPaiseSchema,
+  hasActivity: z.boolean(),
+});
+
+export type AccountHistoryPointDTO = z.infer<typeof accountHistoryPointSchema>;
+
+export const accountHistoryResponseSchema = z.object({
+  accountId: z.string(),
+  accountName: z.string(),
+  kind: z.string(),
+  class: z.string(),
+  currency: z.string(),
+  openingDate: z.string(),
+  currentBalance: moneyPaiseSchema,
+  currentOutstanding: moneyPaiseSchema,
+  isMismatch: z.boolean(),
+  history: z.array(accountHistoryPointSchema),
+});
+
+export type AccountHistoryResponseDTO = z.infer<typeof accountHistoryResponseSchema>;
+
 // ============================================================================
 // Categories
 // ============================================================================
@@ -135,6 +159,10 @@ export const transactionSchema = z.object({
   deletedAt: z.string().or(z.date()).nullable().optional(),
   createdAt: z.string().or(z.date()),
   updatedAt: z.string().or(z.date()),
+  effect: moneyPaiseSchema.optional(),
+  counterparty: z.string().nullable().optional(),
+  runningBalance: moneyPaiseSchema.optional(),
+  isOpening: z.boolean().optional(),
 });
 
 export type TransactionDTO = z.infer<typeof transactionSchema>;
@@ -205,17 +233,31 @@ export const transactionFiltersSchema = z.object({
   search: z.string().optional(),
   cursor: z.string().optional(),
   limit: z
-    .string()
+    .union([z.string(), z.number()])
     .optional()
-    .transform((val) => (val ? Math.min(Math.max(parseInt(val, 10), 1), 200) : 50)),
+    .transform((val) => {
+      if (val === undefined || val === null) return 50;
+      const parsed = typeof val === 'string' ? parseInt(val, 10) : val;
+      return isNaN(parsed) ? 50 : Math.min(Math.max(parsed, 1), 200);
+    }),
 });
 
-export type TransactionFilters = z.infer<typeof transactionFiltersSchema>;
+export type TransactionFilters = z.input<typeof transactionFiltersSchema>;
+
+export const transactionSummarySchema = z.object({
+  count: z.number().int(),
+  totalIn: z.number().int(),
+  totalOut: z.number().int(),
+  net: z.number().int(),
+});
+
+export type TransactionSummaryDTO = z.infer<typeof transactionSummarySchema>;
 
 export const paginatedTransactionsResponseSchema = z.object({
   transactions: z.array(transactionSchema),
   nextCursor: z.string().nullable(),
   hasMore: z.boolean(),
+  summary: transactionSummarySchema.optional(),
 });
 
 export type PaginatedTransactionsResponse = z.infer<

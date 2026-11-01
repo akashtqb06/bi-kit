@@ -177,6 +177,7 @@ export async function changePasswordAction(
 
     revalidatePath('/settings/security');
     revalidatePath('/settings/sessions');
+    revalidatePath('/', 'layout');
     return { ok: true };
 }
 

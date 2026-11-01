@@ -4,6 +4,7 @@ import { users, auditLog } from '@src/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import {
     getGeneralSettings,
+    getPublicSettings,
     updateGeneralSettings,
     getEnvironmentInfo,
 } from './app-settings';
@@ -39,6 +40,11 @@ describe('General Settings & Environment Info', () => {
         expect(typeof settings.sessionLifetimeDays).toBe('number');
         expect(Array.isArray(settings.allowedConnectorTypes)).toBe(true);
 
+        const publicSettings = await getPublicSettings();
+        expect(publicSettings).toBeDefined();
+        expect(typeof publicSettings.appName).toBe('string');
+        expect(publicSettings.appName).toBe(settings.appName);
+
         const env = getEnvironmentInfo();
         expect(env.publicUrl).toBeDefined();
         expect(env.networkPolicy).toBeDefined();
@@ -62,6 +68,9 @@ describe('General Settings & Environment Info', () => {
         expect(updated.allowRegistration).toBe(false);
         expect(updated.sessionLifetimeDays).toBe(14);
         expect(updated.allowedConnectorTypes).toEqual(['postgres', 'sqlite', 'csv']);
+
+        const publicSettings = await getPublicSettings();
+        expect(publicSettings.appName).toBe(newAppName);
 
         // Verify audit log entry
         const [audit] = await db

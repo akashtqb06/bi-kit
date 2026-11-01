@@ -15,11 +15,24 @@ export function proxy(request: NextRequest) {
     const isStaticFile = /\.[^/]+$/.test(pathname);
     const isFavicon = pathname === '/favicon.ico';
 
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set('x-pathname', pathname);
+
     if (isPublicPage || isApi || isNextAsset || isStaticFile || isFavicon) {
-        return NextResponse.next();
+        return NextResponse.next({
+            request: {
+                headers: requestHeaders,
+            },
+        });
     }
 
-    if (request.cookies.get('session')?.value) return NextResponse.next();
+    if (request.cookies.get('session')?.value) {
+        return NextResponse.next({
+            request: {
+                headers: requestHeaders,
+            },
+        });
+    }
 
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';

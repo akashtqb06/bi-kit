@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { requireUserApi } from '@src/lib/auth/dal';
 import {
@@ -48,6 +49,8 @@ export async function PATCH(req: Request): Promise<NextResponse> {
 
         const updated = await updateGeneralSettings(input, user.id);
         const envInfo = getEnvironmentInfo();
+
+        revalidatePath('/', 'layout');
 
         return NextResponse.json({
             data: {

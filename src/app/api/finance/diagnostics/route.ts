@@ -6,6 +6,7 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 import { db, finAccounts, finTransactions } from '@src/lib/db';
 import { jsonNoStore } from '../utils';
 import { todayInTz, DEFAULT_TZ } from '@src/lib/finance/timezone';
+import { getNetWorthHistory } from '@src/lib/finance/db-service/history';
 
 // Owner-only endpoint: checks DB integrity and reconciles balances
 export async function GET() {
@@ -90,6 +91,18 @@ export async function GET() {
       .reduce((sum, a) => sum + a.outstanding, 0);
     const netWorth = totalAssets - totalLiabilities;
 
+    // Check invariant: net worth history ending point must match current calculated net worth
+    const nwHistory = await getNetWorthHistory(userId, { interval: 'daily', endDate: today });
+    const lastHistoryPoint = nwHistory[nwHistory.length - 1];
+    const netWorthHistoryLastPoint = lastHistoryPoint ? lastHistoryPoint.netWorth : netWorth;
+    const netWorthHistoryMatches = Math.abs(netWorthHistoryLastPoint - netWorth) === 0;
+
+    if (!netWorthHistoryMatches) {
+      console.error(
+        `[Diagnostics Invariant Mismatch] Net worth history last point (${netWorthHistoryLastPoint}) !== current net worth (${netWorth})`
+      );
+    }
+
     return jsonNoStore({
       backend,
       databaseConnected: true,
@@ -103,6 +116,8 @@ export async function GET() {
         totalAssets,
         totalLiabilities,
         netWorth,
+        netWorthHistoryLastPoint,
+        netWorthHistoryMatches,
         accounts: accountReconciliation,
       },
     });

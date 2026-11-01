@@ -39,16 +39,25 @@ const adminNavItems: NavItem[] = [
     { label: 'General', href: '/settings/general', icon: Settings2Icon, adminOnly: true },
 ];
 
-export function SettingsNav({ isAdmin }: { isAdmin: boolean }) {
+export function SettingsNav({
+    isAdmin,
+    mustChangePassword = false,
+}: {
+    isAdmin: boolean;
+    mustChangePassword?: boolean;
+}) {
     const pathname = usePathname();
     const router = useRouter();
 
-    const visibleItems = isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems;
+    const allItems = isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems;
+    const visibleItems = mustChangePassword
+        ? allItems.filter((item) => item.href === '/settings/security')
+        : allItems;
 
     // Find active item
     const currentActive = visibleItems.find(
         (item) => pathname === item.href || pathname.startsWith(`${item.href}/`)
-    )?.href ?? '/settings/profile';
+    )?.href ?? (mustChangePassword ? '/settings/security' : '/settings/profile');
 
     return (
         <aside className="w-full md:w-56 shrink-0">

@@ -49,6 +49,18 @@ export function UpdateValuationDialog({
 
   if (!account) return null;
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    onOpenChange(nextOpen);
+    if (!nextOpen) {
+      setTimeout(() => {
+        if (typeof document !== 'undefined') {
+          document.body.removeAttribute('inert');
+          document.body.style.pointerEvents = '';
+        }
+      }, 50);
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const val = parseFloat(valueRupees);
@@ -80,7 +92,7 @@ export function UpdateValuationDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[420px]">
         <DialogHeader>
           <DialogTitle className="text-base font-bold">Update Valuation</DialogTitle>

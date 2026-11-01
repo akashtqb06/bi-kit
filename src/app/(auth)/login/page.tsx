@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { LoginForm } from './login-form';
 import { isRegistrationAllowed } from '@src/lib/auth/registration';
 import { getCurrentUser } from '@src/lib/auth/dal';
+import { getPublicSettings } from '@src/lib/settings/app-settings';
 import { checkDatabaseHealth } from '@src/lib/db/health';
 import { DatabaseErrorPage } from '@src/components/db/database-error-page';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,15 +19,21 @@ async function LoginPageContent({ searchParams }: LoginPageProps) {
         return <DatabaseErrorPage health={health} />;
     }
 
-    const [user, params, allowRegistration] = await Promise.all([
+    const [user, params, allowRegistration, { appName }] = await Promise.all([
         getCurrentUser(),
         searchParams,
         isRegistrationAllowed(),
+        getPublicSettings().catch(() => ({ appName: 'BI Kit' })),
     ]);
-    if (user) redirect('/');
+    if (user) {
+        if (user.mustChangePassword) {
+            redirect('/settings/security?forced=true');
+        }
+        redirect('/');
+    }
     const next = typeof params.next === 'string' ? params.next : '/';
 
-    return <LoginForm next={next} allowRegistration={allowRegistration} />;
+    return <LoginForm next={next} allowRegistration={allowRegistration} appName={appName} />;
 }
 
 function LoginFormSkeleton() {

@@ -9,7 +9,6 @@ import {
     HardDriveIcon,
     SettingsIcon,
     BarChart3Icon,
-    PanelLeftIcon,
     WalletIcon,
 } from 'lucide-react';
 import {
@@ -23,7 +22,6 @@ import {
     SidebarMenuItem,
     SidebarHeader,
     SidebarFooter,
-    useSidebar,
 } from '@/components/ui/sidebar';
 
 const navItems = [
@@ -59,17 +57,31 @@ const navItems = [
     },
 ] as const;
 import { UserMenu } from '@src/components/auth/user-menu';
+import { useCurrentUser } from '@src/components/auth/user-provider';
 import { isAnyFinanceFeatureEnabled } from '@src/lib/finance/flags';
+import { useAppSettings } from '@src/components/settings/app-settings-provider';
 
 export function AppSidebar() {
     const pathname = usePathname();
-    const { toggleSidebar, state } = useSidebar();
+    const { appName } = useAppSettings();
+    const user = useCurrentUser();
 
     const visibleNavItems = navItems.filter((item) => {
+        if (user?.mustChangePassword) {
+            return item.href === '/settings';
+        }
         if (item.href === '/finance') {
             return isAnyFinanceFeatureEnabled();
         }
         return true;
+    }).map((item) => {
+        if (user?.mustChangePassword && item.href === '/settings') {
+            return {
+                ...item,
+                href: '/settings/security?forced=true',
+            };
+        }
+        return item;
     });
 
     return (
@@ -77,8 +89,11 @@ export function AppSidebar() {
             <SidebarHeader className="border-b">
                 <div className="flex items-center gap-2 px-2 py-3">
                     <BarChart3Icon className="size-5 text-primary shrink-0" />
-                    <span className="font-semibold text-base tracking-tight truncate group-data-[collapsible=icon]:hidden">
-                        BI Kit
+                    <span
+                        className="font-semibold text-base tracking-tight truncate group-data-[collapsible=icon]:hidden"
+                        title={appName}
+                    >
+                        {appName}
                     </span>
                 </div>
             </SidebarHeader>

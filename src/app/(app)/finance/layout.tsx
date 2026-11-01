@@ -54,7 +54,7 @@ export default function FinanceLayout({
     <div className="flex flex-1 min-w-0 flex-col min-h-0 overflow-hidden bg-background">
       <FinanceInitializer />
       <SetupBanner />
-      <header className="border-b bg-card/50 px-6 py-3 shrink-0">
+      <header className="border-b bg-background px-4 sm:px-6 py-3 shrink-0 z-10">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold tracking-tight">Personal Finance</h1>
@@ -93,7 +93,7 @@ export default function FinanceLayout({
         </nav>
       </header>
 
-      <main className="flex-1 min-h-0 min-w-0 overflow-y-auto p-6">{children}</main>
+      <main className="flex-1 min-h-0 min-w-0 overflow-y-auto p-4 sm:p-6">{children}</main>
     </div>
   );
 }

@@ -92,8 +92,20 @@ export function EditAccountOpeningDialog({
     }
   };
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    onOpenChange(nextOpen);
+    if (!nextOpen) {
+      setTimeout(() => {
+        if (typeof document !== 'undefined') {
+          document.body.removeAttribute('inert');
+          document.body.style.pointerEvents = '';
+        }
+      }, 50);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="text-base font-bold">

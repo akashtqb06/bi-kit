@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -16,7 +16,7 @@ import {
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useFinanceStore } from '../shared/finance-store';
 import {
   formatINR,
@@ -24,20 +24,22 @@ import {
   formatGain,
   formatLiabilityBalance,
 } from '../shared/format';
+import { FinanceAreaChart, formatDateShort, formatDayOrdinal } from '../charts';
+import { useBreadcrumbStore } from '@src/components/layout/breadcrumb-store';
 import { UpdateValuationDialog } from './update-valuation-dialog';
 import { EditAccountOpeningDialog } from './edit-account-opening-dialog';
 import { TransactionTable } from '../transactions/transaction-table';
-import { ChartRenderer } from '@src/components/charts/chart-renderer';
-import { defaultChartConfig, type ChartConfigData } from '@src/lib/schemas';
 import { cn } from '@/lib/utils';
 import { useAppModal } from '@/components/ui/app-modal';
 
 export function AccountDetailView({ accountId }: { accountId: string }) {
   const router = useRouter();
   const { showConfirm } = useAppModal();
+  const setCrumbs = useBreadcrumbStore((s) => s.setCrumbs);
   const {
     accounts,
-    transactions,
+    accountHistory,
+    refreshAccountHistory,
     valuations,
     deleteAccount,
     openQuickAdd,
@@ -48,17 +50,40 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
   const [valuationOpen, setValuationOpen] = useState(false);
   const [editOpeningOpen, setEditOpeningOpen] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
+  const [preset, setPreset] = useState<'7D' | '30D' | '90D' | '1Y' | 'ALL'>('ALL');
 
   const account = useMemo(
     () => accounts.find((a) => a.id === accountId),
     [accounts, accountId]
   );
 
+  // Set breadcrumb with actual account name
+  useEffect(() => {
+    if (account) {
+      setCrumbs([
+        { label: 'Finance', href: '/finance/overview' },
+        { label: 'Accounts', href: '/finance/accounts' },
+        { label: account.name },
+      ]);
+    }
+    return () => {
+      setCrumbs(null);
+    };
+  }, [account, setCrumbs]);
+
+  // Fetch account history from server
+  useEffect(() => {
+    if (account) {
+      void refreshAccountHistory(account.id, { preset });
+    }
+  }, [account, preset, refreshAccountHistory]);
+
   const handleRecalculate = async () => {
     if (!account) return;
     try {
       setIsRecalculating(true);
       await recalculateAccount(account.id);
+      void refreshAccountHistory(account.id, { preset });
       toast.success('Valuations recalculated');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Recalculation failed');
@@ -72,65 +97,21 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
     [valuations, accountId]
   );
 
-  // Balance history chart data
-  const chartData = useMemo(() => {
-    if (!account) return [];
+  const isCard = account?.kind === 'credit_card';
+  const isInvestment = account?.kind === 'mutual_fund' || account?.kind === 'stocks';
+  const isDeposit = account?.kind === 'fixed_deposit' || account?.kind === 'recurring_deposit';
+  const isLiability = isCard || account?.kind === 'loan' || account?.kind === 'other_liability';
 
-    if (account.kind === 'mutual_fund' || account.kind === 'stocks') {
-      if (accountValuations.length > 0) {
-        return accountValuations.map((v) => ({
-          date: v.date,
-          value: v.value / 100,
-        }));
-      }
-    }
+  const historyData = account ? accountHistory[account.id] : undefined;
+  const historyPoints = useMemo(() => historyData?.history || [], [historyData]);
 
-    // Generate trend from recent transactions
-    const accountTx = transactions
-      .filter((t) => t.accountId === accountId || t.toAccountId === accountId)
-      .sort((a, b) => a.date.localeCompare(b.date));
-
-    if (accountTx.length === 0) {
-      return [
-        { date: '2026-10-01', value: account.balance / 100 },
-        { date: '2026-10-28', value: account.balance / 100 },
-      ];
-    }
-
-    // Reconstruct ledger points
-    let running = account.balance;
-    const points: { date: string; value: number }[] = [];
-
-    // Points for last 5 transactions
-    accountTx.forEach((tx) => {
-      points.push({
-        date: tx.date,
-        value: Math.round(running / 100),
-      });
-      if (tx.type === 'expense' || (tx.type === 'transfer' && tx.accountId === accountId)) {
-        running += tx.amount;
-      } else {
-        running -= tx.amount;
-      }
-    });
-
-    return points.reverse();
-  }, [account, accountValuations, transactions, accountId]);
-
-  const chartConfig: ChartConfigData = {
-    ...defaultChartConfig,
-    title: 'Balance Trend',
-    xAxis: 'date',
-    yAxis: ['value'],
-    seriesConfig: [
-      {
-        column: 'value',
-        label: 'Balance (₹)',
-        color: 'var(--chart-1)',
-        aggregation: 'sum',
-      },
-    ],
-  };
+  const chartPoints = useMemo(() => {
+    return historyPoints.map((p) => ({
+      date: p.date,
+      value: isLiability ? p.outstanding : p.balance,
+      hasActivity: p.hasActivity,
+    }));
+  }, [historyPoints, isLiability]);
 
   if (!account) {
     return (
@@ -148,10 +129,6 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
       </div>
     );
   }
-
-  const isCard = account.kind === 'credit_card';
-  const isInvestment = account.kind === 'mutual_fund' || account.kind === 'stocks';
-  const isDeposit = account.kind === 'fixed_deposit' || account.kind === 'recurring_deposit';
 
   const handleDelete = async () => {
     const confirmed = await showConfirm({
@@ -332,33 +309,38 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
             </div>
           </div>
 
-          {account.creditLimit && account.creditLimit > 0 && (
-            <div className="space-y-1.5 pt-1">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Credit Utilization</span>
-                <span className="font-semibold text-foreground">
-                  {Math.round(account.utilization * 100)}%
-                </span>
+          {account.creditLimit && account.creditLimit > 0 && (() => {
+            const pct = Math.min(100, Math.max(0, account.utilization * 100));
+            const formattedPct = (account.utilization * 100).toFixed(1);
+            const colorClass =
+              account.utilization > 0.6
+                ? 'bg-rose-500'
+                : account.utilization >= 0.3
+                ? 'bg-amber-500'
+                : 'bg-emerald-500';
+            return (
+              <div className="space-y-1.5 pt-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Credit Utilization</span>
+                  <span className="font-semibold text-foreground">
+                    {formatINR(account.outstanding)} of {formatINR(account.creditLimit)} ({formattedPct}%)
+                  </span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={cn('h-full transition-all duration-300 rounded-full', colorClass)}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
               </div>
-              <Progress
-                value={account.utilization * 100}
-                className={cn(
-                  'h-2',
-                  account.utilization > 0.5
-                    ? '[&>div]:bg-destructive'
-                    : account.utilization > 0.3
-                    ? '[&>div]:bg-amber-500'
-                    : '[&>div]:bg-emerald-500'
-                )}
-              />
-            </div>
-          )}
+            );
+          })()}
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t text-xs">
             <div className="p-2 rounded-lg bg-muted/30">
               <span className="text-[10px] text-muted-foreground block uppercase font-medium">Billing Cycle</span>
               <p className="font-semibold text-foreground mt-0.5">
-                {account.statementDay ? `${account.statementDay}th of month` : '21st'}
+                {account.statementDay ? `${formatDayOrdinal(account.statementDay)} of month` : '21st'}
               </p>
             </div>
             <div className="p-2 rounded-lg bg-muted/30">
@@ -636,35 +618,70 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
       )}
 
       {/* Balance Trend Chart */}
-      {chartData.length > 0 && (
-        <div className="p-4 rounded-xl border bg-card space-y-3">
-          <div className="flex items-center justify-between">
+      <div className="p-4 rounded-xl border bg-card space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Balance History
             </h3>
             <span className="text-xs font-semibold text-foreground">
-              Current: {formatINR(account.currentValue || account.balance)}
+              {isLiability ? 'Outstanding' : 'Current'}:{' '}
+              {formatINR(isLiability ? account.outstanding : (account.currentValue || account.balance))}
             </span>
           </div>
 
-          <div className="h-56 w-full">
-            <ChartRenderer
-              type="area"
-              config={chartConfig}
-              data={chartData}
-              showTitle={false}
-              className="h-full"
-            />
+          {/* Range Presets */}
+          <div className="flex items-center gap-1 rounded-lg bg-muted/60 p-1 self-start sm:self-center">
+            {(['7D', '30D', '90D', '1Y', 'ALL'] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPreset(p)}
+                className={cn(
+                  'px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors',
+                  preset === p
+                    ? 'bg-background text-foreground shadow-xs font-semibold'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {p === 'ALL' ? 'All' : p}
+              </button>
+            ))}
           </div>
         </div>
-      )}
+
+        {/* Invariant Mismatch Alert */}
+        {historyData?.isMismatch && (
+          <Alert variant="destructive">
+            <AlertCircleIcon className="size-4" />
+            <AlertTitle>Data mismatch</AlertTitle>
+            <AlertDescription>
+              The balance history last point does not match the account&apos;s current {isLiability ? 'outstanding' : 'balance'}.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <div className="h-60 w-full">
+          <FinanceAreaChart
+            data={chartPoints}
+            label={isLiability ? 'Outstanding' : 'Balance'}
+            height={240}
+          />
+        </div>
+
+        {historyPoints.length < 3 && (
+          <p className="text-xs text-muted-foreground italic">
+            Tracking started on {formatDateShort(String((account.metadata as Record<string, unknown> | null)?.openingBalanceDate || historyPoints[0]?.date || ''))}. History builds up as you add transactions.
+          </p>
+        )}
+      </div>
 
       {/* Ledger Table */}
       <div className="space-y-3">
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
           Account Ledger
         </h3>
-        <TransactionTable />
+        <TransactionTable accountId={account.id} />
       </div>
 
       {/* Update Valuation Dialog */}

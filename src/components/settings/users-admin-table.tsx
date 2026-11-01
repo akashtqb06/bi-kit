@@ -657,7 +657,7 @@ export function UsersAdminTable() {
 
             {/* Add User Dialog */}
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle>Add New User</DialogTitle>
                         <DialogDescription>
@@ -742,7 +742,7 @@ export function UsersAdminTable() {
                     }
                 }}
             >
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
                         <div className="flex items-center gap-2 text-emerald-600">
                             <CheckCircle2Icon className="size-5" />

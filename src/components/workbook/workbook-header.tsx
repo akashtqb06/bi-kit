@@ -24,9 +24,11 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useWorkbookWorkspace } from './workbook-context';
 import { UserMenu } from '@src/components/auth/user-menu';
+import { useAppSettings } from '@src/components/settings/app-settings-provider';
 
 export function WorkbookHeader() {
     const { workbook, renameWorkbook, duplicateWorkbook, deleteWorkbook } = useWorkbookWorkspace();
+    const { appName } = useAppSettings();
 
     const [isEditing, setIsEditing] = useState(false);
     const [nameInput, setNameInput] = useState('');
@@ -84,8 +86,11 @@ export function WorkbookHeader() {
                     </Button>
                     <div className="flex items-center gap-1.5 pl-1">
                         <BarChart3Icon className="size-4 text-primary" />
-                        <span className="text-xs font-semibold tracking-tight text-foreground/80 hidden sm:inline">
-                            BI Kit
+                        <span
+                            className="text-xs font-semibold tracking-tight text-foreground/80 hidden sm:inline"
+                            title={appName}
+                        >
+                            {appName}
                         </span>
                     </div>
                 </div>

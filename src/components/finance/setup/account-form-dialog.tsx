@@ -211,8 +211,20 @@ export function AccountFormDialog({
     onOpenChange(false);
   };
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    onOpenChange(nextOpen);
+    if (!nextOpen) {
+      setTimeout(() => {
+        if (typeof document !== 'undefined') {
+          document.body.removeAttribute('inert');
+          document.body.style.pointerEvents = '';
+        }
+      }, 50);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-base font-bold">
@@ -232,6 +244,18 @@ export function AccountFormDialog({
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">Account Kind</Label>
             <Select
+              items={[
+                { value: 'bank', label: 'Bank / Savings Account' },
+                { value: 'cash', label: 'Cash / Physical Wallet' },
+                { value: 'credit_card', label: 'Credit Card (Liability)' },
+                { value: 'fixed_deposit', label: 'Fixed Deposit (FD)' },
+                { value: 'recurring_deposit', label: 'Recurring Deposit (RD)' },
+                { value: 'mutual_fund', label: 'Mutual Funds' },
+                { value: 'stocks', label: 'Stocks / Demat' },
+                { value: 'loan', label: 'Loan / Mortgage (Liability)' },
+                { value: 'other_asset', label: 'Other Asset' },
+                { value: 'other_liability', label: 'Other Liability' },
+              ]}
               value={kind}
               onValueChange={(val) => setKind(val as AccountKind)}
             >
@@ -401,6 +425,13 @@ export function AccountFormDialog({
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">Compounding</Label>
                   <Select
+                    items={[
+                      { value: 'quarterly', label: 'Quarterly (Indian Default)' },
+                      { value: 'monthly', label: 'Monthly' },
+                      { value: 'half_yearly', label: 'Half-yearly' },
+                      { value: 'yearly', label: 'Yearly' },
+                      { value: 'simple', label: 'Simple Interest' },
+                    ]}
                     value={compounding}
                     onValueChange={(val) => setCompounding(val as CompoundingFrequency)}
                   >

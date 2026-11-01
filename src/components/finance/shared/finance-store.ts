@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import type {
+  AccountHistoryResponseDTO,
   BudgetDTO,
   BudgetFilters,
   BudgetProgressDTO,
@@ -14,6 +15,8 @@ import type {
   NetWorthPointDTO,
   OverviewStatsDTO,
   TransactionDTO,
+  TransactionFilters,
+  TransactionSummaryDTO,
   UpdateAccountDTO,
   UpdateBudgetDTO,
   UpdateCategoryDTO,
@@ -39,6 +42,9 @@ export interface FinanceState {
   accounts: AccountWithBalance[];
   categories: CategoryDTO[];
   transactions: TransactionDTO[];
+  transactionsByAccount: Record<string, { transactions: TransactionDTO[]; summary?: TransactionSummaryDTO }>;
+  accountHistory: Record<string, AccountHistoryResponseDTO>;
+  accountHistoryStatus: Record<string, SliceStatus>;
   budgets: BudgetDTO[];
   budgetProgress: BudgetProgressDTO[];
   valuations: Record<string, ValuationDTO[]>;
@@ -64,7 +70,11 @@ export interface FinanceState {
     accounts?: string;
   }) => Promise<void>;
   refreshNetWorthHistory: () => Promise<void>;
-  refreshTransactions: () => Promise<void>;
+  refreshTransactions: (filters?: Partial<TransactionFilters>) => Promise<void>;
+  refreshAccountHistory: (
+    accountId: string,
+    options?: { from?: string; to?: string; preset?: string }
+  ) => Promise<void>;
   refreshCategories: () => Promise<void>;
   refreshBudgets: (filters?: BudgetFilters) => Promise<void>;
   openQuickAdd: (initialData?: Partial<CreateTransactionDTO>) => void;
@@ -124,6 +134,9 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
     accounts: [],
     categories: [],
     transactions: [],
+    transactionsByAccount: {},
+    accountHistory: {},
+    accountHistoryStatus: {},
     budgets: [],
     budgetProgress: [],
     valuations: {},
@@ -150,6 +163,9 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
       accounts: [],
       categories: [],
       transactions: [],
+      transactionsByAccount: {},
+      accountHistory: {},
+      accountHistoryStatus: {},
       budgets: [],
       budgetProgress: [],
       valuations: {},
@@ -241,22 +257,87 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
     }
   },
 
-  refreshTransactions: async () => {
+  refreshTransactions: async (filters?: Partial<TransactionFilters>) => {
     set({ transactionsStatus: 'loading' });
     try {
-      const res = await fetch('/api/finance/transactions', {
+      const sp = new URLSearchParams();
+      if (filters?.accountId) sp.set('accountId', filters.accountId);
+      if (filters?.categoryId) sp.set('categoryId', filters.categoryId);
+      if (filters?.type) sp.set('type', filters.type);
+      if (filters?.startDate) sp.set('startDate', filters.startDate);
+      if (filters?.endDate) sp.set('endDate', filters.endDate);
+      if (filters?.search) sp.set('search', filters.search);
+      if (filters?.limit) sp.set('limit', String(filters.limit));
+
+      const qs = sp.toString();
+      const url = qs ? `/api/finance/transactions?${qs}` : '/api/finance/transactions';
+      const res = await fetch(url, {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
       });
       if (!res.ok) throw new Error(`Transactions request failed: ${res.status}`);
       const data = await res.json();
-      set({
-        transactions: Array.isArray(data.transactions) ? data.transactions : [],
+      const txs = Array.isArray(data.transactions) ? data.transactions : [];
+      const cacheKey = filters?.accountId || 'all';
+
+      set((state) => ({
+        transactions: cacheKey === 'all' ? txs : state.transactions,
+        transactionsByAccount: {
+          ...state.transactionsByAccount,
+          [cacheKey]: {
+            transactions: txs,
+            summary: data.summary,
+          },
+        },
         transactionsStatus: 'ready',
-      });
+      }));
     } catch (err) {
       console.error('Failed to load transactions:', err);
       set({ transactionsStatus: 'error' });
+    }
+  },
+
+  refreshAccountHistory: async (
+    accountId: string,
+    options?: { from?: string; to?: string; preset?: string }
+  ) => {
+    set((state) => ({
+      accountHistoryStatus: { ...state.accountHistoryStatus, [accountId]: 'loading' },
+    }));
+    try {
+      const sp = new URLSearchParams();
+      if (options?.from) sp.set('from', options.from);
+      if (options?.to) sp.set('to', options.to);
+      if (options?.preset) sp.set('preset', options.preset);
+
+      const qs = sp.toString();
+      const url = qs
+        ? `/api/finance/accounts/${accountId}/history?${qs}`
+        : `/api/finance/accounts/${accountId}/history`;
+      const res = await fetch(url, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+      });
+      if (!res.ok) throw new Error(`Account history request failed: ${res.status}`);
+      const data = await res.json();
+      set((state) => ({
+        accountHistory: {
+          ...state.accountHistory,
+          [accountId]: data,
+        },
+        accountHistoryStatus: {
+          ...state.accountHistoryStatus,
+          [accountId]: 'ready',
+        },
+      }));
+    } catch (err) {
+      console.error(`Failed to load history for account ${accountId}:`, err);
+      set((state) => ({
+        accountHistoryStatus: {
+          ...state.accountHistoryStatus,
+          [accountId]: 'error',
+        },
+      }));
     }
   },
 

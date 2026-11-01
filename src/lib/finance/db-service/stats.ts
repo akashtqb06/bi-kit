@@ -252,13 +252,13 @@ export async function getOverviewStats(
     : 0;
 
   // 7. Spend by category for selected period (filtered by date and accounts)
+  // Donut slices must sum exactly to total expense for the period
   const catSpendConditions = [
     eq(finTransactions.userId, userId),
     eq(finTransactions.type, 'expense'),
     isNull(finTransactions.deletedAt),
     gte(finTransactions.date, startDate),
     lte(finTransactions.date, endDate),
-    sql`(${finCategories.name} IS NULL OR ${finCategories.name} <> 'Credit card payment')`,
   ];
   if (filterAccountIds.length > 0) {
     catSpendConditions.push(inArray(finTransactions.accountId, filterAccountIds));
@@ -288,12 +288,13 @@ export async function getOverviewStats(
     };
   });
 
-  // 8. Recent transactions for selected period
+  // 8. Recent transactions for selected period (excludes opening balance adjustments)
   const recentConditions = [
     eq(finTransactions.userId, userId),
     isNull(finTransactions.deletedAt),
     gte(finTransactions.date, startDate),
     lte(finTransactions.date, endDate),
+    sql`NOT (${finTransactions.type} = 'adjustment' AND ${finTransactions.payee} = 'Opening Balance')`,
   ];
   if (filterAccountIds.length > 0) {
     recentConditions.push(inArray(finTransactions.accountId, filterAccountIds));
@@ -320,7 +321,7 @@ export async function getOverviewStats(
     },
     spendByCategory,
     accountsByKind,
-    recentTransactions: recentRows.map(mapTransactionToDTO),
+    recentTransactions: recentRows.map((r) => mapTransactionToDTO(r)),
     cardsDueSoon,
     activePeriod: {
       from: startDate,

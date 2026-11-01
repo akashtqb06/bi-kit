@@ -71,6 +71,12 @@ export function SecurityForm({ user, isLastAdmin }: SecurityFormProps) {
                 setConfirmPassword('');
                 setPasswordErrors({});
                 setPasswordFormError(null);
+                if (user.mustChangePassword) {
+                    router.push('/');
+                    router.refresh();
+                } else {
+                    router.refresh();
+                }
             } else {
                 if (res.fieldErrors) {
                     setPasswordErrors(res.fieldErrors);
@@ -243,7 +249,8 @@ export function SecurityForm({ user, isLastAdmin }: SecurityFormProps) {
             </Card>
 
             {/* Danger Zone Card */}
-            <Card className="border-destructive/30 bg-destructive/5">
+            {!user.mustChangePassword && (
+                <Card className="border-destructive/30 bg-destructive/5">
                 <CardHeader>
                     <div className="flex items-center gap-2 text-destructive">
                         <ShieldAlertIcon className="size-5" />
@@ -367,6 +374,7 @@ export function SecurityForm({ user, isLastAdmin }: SecurityFormProps) {
                     )}
                 </CardContent>
             </Card>
+            )}
         </div>
     );
 }

@@ -291,7 +291,7 @@ export class MockFinanceService implements FinanceService {
       }
     }
 
-    const limit = filters?.limit ?? 50;
+    const limit = typeof filters?.limit === 'string' ? parseInt(filters.limit, 10) : (filters?.limit ?? 50);
     const hasMore = list.length > limit;
     const pageItems = list.slice(0, limit);
 

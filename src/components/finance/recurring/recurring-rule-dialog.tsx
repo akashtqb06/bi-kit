@@ -375,6 +375,13 @@ function RecurringRuleForm({
               Frequency
             </Label>
             <Select
+              items={[
+                { value: 'daily', label: 'Daily' },
+                { value: 'weekly', label: 'Weekly' },
+                { value: 'monthly', label: 'Monthly' },
+                { value: 'quarterly', label: 'Quarterly' },
+                { value: 'yearly', label: 'Yearly' },
+              ]}
               value={frequency}
               onValueChange={(val) => setFrequency(val as RecurringFrequency)}
             >
@@ -459,6 +466,10 @@ function RecurringRuleForm({
               {type === 'transfer' ? 'From Account *' : 'Account *'}
             </Label>
             <Select
+              items={accounts.map((acc) => ({
+                value: acc.id,
+                label: `${acc.name} (${acc.kind.replace('_', ' ')})`,
+              }))}
               value={accountId || undefined}
               onValueChange={(val) => setAccountId(val || '')}
             >
@@ -482,6 +493,12 @@ function RecurringRuleForm({
                 To Account *
               </Label>
               <Select
+                items={accounts
+                  .filter((a) => a.id !== accountId)
+                  .map((acc) => ({
+                    value: acc.id,
+                    label: `${acc.name} (${acc.kind.replace('_', ' ')})`,
+                  }))}
                 value={toAccountId || undefined}
                 onValueChange={(val) => setToAccountId(val || '')}
               >
@@ -506,6 +523,13 @@ function RecurringRuleForm({
                 Category
               </Label>
               <Select
+                items={[
+                  { value: '__none__', label: 'None / Uncategorized' },
+                  ...filteredCategories.map((cat) => ({
+                    value: cat.id,
+                    label: cat.name,
+                  })),
+                ]}
                 value={categoryId || '__none__'}
                 onValueChange={(val) => setCategoryId((!val || val === '__none__') ? '' : val)}
               >
@@ -600,8 +624,20 @@ export function RecurringRuleDialog({
   categories,
   onSuccess,
 }: RecurringRuleDialogProps) {
+  const handleOpenChange = (nextOpen: boolean) => {
+    onOpenChange(nextOpen);
+    if (!nextOpen) {
+      setTimeout(() => {
+        if (typeof document !== 'undefined') {
+          document.body.removeAttribute('inert');
+          document.body.style.pointerEvents = '';
+        }
+      }, 50);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-base font-bold">
@@ -616,7 +652,7 @@ export function RecurringRuleDialog({
             initialPresetId={initialPresetId}
             accounts={accounts}
             categories={categories}
-            onClose={() => onOpenChange(false)}
+            onClose={() => handleOpenChange(false)}
             onSuccess={onSuccess}
           />
         )}

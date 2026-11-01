@@ -7,7 +7,6 @@ import {
     Line,
     Area,
     AreaChart,
-    ResponsiveContainer,
     PieChart,
     Pie,
     Cell,
@@ -18,7 +17,14 @@ import {
     ReferenceLine,
     Brush,
 } from 'recharts';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
+import {
+    ChartContainer,
+    ChartTooltip,
+    ChartTooltipContent,
+    ChartLegend,
+    ChartLegendContent,
+    type ChartConfig,
+} from '@/components/ui/chart';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useLegacyTable, getCoreRowModel, type LegacyColumnDef } from '@tanstack/react-table/legacy';
 import { flexRender } from '@tanstack/react-table';
@@ -213,7 +219,7 @@ export function computeNumberCardValue(
                     }).format(num);
                     break;
                 case 'percent':
-                    formatted = `${(num <= 1 && num >= -1 ? num * 100 : num).toFixed(typeof decimals === 'number' ? decimals : (isInteger ? 0 : 1))}%`;
+                    formatted = `${(num <= 1 && num >= -1 ? num * 100 : num).toFixed(typeof decimals === 'number' ? decimals : isInteger ? 0 : 1)}%`;
                     break;
                 case 'compact':
                     formatted = new Intl.NumberFormat('en-US', {
@@ -268,7 +274,8 @@ export function computeNumberCardValue(
     let timeDelta = null;
     let sparklineData = null;
     const cfgRecord = config as Record<string, unknown>;
-    const dateCol = (config.xAxis || cfgRecord.dateColumn || cfgRecord.numberDateColumn) as string | undefined ||
+    const dateCol =
+        ((config.xAxis || cfgRecord.dateColumn || cfgRecord.numberDateColumn) as string | undefined) ||
         columnNames.find((c) => /date|time|timestamp|month|year|day/i.test(c));
 
     if (dateCol && columnNames.includes(dateCol)) {
@@ -289,7 +296,8 @@ export function computeNumberCardValue(
             const cur = timePoints[timePoints.length - 1];
             const prev = timePoints[timePoints.length - 2];
             const diff = cur.value - prev.value;
-            const diffPct = prev.value !== 0 ? Math.round(((cur.value - prev.value) / Math.abs(prev.value)) * 1000) / 10 : 0;
+            const diffPct =
+                prev.value !== 0 ? Math.round(((cur.value - prev.value) / Math.abs(prev.value)) * 1000) / 10 : 0;
             timeDelta = {
                 diff,
                 diffPct: Math.abs(diffPct),
@@ -363,10 +371,7 @@ export function ChartRenderer({
         const cConfig: ChartConfig = {};
         seriesList.forEach((s, idx) => {
             const safeKey = s.key.replace(/[^a-zA-Z0-9_-]/g, '_');
-            const mappedColor =
-                categoryColorMap?.[s.label] ||
-                categoryColorMap?.[s.key] ||
-                categoryColorMap?.[safeKey];
+            const mappedColor = categoryColorMap?.[s.label] || categoryColorMap?.[s.key] || categoryColorMap?.[safeKey];
             const color = s.color || mappedColor || palette[idx % palette.length];
             cConfig[safeKey] = { label: s.label, color };
             if (safeKey !== s.key) {
@@ -444,9 +449,7 @@ export function ChartRenderer({
 
         return (
             <div className={cn('flex flex-col justify-between p-3.5 w-full h-full min-h-0', className)}>
-                {showTitle && cardTitle && (
-                    <ChartTitle title={cardTitle} textStyle={textStyle} className="mb-1" />
-                )}
+                {showTitle && cardTitle && <ChartTitle title={cardTitle} textStyle={textStyle} className="mb-1" />}
                 <div className="flex items-end justify-between gap-3 mt-auto">
                     <div className="min-w-0">
                         <div
@@ -457,10 +460,10 @@ export function ChartRenderer({
                                     textStyle.numberValue.fontWeight === 'bold'
                                         ? 700
                                         : textStyle.numberValue.fontWeight === 'medium'
-                                        ? 500
-                                        : textStyle.numberValue.fontWeight === 'normal'
-                                        ? 400
-                                        : 600,
+                                          ? 500
+                                          : textStyle.numberValue.fontWeight === 'normal'
+                                            ? 400
+                                            : 600,
                                 fontFamily: getFontFamily(textStyle.title.fontFamily),
                                 color: textStyle.title.color || undefined,
                             }}
@@ -471,13 +474,11 @@ export function ChartRenderer({
                             <div className="flex items-center gap-1 text-xs mt-1">
                                 {timeDelta.isPositive ? (
                                     <span className="flex items-center font-medium text-emerald-600 dark:text-emerald-400">
-                                        <TrendingUpIcon className="size-3.5 mr-0.5" />
-                                        +{timeDelta.diffPct}%
+                                        <TrendingUpIcon className="size-3.5 mr-0.5" />+{timeDelta.diffPct}%
                                     </span>
                                 ) : (
                                     <span className="flex items-center font-medium text-rose-600 dark:text-rose-400">
-                                        <TrendingDownIcon className="size-3.5 mr-0.5" />
-                                        -{timeDelta.diffPct}%
+                                        <TrendingDownIcon className="size-3.5 mr-0.5" />-{timeDelta.diffPct}%
                                     </span>
                                 )}
                                 <span className="text-[11px] text-muted-foreground">vs previous</span>
@@ -486,8 +487,7 @@ export function ChartRenderer({
                             <div className="flex items-center gap-1 text-xs mt-1">
                                 {comparison.isPositive ? (
                                     <span className="flex items-center font-medium text-emerald-600 dark:text-emerald-400">
-                                        <TrendingUpIcon className="size-3.5 mr-0.5" />
-                                        +{comparison.diffPct}%
+                                        <TrendingUpIcon className="size-3.5 mr-0.5" />+{comparison.diffPct}%
                                     </span>
                                 ) : (
                                     <span className="flex items-center font-medium text-rose-600 dark:text-rose-400">
@@ -501,7 +501,18 @@ export function ChartRenderer({
                     </div>
                     {sparklineData && sparklineData.length >= 2 && (
                         <div className="w-24 sm:w-28 h-10 shrink-0">
-                            <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                            <ChartContainer
+                                config={{
+                                    value: {
+                                        label: 'Trend',
+                                        color:
+                                            timeDelta?.isPositive !== false
+                                                ? 'var(--chart-emerald-2, #10b981)'
+                                                : 'var(--chart-1, #f43f5e)',
+                                    },
+                                }}
+                                className="h-full w-full aspect-auto min-h-0"
+                            >
                                 <AreaChart data={sparklineData} margin={{ top: 2, right: 0, bottom: 2, left: 0 }}>
                                     <defs>
                                         <linearGradient id="sparkline-gradient" x1="0" y1="0" x2="0" y2="1">
@@ -527,7 +538,7 @@ export function ChartRenderer({
                                         isAnimationActive={false}
                                     />
                                 </AreaChart>
-                            </ResponsiveContainer>
+                            </ChartContainer>
                         </div>
                     )}
                 </div>
@@ -705,10 +716,10 @@ export function ChartRenderer({
                                                       textStyle.dataLabels.fontWeight === 'bold'
                                                           ? 700
                                                           : textStyle.dataLabels.fontWeight === 'medium'
-                                                          ? 500
-                                                          : textStyle.dataLabels.fontWeight === 'semibold'
-                                                          ? 600
-                                                          : 400,
+                                                            ? 500
+                                                            : textStyle.dataLabels.fontWeight === 'semibold'
+                                                              ? 600
+                                                              : 400,
                                               }
                                             : false
                                     }
@@ -717,18 +728,17 @@ export function ChartRenderer({
                                         chartData.map((entry, entryIdx) => {
                                             const itemLabel = String(entry[xAxisKey] ?? '');
                                             const cColor =
-                                                categoryColorMap[itemLabel] ||
-                                                palette[entryIdx % palette.length];
+                                                categoryColorMap[itemLabel] || palette[entryIdx % palette.length];
                                             return <Cell key={`row-cell-${entryIdx}`} fill={cColor} />;
                                         })}
                                 </Bar>
                             );
                         })}
+                        {config.showLegend && textStyle.legend.show !== false && (
+                            <ChartLegend content={<ChartLegendContent className="flex-wrap pt-2" />} />
+                        )}
                     </BarChart>
                 </ChartContainer>
-                {config.showLegend && textStyle.legend.show !== false && (
-                    <CompactSeriesLegend series={seriesList} palette={palette} textStyle={textStyle} />
-                )}
             </div>
         );
     }
@@ -759,7 +769,9 @@ export function ChartRenderer({
                     margin={{
                         top: 8,
                         right: 16,
-                        bottom: config.xRotateValues ? Math.max(16, Math.round(textStyle.axisLabels.fontSize * 1.2)) : 4,
+                        bottom: config.xRotateValues
+                            ? Math.max(16, Math.round(textStyle.axisLabels.fontSize * 1.2))
+                            : 4,
                         left: 4,
                     }}
                     barGap={config.overlap ? -20 : 4}
@@ -774,7 +786,9 @@ export function ChartRenderer({
                         textAnchor={textAnchor}
                         interval="preserveStartEnd"
                         height={xAxisHeight}
-                        tickMargin={config.xRotateValues ? Math.max(8, Math.round(textStyle.axisLabels.fontSize * 0.6)) : 4}
+                        tickMargin={
+                            config.xRotateValues ? Math.max(8, Math.round(textStyle.axisLabels.fontSize * 0.6)) : 4
+                        }
                         minTickGap={8}
                         tick={{
                             fontSize: textStyle.axisLabels.fontSize,
@@ -837,10 +851,10 @@ export function ChartRenderer({
                                                       textStyle.dataLabels.fontWeight === 'bold'
                                                           ? 700
                                                           : textStyle.dataLabels.fontWeight === 'medium'
-                                                          ? 500
-                                                          : textStyle.dataLabels.fontWeight === 'semibold'
-                                                          ? 600
-                                                          : 400,
+                                                            ? 500
+                                                            : textStyle.dataLabels.fontWeight === 'semibold'
+                                                              ? 600
+                                                              : 400,
                                               }
                                             : false
                                     }
@@ -880,10 +894,10 @@ export function ChartRenderer({
                                                   textStyle.dataLabels.fontWeight === 'bold'
                                                       ? 700
                                                       : textStyle.dataLabels.fontWeight === 'medium'
-                                                      ? 500
-                                                      : textStyle.dataLabels.fontWeight === 'semibold'
-                                                      ? 600
-                                                      : 400,
+                                                        ? 500
+                                                        : textStyle.dataLabels.fontWeight === 'semibold'
+                                                          ? 600
+                                                          : 400,
                                           }
                                         : false
                                 }
@@ -892,54 +906,17 @@ export function ChartRenderer({
                                     chartData.map((entry, entryIdx) => {
                                         const itemLabel = String(entry[xAxisKey] ?? '');
                                         const cColor =
-                                            categoryColorMap[itemLabel] ||
-                                            palette[entryIdx % palette.length];
+                                            categoryColorMap[itemLabel] || palette[entryIdx % palette.length];
                                         return <Cell key={`bar-cell-${entryIdx}`} fill={cColor} />;
                                     })}
                             </Bar>
                         );
                     })}
+                    {config.showLegend && textStyle.legend.show !== false && (
+                        <ChartLegend content={<ChartLegendContent className="flex-wrap pt-2" />} />
+                    )}
                 </ComposedChart>
             </ChartContainer>
-            {config.showLegend && textStyle.legend.show !== false && (
-                <CompactSeriesLegend series={seriesList} palette={palette} textStyle={textStyle} />
-            )}
-        </div>
-    );
-}
-
-function CompactSeriesLegend({
-    series,
-    palette,
-    textStyle,
-}: {
-    series: ReturnType<typeof aggregateChartData>['series'];
-    palette: string[];
-    textStyle?: NormalizedChartTextStyle;
-}) {
-    return (
-        <div
-            className="flex max-h-10 shrink-0 flex-wrap items-center justify-center gap-x-3 gap-y-1 overflow-y-auto px-1 py-1"
-            style={{
-                fontFamily: textStyle ? getFontFamily(textStyle.legend.fontFamily) : undefined,
-                fontSize: textStyle ? `${textStyle.legend.fontSize}px` : '10px',
-            }}
-        >
-            {series.map((item, index) => (
-                <span
-                    key={item.key}
-                    className="flex min-w-0 max-w-full items-center gap-1 text-muted-foreground"
-                    style={{ color: textStyle?.legend.color || undefined }}
-                >
-                    <span
-                        className="size-2 shrink-0 rounded-full"
-                        style={{ backgroundColor: item.color || palette[index % palette.length] }}
-                    />
-                    <span className="max-w-32 truncate" title={item.label}>
-                        {item.label}
-                    </span>
-                </span>
-            ))}
         </div>
     );
 }
@@ -984,9 +961,7 @@ function PieChartWithLegend({
             ref={containerRef}
             className={`flex min-h-0 min-w-0 flex-1 h-full w-full ${isWide ? 'flex-row' : 'flex-col'} ${showLegend ? 'gap-2' : ''}`}
         >
-            <div
-                className={`relative flex min-h-0 min-w-0 flex-1 ${isWide && showLegend ? 'w-[58%]' : 'w-full'}`}
-            >
+            <div className={`relative flex min-h-0 min-w-0 flex-1 ${isWide && showLegend ? 'w-[58%]' : 'w-full'}`}>
                 <ChartContainer config={chartConfig} className="h-full w-full aspect-auto min-h-0 flex-1">
                     <PieChart margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                         <ChartTooltip

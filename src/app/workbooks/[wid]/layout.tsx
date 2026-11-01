@@ -56,6 +56,8 @@ import { eq } from 'drizzle-orm';
 import { db } from '@src/lib/db';
 import { workbooks } from '@src/lib/db/schema';
 import { UserProvider } from '@src/components/auth/user-provider';
+import { AppSettingsProvider } from '@src/components/settings/app-settings-provider';
+import { getPublicSettings } from '@src/lib/settings/app-settings';
 import { requireUser, can } from '@src/lib/auth/dal';
 import { checkDatabaseHealth } from '@src/lib/db/health';
 import { DatabaseErrorPage } from '@src/components/db/database-error-page';
@@ -73,21 +75,25 @@ async function WorkbookLayoutContent({ children, params }: WorkbookLayoutProps) 
         notFound();
     }
 
+    const { appName } = await getPublicSettings().catch(() => ({ appName: 'BI Kit' }));
+
     return (
         <UserProvider user={user}>
-            <WorkbookProvider workbookId={wid}>
-                <div className="flex h-dvh flex-col overflow-hidden bg-background">
-                    <Suspense fallback={<header className="h-12 border-b bg-background shrink-0" />}>
-                        <WorkbookHeader />
-                    </Suspense>
-                    <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
-                        <Suspense fallback={<WorkbookSidebarSkeleton />}>
-                            <WorkbookSidebar />
+            <AppSettingsProvider initialAppName={appName}>
+                <WorkbookProvider workbookId={wid}>
+                    <div className="flex h-dvh flex-col overflow-hidden bg-background">
+                        <Suspense fallback={<header className="h-12 border-b bg-background shrink-0" />}>
+                            <WorkbookHeader />
                         </Suspense>
-                        <main className="flex flex-1 min-h-0 min-w-0 overflow-hidden">{children}</main>
+                        <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
+                            <Suspense fallback={<WorkbookSidebarSkeleton />}>
+                                <WorkbookSidebar />
+                            </Suspense>
+                            <main className="flex flex-1 min-h-0 min-w-0 overflow-hidden">{children}</main>
+                        </div>
                     </div>
-                </div>
-            </WorkbookProvider>
+                </WorkbookProvider>
+            </AppSettingsProvider>
         </UserProvider>
     );
 }

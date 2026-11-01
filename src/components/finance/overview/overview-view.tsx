@@ -29,8 +29,7 @@ import {
 import { useFinanceStore } from '../shared/finance-store';
 import { formatINR, formatPercent } from '../shared/format';
 import { FinancePageSkeleton } from '../shared/finance-skeleton';
-import { ChartRenderer } from '@src/components/charts/chart-renderer';
-import { defaultChartConfig, type ChartConfigData } from '@src/lib/schemas';
+import { FinanceAreaChart, FinanceDonutChart } from '../charts';
 import { cn } from '@/lib/utils';
 import {
   formatDateRangeDisplay,
@@ -221,71 +220,23 @@ export function OverviewView() {
     return getCategoryColorMap(categories);
   }, [categories]);
 
-  // Net worth sparkline data (trend)
-  const sparklineData = useMemo(() => {
+  // Net worth history points (historical trend)
+  const netWorthPoints = useMemo(() => {
     return netWorthHistory.map((p) => ({
       date: p.date,
-      netWorth: Math.round(p.netWorth / 100),
-      assets: Math.round(p.assets / 100),
-      liabilities: Math.round(p.liabilities / 100),
+      value: p.netWorth,
     }));
   }, [netWorthHistory]);
 
-  const netWorthChartConfig: ChartConfigData = {
-    ...defaultChartConfig,
-    title: 'Net Worth Trend',
-    xAxis: 'date',
-    yAxis: ['netWorth'],
-    seriesConfig: [
-      {
-        column: 'netWorth',
-        label: 'Net Worth (₹)',
-        color: 'var(--chart-1)',
-        aggregation: 'sum',
-      },
-    ],
-  };
-
-  // Spend by Category Donut Data (respects period and accounts)
+  // Spend by Category Donut Data (strictly server-computed aggregates)
   const spendByCategoryData = useMemo(() => {
-    if (overviewStats?.spendByCategory && overviewStats.spendByCategory.length > 0) {
-      return overviewStats.spendByCategory.map((c) => ({
-        category: c.categoryName,
-        amount: Math.round(c.amount / 100),
-      }));
-    }
-
-    if (overviewStats?.spendByCategory && overviewStats.spendByCategory.length === 0) {
-      return [];
-    }
-
-    const categoryTotals: Record<string, number> = {};
-
-    transactions.forEach((t) => {
-      if (t.type === 'expense' && t.categoryId) {
-        categoryTotals[t.categoryId] = (categoryTotals[t.categoryId] || 0) + t.amount;
-      }
-    });
-
-    const rows = Object.entries(categoryTotals).map(([catId, amountPaise]) => {
-      const cat = categories.find((c) => c.id === catId);
-      return {
-        category: cat?.name || 'Other',
-        amount: Math.round(amountPaise / 100),
-      };
-    });
-
-    return rows.sort((a, b) => b.amount - a.amount);
-  }, [overviewStats, transactions, categories]);
-
-  const donutConfig: ChartConfigData = {
-    ...defaultChartConfig,
-    title: 'Spend by Category',
-    donutLabelColumn: 'category',
-    donutValueColumn: 'amount',
-    showDataLabels: false,
-    showLegend: true,
-  };
+    if (!overviewStats?.spendByCategory) return [];
+    return overviewStats.spendByCategory.map((c) => ({
+      name: c.categoryName,
+      amount: c.amount,
+      color: categoryColorMap[c.categoryName] || categoryColorMap[c.categoryId],
+    }));
+  }, [overviewStats, categoryColorMap]);
 
   // Period stats & deltas
   const currentIncome = overviewStats?.monthlyIncome ?? 0;
@@ -595,12 +546,10 @@ export function OverviewView() {
 
         {/* Sparkline Trend Chart (Historical as of today) */}
         <div className="lg:col-span-2 h-48 w-full pt-2">
-          <ChartRenderer
-            type="area"
-            config={netWorthChartConfig}
-            data={sparklineData}
-            showTitle={false}
-            className="h-full"
+          <FinanceAreaChart
+            data={netWorthPoints}
+            label="Net Worth"
+            height={180}
           />
         </div>
       </div>
@@ -776,22 +725,13 @@ export function OverviewView() {
             </span>
           </div>
 
-          {spendByCategoryData.length === 0 ? (
-            <div className="h-64 w-full flex items-center justify-center text-xs text-muted-foreground">
-              No transactions in this period
-            </div>
-          ) : (
-            <div className="h-64 w-full">
-              <ChartRenderer
-                type="donut"
-                config={donutConfig}
-                data={spendByCategoryData}
-                categoryColorMap={categoryColorMap}
-                showTitle={false}
-                className="h-full"
-              />
-            </div>
-          )}
+          <div className="h-64 w-full">
+            <FinanceDonutChart
+              data={spendByCategoryData}
+              totalLabel="Total Spend"
+              height={256}
+            />
+          </div>
         </div>
       </div>
 

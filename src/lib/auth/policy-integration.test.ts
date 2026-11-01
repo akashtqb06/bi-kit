@@ -232,8 +232,8 @@ describe('Policy Integration & Access Control', () => {
             const methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
 
             for (const file of routeFiles) {
-                // Public health check route does not require user authentication
-                if (file.endsWith('/api/health/route.ts')) {
+                // Public health check and public settings routes do not require user authentication
+                if (file.endsWith('/api/health/route.ts') || file.endsWith('/api/settings/public/route.ts')) {
                     continue;
                 }
                 const mod = await import(file);

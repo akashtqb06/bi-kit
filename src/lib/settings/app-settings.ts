@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 import { db } from '@src/lib/db';
 import { appSettings } from '@src/lib/db/schema';
 import { getAllowedConnectorTypes, setAllowedConnectorTypes } from './allowed-connectors';
@@ -8,6 +9,10 @@ export interface GeneralSettings {
     allowRegistration: boolean;
     sessionLifetimeDays: number;
     allowedConnectorTypes: string[];
+}
+
+export interface PublicSettings {
+    appName: string;
 }
 
 export interface EnvironmentInfo {
@@ -37,6 +42,25 @@ export async function getGeneralSettings(): Promise<GeneralSettings> {
         sessionLifetimeDays,
         allowedConnectorTypes,
     };
+}
+
+export async function getPublicSettings(): Promise<PublicSettings> {
+    try {
+        const [row] = await db
+            .select()
+            .from(appSettings)
+            .where(eq(appSettings.key, 'appName'))
+            .limit(1);
+
+        const appName =
+            row && typeof row.value === 'string' && row.value.trim().length > 0
+                ? row.value.trim()
+                : 'BI Kit';
+
+        return { appName };
+    } catch {
+        return { appName: 'BI Kit' };
+    }
 }
 
 export function getEnvironmentInfo(): EnvironmentInfo {

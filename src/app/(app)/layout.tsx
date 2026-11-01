@@ -1,8 +1,11 @@
 import React, { Suspense } from 'react';
+import type { Metadata } from 'next';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from '@src/components/layout/app-sidebar';
 import { AppHeader } from '@src/components/layout/app-header';
 import { UserProvider } from '@src/components/auth/user-provider';
+import { AppSettingsProvider } from '@src/components/settings/app-settings-provider';
+import { getPublicSettings } from '@src/lib/settings/app-settings';
 import { requireUser } from '@src/lib/auth/dal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { checkDatabaseHealth } from '@src/lib/db/health';
@@ -73,17 +76,31 @@ async function AuthenticatedShell({ children }: { children: React.ReactNode }) {
         return <DatabaseErrorPage error={err} />;
     }
 
+    const { appName } = await getPublicSettings().catch(() => ({ appName: 'BI Kit' }));
+
     return (
         <UserProvider user={user}>
-            <SidebarProvider>
-                <AppSidebar />
-                <SidebarInset className="flex flex-col min-h-0 min-w-0 h-dvh overflow-hidden">
-                    <AppHeader />
-                    <main className="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden">{children}</main>
-                </SidebarInset>
-            </SidebarProvider>
+            <AppSettingsProvider initialAppName={appName}>
+                <SidebarProvider>
+                    <AppSidebar />
+                    <SidebarInset className="flex flex-col min-h-0 min-w-0 h-dvh overflow-hidden">
+                        <AppHeader />
+                        <main className="flex flex-1 flex-col min-h-0 min-w-0 overflow-hidden">{children}</main>
+                    </SidebarInset>
+                </SidebarProvider>
+            </AppSettingsProvider>
         </UserProvider>
     );
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+    const { appName } = await getPublicSettings().catch(() => ({ appName: 'BI Kit' }));
+    return {
+        title: {
+            default: appName,
+            template: `%s | ${appName}`,
+        },
+    };
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

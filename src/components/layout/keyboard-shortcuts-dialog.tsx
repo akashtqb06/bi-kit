@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { KeyboardIcon } from "lucide-react";
+import { useAppSettings } from "@src/components/settings/app-settings-provider";
 
 interface ShortcutGroup {
   category: string;
@@ -52,6 +53,7 @@ const SHORTCUTS: ShortcutGroup[] = [
 
 export function KeyboardShortcutsDialog() {
   const [open, setOpen] = useState(false);
+  const { appName } = useAppSettings();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -97,7 +99,7 @@ export function KeyboardShortcutsDialog() {
               Keyboard Shortcuts & Tips
             </DialogTitle>
             <DialogDescription>
-              Quick reference for shortcuts and navigation in BI Kit.
+              Quick reference for shortcuts and navigation in {appName}.
             </DialogDescription>
           </DialogHeader>
 

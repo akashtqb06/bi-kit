@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +19,7 @@ import {
     CheckCircle2Icon,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAppSettings } from './app-settings-provider';
 
 interface GeneralSettingsData {
     settings: {
@@ -46,6 +48,8 @@ const ALL_CONNECTOR_TYPES = [
 ];
 
 export function GeneralSettingsForm() {
+    const router = useRouter();
+    const { setAppName: setGlobalAppName } = useAppSettings();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -65,7 +69,7 @@ export function GeneralSettingsForm() {
         secureCookies: false,
     });
 
-    const loadSettings = async () => {
+    const loadSettings = useCallback(async () => {
         try {
             setLoading(true);
             const res = await fetch('/api/admin/settings');
@@ -74,6 +78,7 @@ export function GeneralSettingsForm() {
                 throw new Error(json.error || 'Failed to load settings');
             }
             setAppName(json.data.settings.appName);
+            setGlobalAppName(json.data.settings.appName);
             setAllowRegistration(json.data.settings.allowRegistration);
             setSessionLifetimeDays(json.data.settings.sessionLifetimeDays);
             setAllowedConnectorTypes(json.data.settings.allowedConnectorTypes);
@@ -83,7 +88,7 @@ export function GeneralSettingsForm() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [setGlobalAppName]);
 
     useEffect(() => {
         let cancelled = false;
@@ -96,17 +101,18 @@ export function GeneralSettingsForm() {
             cancelled = true;
             clearTimeout(timer);
         };
-    }, []);
+    }, [loadSettings]);
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
+        const trimmedAppName = appName.trim();
         try {
             setSaving(true);
             const res = await fetch('/api/admin/settings', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    appName: appName.trim(),
+                    appName: trimmedAppName,
                     allowRegistration,
                     sessionLifetimeDays: Number(sessionLifetimeDays) || 30,
                     allowedConnectorTypes,
@@ -116,6 +122,8 @@ export function GeneralSettingsForm() {
             if (!res.ok) {
                 throw new Error(json.error || 'Failed to save settings');
             }
+            setGlobalAppName(trimmedAppName);
+            router.refresh();
             toast.success('System settings saved successfully');
         } catch (err) {
             toast.error(err instanceof Error ? err.message : 'Error saving settings');

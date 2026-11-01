@@ -17,12 +17,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -38,13 +32,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useIsMobile } from '@/hooks/use-mobile';
 import { useFinanceStore } from '../shared/finance-store';
 import {
   formatINR,
-  formatAccountDisplayBalance,
   formatLiabilityBalance,
-  rupeesToPaise,
 } from '../shared/format';
 import { parseAmountExpression } from '../shared/expression-parser';
 import { cn } from '@/lib/utils';
@@ -445,27 +436,22 @@ export function PayBillForm() {
 }
 
 export function PayBillDialog() {
-  const isMobile = useIsMobile();
   const { payBillOpen, closePayBill } = useFinanceStore();
 
-  if (isMobile) {
-    return (
-      <Sheet open={payBillOpen} onOpenChange={(open) => !open && closePayBill()}>
-        <SheetContent side="bottom" className="rounded-t-2xl max-h-[92vh] overflow-y-auto px-4 pb-6">
-          <SheetHeader className="text-left pb-2">
-            <SheetTitle className="text-base font-bold flex items-center gap-2">
-              <CreditCardIcon className="size-4 text-primary" />
-              <span>Pay Credit Card Bill</span>
-            </SheetTitle>
-          </SheetHeader>
-          <PayBillForm />
-        </SheetContent>
-      </Sheet>
-    );
-  }
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      closePayBill();
+      setTimeout(() => {
+        if (typeof document !== 'undefined') {
+          document.body.removeAttribute('inert');
+          document.body.style.pointerEvents = '';
+        }
+      }, 50);
+    }
+  };
 
   return (
-    <Dialog open={payBillOpen} onOpenChange={(open) => !open && closePayBill()}>
+    <Dialog open={payBillOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[440px]">
         <DialogHeader>
           <DialogTitle className="text-base font-bold flex items-center gap-2">

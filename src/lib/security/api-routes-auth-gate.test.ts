@@ -32,7 +32,7 @@ describe('API Security Gate: Authentication Enforcement on All Route Handlers', 
             .replace(/\/route\.ts$/, '');
 
         // Exclude intentionally public routes
-        if (apiPath === '/api/health') {
+        if (apiPath === '/api/health' || apiPath === '/api/settings/public') {
             continue;
         }
 

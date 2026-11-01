@@ -258,6 +258,14 @@ export class DbFinanceService implements FinanceService {
     return history.getNetWorthHistory(userId, query);
   }
 
+  async getAccountHistory(
+    userId: string,
+    accountId: string,
+    options?: { from?: string; to?: string; preset?: string }
+  ): Promise<history.AccountHistoryResponseDTO> {
+    return history.getAccountHistory(userId, accountId, options);
+  }
+
   // ============================================================================
   // Cron Automation
   // ============================================================================

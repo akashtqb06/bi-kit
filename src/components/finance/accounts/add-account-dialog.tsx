@@ -136,7 +136,22 @@ export function AddAccountForm({ onSuccess, onCancel }: { onSuccess?: () => void
                 <Label htmlFor="account-kind" className="text-xs font-medium text-muted-foreground">
                     Account Kind
                 </Label>
-                <Select value={kind} onValueChange={(val) => setKind(val as AccountKind)}>
+                <Select
+                    items={[
+                        { value: 'bank', label: 'Bank Account (Checking / Savings)' },
+                        { value: 'cash', label: 'Cash / Physical Wallet' },
+                        { value: 'credit_card', label: 'Credit Card' },
+                        { value: 'fixed_deposit', label: 'Fixed Deposit (FD)' },
+                        { value: 'recurring_deposit', label: 'Recurring Deposit (RD)' },
+                        { value: 'mutual_fund', label: 'Mutual Funds Portfolio' },
+                        { value: 'stocks', label: 'Demat / Stocks' },
+                        { value: 'loan', label: 'Loan (Home, Auto, Personal)' },
+                        { value: 'other_asset', label: 'Other Asset' },
+                        { value: 'other_liability', label: 'Other Liability' },
+                    ]}
+                    value={kind}
+                    onValueChange={(val) => setKind(val as AccountKind)}
+                >
                     <SelectTrigger
                         id="account-kind"
                         data-testid="account-kind-select"
@@ -327,6 +342,11 @@ export function AddAccountForm({ onSuccess, onCancel }: { onSuccess?: () => void
                                 Compounding
                             </Label>
                             <Select
+                                items={[
+                                    { value: 'quarterly', label: 'Quarterly (Bank Default)' },
+                                    { value: 'monthly', label: 'Monthly' },
+                                    { value: 'yearly', label: 'Yearly' },
+                                ]}
                                 value={compounding}
                                 onValueChange={(val) => setCompounding(val as typeof compounding)}
                             >
@@ -511,8 +531,27 @@ export function AddAccountForm({ onSuccess, onCancel }: { onSuccess?: () => void
 }
 
 export function AddAccountDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+    const handleOpenChange = (nextOpen: boolean) => {
+        onOpenChange(nextOpen);
+        if (!nextOpen) {
+            setTimeout(() => {
+                if (typeof document !== 'undefined') {
+                    document.body.removeAttribute('inert');
+                    document.body.style.pointerEvents = '';
+                    if (!document.querySelector('[data-slot="dialog-content"], [data-slot="sheet-content"]')) {
+                        document.querySelectorAll('[data-base-ui-inert]').forEach((el) => {
+                            el.removeAttribute('data-base-ui-inert');
+                            el.removeAttribute('inert');
+                            el.removeAttribute('aria-hidden');
+                        });
+                    }
+                }
+            }, 50);
+        }
+    };
+
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent className="sm:max-w-xl">
                 <DialogHeader>
                     <DialogTitle className="text-base font-bold">Add Account</DialogTitle>
@@ -520,7 +559,12 @@ export function AddAccountDialog({ open, onOpenChange }: { open: boolean; onOpen
                         Add a bank account, credit card, deposit, or investment portfolio.
                     </DialogDescription>
                 </DialogHeader>
-                <AddAccountForm onSuccess={() => onOpenChange(false)} onCancel={() => onOpenChange(false)} />
+                {open && (
+                    <AddAccountForm
+                        onSuccess={() => handleOpenChange(false)}
+                        onCancel={() => handleOpenChange(false)}
+                    />
+                )}
             </DialogContent>
         </Dialog>
     );

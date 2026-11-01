@@ -702,13 +702,36 @@ export function QuickAddDialog() {
     closeQuickAdd,
   } = useFinanceStore();
 
-  const formContent = (
-    <QuickAddForm onClose={closeQuickAdd} initialData={quickAddInitialData} />
-  );
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      closeQuickAdd();
+      setTimeout(() => {
+        if (typeof document !== 'undefined') {
+          document.body.removeAttribute('inert');
+          document.body.style.pointerEvents = '';
+          if (!document.querySelector('[data-slot="dialog-content"], [data-slot="sheet-content"]')) {
+            document.querySelectorAll('[data-base-ui-inert]').forEach((el) => {
+              el.removeAttribute('data-base-ui-inert');
+              el.removeAttribute('inert');
+              el.removeAttribute('aria-hidden');
+            });
+          }
+        }
+      }, 50);
+    }
+  };
+
+  const formContent = quickAddOpen ? (
+    <QuickAddForm
+      key={quickAddInitialData ? JSON.stringify(quickAddInitialData) : 'qa-new'}
+      onClose={() => handleOpenChange(false)}
+      initialData={quickAddInitialData}
+    />
+  ) : null;
 
   if (isMobile) {
     return (
-      <Sheet open={quickAddOpen} onOpenChange={(open) => !open && closeQuickAdd()}>
+      <Sheet open={quickAddOpen} onOpenChange={handleOpenChange}>
         <SheetContent side="bottom" className="rounded-t-2xl max-h-[92vh] overflow-y-auto px-4 pb-6">
           <SheetHeader className="text-left pb-2">
             <SheetTitle className="text-base font-bold">Quick Add Transaction</SheetTitle>
@@ -720,7 +743,7 @@ export function QuickAddDialog() {
   }
 
   return (
-    <Dialog open={quickAddOpen} onOpenChange={(open) => !open && closeQuickAdd()}>
+    <Dialog open={quickAddOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle className="text-base font-bold">Quick Add Transaction</DialogTitle>

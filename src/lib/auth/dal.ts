@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { getSession } from "./session";
 import type { SafeUser } from "./types";
 
@@ -28,11 +29,40 @@ export async function getCurrentUser(): Promise<SafeUser | null> {
   return null;
 }
 
+async function getRequestPathname(): Promise<string | null> {
+  try {
+    const headerList = await headers();
+    const xPath = headerList.get('x-pathname');
+    if (xPath) return xPath;
+
+    const referer = headerList.get('referer');
+    if (referer) {
+      try {
+        const url = new URL(referer);
+        return url.pathname;
+      } catch {
+        // ignore
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function requireUser(next = "/"): Promise<SafeUser> {
   const user = await getCurrentUser();
-  if (!user) redirect(`/login?next=${encodeURIComponent(next)}`);
-  if (user.mustChangePassword && !next.startsWith('/settings/security')) {
-    redirect('/settings/security?forced=true');
+  const requestPath = await getRequestPathname();
+  const currentPath = requestPath ?? next;
+
+  if (!user) redirect(`/login?next=${encodeURIComponent(currentPath)}`);
+  if (user.mustChangePassword) {
+    const isSecurityPage =
+      currentPath.startsWith('/settings/security') ||
+      next.startsWith('/settings/security');
+    if (!isSecurityPage) {
+      redirect('/settings/security?forced=true');
+    }
   }
   return user;
 }
@@ -55,16 +85,24 @@ export async function requireRole(
   options: { api?: boolean; next?: string } = {},
 ): Promise<SafeUser | Response> {
   const user = await getCurrentUser();
+  const requestPath = await getRequestPathname();
+  const currentPath = requestPath ?? options.next ?? "/";
+
   if (!user) {
     if (options.api) return Response.json({ error: "Unauthorized" }, { status: 401 });
-    redirect(`/login?next=${encodeURIComponent(options.next ?? "/")}`);
+    redirect(`/login?next=${encodeURIComponent(options.next ?? currentPath)}`);
   }
   if (user.role !== role) {
     if (options.api) return Response.json({ error: "Forbidden" }, { status: 403 });
     redirect("/?toast=forbidden");
   }
-  if (!options.api && user.mustChangePassword && !options.next?.startsWith('/settings/security')) {
-    redirect('/settings/security?forced=true');
+  if (!options.api && user.mustChangePassword) {
+    const isSecurityPage =
+      currentPath.startsWith('/settings/security') ||
+      (options.next?.startsWith('/settings/security') ?? false);
+    if (!isSecurityPage) {
+      redirect('/settings/security?forced=true');
+    }
   }
   return user;
 }

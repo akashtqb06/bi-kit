@@ -346,12 +346,14 @@ describe('DbFinanceService Integration Tests on PGlite', () => {
         creditLimit: 10000000,
       });
 
+      const currentMonth = new Date().toISOString().slice(0, 7);
+
       // Spends on card: 2,159 INR
       await service.createTransaction(USER_A, {
         accountId: card.id,
         type: 'expense',
         amount: 215900,
-        date: '2026-10-15',
+        date: `${currentMonth}-01`,
         payee: 'Amazon Spends',
       });
 
@@ -369,7 +371,7 @@ describe('DbFinanceService Integration Tests on PGlite', () => {
         type: 'transfer',
         amount: 215900,
         categoryId: ccCategory.id,
-        date: '2026-10-28',
+        date: `${currentMonth}-01`,
         payee: 'Card Bill Payment',
       });
 

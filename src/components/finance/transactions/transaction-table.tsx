@@ -14,6 +14,13 @@ import {
   RotateCcwIcon,
   TagIcon,
   Building2Icon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  ChevronUpIcon,
+  ChevronsUpDownIcon,
+  ChevronsDownUpIcon,
+  CopyIcon,
+  CheckIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -52,20 +59,37 @@ import { getDeterministicCategoryColor } from '@src/lib/finance/colors';
 import type { TransactionDTO } from '@src/lib/finance/contract';
 import { cn } from '@/lib/utils';
 
-export function TransactionTable() {
+export function TransactionTable({ accountId }: { accountId?: string } = {}) {
   const {
-    transactions,
+    transactions: globalTransactions,
+    transactionsByAccount,
     accounts,
     categories,
     deleteTransaction,
     bulkDeleteTransactions,
     bulkUpdateTransactions,
     openQuickAdd,
+    refreshTransactions,
   } = useFinanceStore();
+
+  // Load account-specific transactions when accountId is passed
+  React.useEffect(() => {
+    if (accountId) {
+      void refreshTransactions({ accountId });
+    }
+  }, [accountId, refreshTransactions]);
+
+  const sourceTransactions = useMemo(() => {
+    if (accountId) {
+      return transactionsByAccount[accountId]?.transactions || [];
+    }
+    return globalTransactions;
+  }, [accountId, transactionsByAccount, globalTransactions]);
 
   // Filter states
   const [search, setSearch] = useState('');
-  const [selectedAccountId, setSelectedAccountId] = useState('all');
+  const [selectedAccountId, setSelectedAccountId] = useState(accountId || 'all');
+  const activeAccountId = accountId || selectedAccountId;
   const [selectedCategoryId, setSelectedCategoryId] = useState('all');
   const [selectedType, setSelectedType] = useState<'all' | 'expense' | 'income' | 'transfer'>('all');
   const [datePreset, setDatePreset] = useState<'all' | 'today' | 'yesterday' | 'week' | 'month' | 'last30' | 'custom'>('all');
@@ -77,6 +101,11 @@ export function TransactionTable() {
 
   // Row selection
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+
+  // Collapsed day groups & expanded row details
+  const [collapsedDayMap, setCollapsedDayMap] = useState<Record<string, boolean>>({});
+  const [expandedRowIds, setExpandedRowIds] = useState<Record<string, boolean>>({});
+  const [copiedTxId, setCopiedTxId] = useState<string | null>(null);
 
   // Dialog states
   const [editingTx, setEditingTx] = useState<TransactionDTO | null>(null);
@@ -96,7 +125,7 @@ export function TransactionTable() {
 
   // Filtered transactions
   const filteredTransactions = useMemo(() => {
-    return transactions.filter((t) => {
+    return sourceTransactions.filter((t) => {
       // Search
       if (search.trim()) {
         const q = search.toLowerCase();
@@ -113,8 +142,8 @@ export function TransactionTable() {
       }
 
       // Account filter
-      if (selectedAccountId !== 'all') {
-        if (t.accountId !== selectedAccountId && t.toAccountId !== selectedAccountId) {
+      if (activeAccountId !== 'all') {
+        if (t.accountId !== activeAccountId && t.toAccountId !== activeAccountId) {
           return false;
         }
       }
@@ -166,9 +195,9 @@ export function TransactionTable() {
       return true;
     });
   }, [
-    transactions,
+    sourceTransactions,
     search,
-    selectedAccountId,
+    activeAccountId,
     selectedCategoryId,
     selectedType,
     minAmount,
@@ -187,30 +216,63 @@ export function TransactionTable() {
     return Object.keys(rowSelection).filter((k) => rowSelection[k]);
   }, [rowSelection]);
 
-  // Running totals calculations
-  const filteredTotalPaise = useMemo(() => {
-    return filteredTransactions.reduce((acc, t) => {
-      if (t.type === 'expense') return acc - t.amount;
-      if (t.type === 'income') return acc + t.amount;
-      return acc;
-    }, 0);
-  }, [filteredTransactions]);
+  // Running summary calculations
+  const filteredSummary = useMemo(() => {
+    let count = 0;
+    let totalIn = 0;
+    let totalOut = 0;
+
+    for (const t of filteredTransactions) {
+      count++;
+      const eff =
+        t.effect !== undefined
+          ? t.effect
+          : t.type === 'income'
+          ? t.amount
+          : t.type === 'expense'
+          ? -t.amount
+          : t.type === 'transfer' && accountId
+          ? t.accountId === accountId
+            ? -t.amount
+            : t.amount
+          : 0;
+
+      if (eff > 0) {
+        totalIn += eff;
+      } else if (eff < 0) {
+        totalOut += Math.abs(eff);
+      }
+    }
+
+    return {
+      count,
+      totalIn,
+      totalOut,
+      net: totalIn - totalOut,
+    };
+  }, [filteredTransactions, accountId]);
 
   const selectedTotalPaise = useMemo(() => {
     const idSet = new Set(selectedIds);
     return filteredTransactions
       .filter((t) => idSet.has(t.id))
       .reduce((acc, t) => {
-        if (t.type === 'expense') return acc - t.amount;
-        if (t.type === 'income') return acc + t.amount;
-        return acc;
+        const eff =
+          t.effect !== undefined
+            ? t.effect
+            : t.type === 'income'
+            ? t.amount
+            : t.type === 'expense'
+            ? -t.amount
+            : 0;
+        return acc + eff;
       }, 0);
   }, [filteredTransactions, selectedIds]);
 
   // Reset filters
   const resetFilters = () => {
     setSearch('');
-    setSelectedAccountId('all');
+    setSelectedAccountId(accountId || 'all');
     setSelectedCategoryId('all');
     setSelectedType('all');
     setDatePreset('all');
@@ -316,6 +378,71 @@ export function TransactionTable() {
     return groups;
   }, [filteredTransactions, todayStr, yesterdayStr]);
 
+  // Collapse & expand state helpers
+  const areAllDaysCollapsed = useMemo(() => {
+    if (dayGrouped.length === 0) return false;
+    return dayGrouped.every((g) => collapsedDayMap[g.date]);
+  }, [dayGrouped, collapsedDayMap]);
+
+  const toggleDayCollapse = (date: string) => {
+    setCollapsedDayMap((prev) => ({
+      ...prev,
+      [date]: !prev[date],
+    }));
+  };
+
+  const toggleAllDayGroups = () => {
+    if (areAllDaysCollapsed) {
+      setCollapsedDayMap({});
+    } else {
+      const next: Record<string, boolean> = {};
+      dayGrouped.forEach((g) => {
+        next[g.date] = true;
+      });
+      setCollapsedDayMap(next);
+    }
+  };
+
+  const areAllRowsExpanded = useMemo(() => {
+    if (filteredTransactions.length === 0) return false;
+    return filteredTransactions.every((t) => expandedRowIds[t.id]);
+  }, [filteredTransactions, expandedRowIds]);
+
+  const toggleRowExpand = (id: string) => {
+    setExpandedRowIds((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
+
+  const toggleAllRows = () => {
+    if (areAllRowsExpanded) {
+      setExpandedRowIds({});
+    } else {
+      const next: Record<string, boolean> = {};
+      filteredTransactions.forEach((t) => {
+        next[t.id] = true;
+      });
+      setExpandedRowIds(next);
+      // Ensure days are also expanded so the row details can be seen
+      setCollapsedDayMap({});
+    }
+  };
+
+  const handleCopyId = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(id);
+      setCopiedTxId(id);
+      toast.success('Transaction ID copied to clipboard');
+      setTimeout(() => {
+        setCopiedTxId((curr) => (curr === id ? null : curr));
+      }, 2000);
+    } catch {
+      toast.error('Failed to copy ID');
+    }
+  };
+
   return (
     <div className="flex-1 min-h-0 flex flex-col gap-3 w-full">
       {/* Top Search & Filter Bar */}
@@ -407,27 +534,29 @@ export function TransactionTable() {
       {/* Expanded Filters Drawer */}
       {showFilters && (
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 p-3 rounded-lg border bg-muted/30">
-          <div>
-            <label className="text-[11px] font-medium text-muted-foreground block mb-1">
-              Account
-            </label>
-            <Select
-              value={selectedAccountId}
-              onValueChange={(val) => setSelectedAccountId(val || 'all')}
-            >
-              <SelectTrigger className="w-full h-8 bg-card px-2 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="text-xs">All Accounts</SelectItem>
-                {accounts.map((a) => (
-                  <SelectItem key={a.id} value={a.id} className="text-xs">
-                    {a.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!accountId && (
+            <div>
+              <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+                Account
+              </label>
+              <Select
+                value={selectedAccountId}
+                onValueChange={(val) => setSelectedAccountId(val || 'all')}
+              >
+                <SelectTrigger className="w-full h-8 bg-card px-2 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-xs">All Accounts</SelectItem>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id} className="text-xs">
+                      {a.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -528,7 +657,7 @@ export function TransactionTable() {
 
       {/* Running Totals & Bulk Actions Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2 rounded-lg bg-card border text-xs">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1.5">
             <Checkbox
               checked={isAllSelected}
@@ -536,7 +665,25 @@ export function TransactionTable() {
               aria-label="Select all filtered transactions"
             />
             <span className="text-muted-foreground">
-              {filteredTransactions.length} transaction{filteredTransactions.length === 1 ? '' : 's'}
+              {filteredSummary.count} transaction{filteredSummary.count === 1 ? '' : 's'}
+            </span>
+          </div>
+
+          <span className="text-muted-foreground/60">•</span>
+
+          <div>
+            <span className="text-muted-foreground">Total In: </span>
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+              +{formatINR(filteredSummary.totalIn)}
+            </span>
+          </div>
+
+          <span className="text-muted-foreground/60">•</span>
+
+          <div>
+            <span className="text-muted-foreground">Total Out: </span>
+            <span className="font-semibold text-foreground">
+              -{formatINR(filteredSummary.totalOut)}
             </span>
           </div>
 
@@ -547,12 +694,12 @@ export function TransactionTable() {
             <span
               className={cn(
                 'font-bold',
-                filteredTotalPaise >= 0
+                filteredSummary.net >= 0
                   ? 'text-emerald-600 dark:text-emerald-400'
-                  : 'text-foreground'
+                  : 'text-rose-600 dark:text-rose-400'
               )}
             >
-              {formatINR(filteredTotalPaise, { signDisplay: 'always' })}
+              {formatINR(filteredSummary.net, { signDisplay: 'always' })}
             </span>
           </div>
 
@@ -566,43 +713,91 @@ export function TransactionTable() {
           )}
         </div>
 
-        {/* Bulk Action Controls */}
-        {selectedIds.length > 0 && (
-          <div className="flex items-center gap-1.5">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs gap-1"
-              onClick={() => setBulkCategoryOpen(true)}
-            >
-              <TagIcon className="size-3" />
-              <span>Change Category</span>
-            </Button>
+        {/* Action Controls: Bulk actions & Expand/Collapse Toggles */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {selectedIds.length > 0 && (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={() => setBulkCategoryOpen(true)}
+              >
+                <TagIcon className="size-3" />
+                <span>Change Category</span>
+              </Button>
 
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs gap-1"
-              onClick={() => setBulkAccountOpen(true)}
-            >
-              <Building2Icon className="size-3" />
-              <span>Change Account</span>
-            </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={() => setBulkAccountOpen(true)}
+              >
+                <Building2Icon className="size-3" />
+                <span>Change Account</span>
+              </Button>
 
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              className="h-7 text-xs gap-1"
-              onClick={() => setBulkDeleteConfirmOpen(true)}
-            >
-              <Trash2Icon className="size-3" />
-              <span>Delete ({selectedIds.length})</span>
-            </Button>
-          </div>
-        )}
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                className="h-7 text-xs gap-1"
+                onClick={() => setBulkDeleteConfirmOpen(true)}
+              >
+                <Trash2Icon className="size-3" />
+                <span>Delete ({selectedIds.length})</span>
+              </Button>
+
+              <span className="text-muted-foreground/40 hidden sm:inline">|</span>
+            </>
+          )}
+
+          {/* Group Expand / Collapse All Toggle */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
+            onClick={toggleAllDayGroups}
+            title={areAllDaysCollapsed ? 'Expand all date groups' : 'Collapse all date groups'}
+          >
+            {areAllDaysCollapsed ? (
+              <>
+                <ChevronsUpDownIcon className="size-3" />
+                <span>Expand Days</span>
+              </>
+            ) : (
+              <>
+                <ChevronsDownUpIcon className="size-3" />
+                <span>Collapse Days</span>
+              </>
+            )}
+          </Button>
+
+          {/* Row Details Expand / Collapse Toggle */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
+            onClick={toggleAllRows}
+            title={areAllRowsExpanded ? 'Collapse all row details' : 'Expand all row details'}
+          >
+            {areAllRowsExpanded ? (
+              <>
+                <ChevronUpIcon className="size-3" />
+                <span>Collapse Details</span>
+              </>
+            ) : (
+              <>
+                <ChevronDownIcon className="size-3" />
+                <span>Expand Details</span>
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Main Table Container: Fixed Height & Scrolling */}
@@ -612,12 +807,12 @@ export function TransactionTable() {
             <ArrowRightLeftIcon className="size-10 text-muted-foreground/40 mb-3" />
             <h3 className="text-sm font-semibold text-foreground">No transactions found</h3>
             <p className="text-xs text-muted-foreground max-w-sm mt-1">
-              {transactions.length === 0
+              {sourceTransactions.length === 0
                 ? 'Get started by logging your first transaction or card payment.'
                 : 'No transactions match the selected filters or search terms.'}
             </p>
             <div className="mt-4 flex gap-2">
-              {transactions.length > 0 && (
+              {sourceTransactions.length > 0 && (
                 <Button type="button" variant="outline" size="sm" onClick={resetFilters}>
                   Reset Filters
                 </Button>
@@ -630,168 +825,439 @@ export function TransactionTable() {
           </div>
         ) : (
           <div className="divide-y divide-border">
-            {dayGrouped.map((group) => (
-              <div key={group.date} className="group-section">
-                {/* Day Header Strip */}
-                <div className="sticky top-0 z-10 bg-muted/80 backdrop-blur-xs px-4 py-1.5 flex items-center justify-between text-xs border-b">
-                  <div className="flex items-center gap-2">
-                    <CalendarIcon className="size-3.5 text-muted-foreground" />
-                    <span className="font-semibold text-foreground">{group.label}</span>
-                    <span className="text-muted-foreground text-[11px]">
-                      ({group.transactions.length})
-                    </span>
-                  </div>
-                  <div className="font-medium text-[11px] text-muted-foreground">
-                    Day Total:{' '}
-                    <span
-                      className={cn(
-                        'font-bold',
-                        group.dayTotal >= 0
-                          ? 'text-emerald-600 dark:text-emerald-400'
-                          : 'text-foreground'
+            {dayGrouped.map((group) => {
+              const isDayCollapsed = Boolean(collapsedDayMap[group.date]);
+
+              return (
+                <div key={group.date} className="group-section">
+                  {/* Day Header Strip */}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={!isDayCollapsed}
+                    aria-label={`${group.label}, ${group.transactions.length} transactions, ${
+                      isDayCollapsed ? 'collapsed. Click to expand' : 'expanded. Click to collapse'
+                    }`}
+                    onClick={() => toggleDayCollapse(group.date)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleDayCollapse(group.date);
+                      }
+                    }}
+                    className={cn(
+                      'sticky top-0 z-10 bg-muted/80 backdrop-blur-xs px-4 py-1.5 flex items-center justify-between text-xs border-b cursor-pointer select-none transition-colors',
+                      'hover:bg-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="p-0.5 rounded text-muted-foreground">
+                        <ChevronDownIcon
+                          className={cn(
+                            'size-3.5 transition-transform duration-200',
+                            isDayCollapsed && '-rotate-90 text-muted-foreground'
+                          )}
+                        />
+                      </span>
+                      <CalendarIcon className="size-3.5 text-muted-foreground" />
+                      <span className="font-semibold text-foreground">{group.label}</span>
+                      <span className="text-muted-foreground text-[11px]">
+                        ({group.transactions.length})
+                      </span>
+                      {isDayCollapsed && (
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] h-4 px-1.5 font-normal text-muted-foreground"
+                        >
+                          Collapsed
+                        </Badge>
                       )}
-                    >
-                      {formatINR(group.dayTotal, { signDisplay: 'always' })}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Day Transactions List */}
-                <div className="divide-y divide-border/60">
-                  {group.transactions.map((tx) => {
-                    const isSelected = Boolean(rowSelection[tx.id]);
-                    const account = accounts.find((a) => a.id === tx.accountId);
-                    const toAccount = tx.toAccountId
-                      ? accounts.find((a) => a.id === tx.toAccountId)
-                      : null;
-                    const category = categories.find((c) => c.id === tx.categoryId);
-
-                    return (
-                      <div
-                        key={tx.id}
+                    </div>
+                    <div className="font-medium text-[11px] text-muted-foreground flex items-center gap-1.5">
+                      <span>Day Total:</span>
+                      <span
                         className={cn(
-                          'flex items-center justify-between px-4 py-2.5 hover:bg-muted/40 transition-colors text-xs gap-3',
-                          isSelected && 'bg-primary/5'
+                          'font-bold',
+                          group.dayTotal >= 0
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-foreground'
                         )}
                       >
-                        {/* Checkbox & Details */}
-                        <div className="flex items-center gap-3 min-w-0">
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={(checked) =>
-                              setRowSelection((prev) => {
-                                const next: RowSelectionState = { ...prev };
-                                if (checked) {
-                                  next[tx.id] = true;
-                                } else {
-                                  delete next[tx.id];
-                                }
-                                return next;
-                              })
-                            }
-                            aria-label={`Select transaction ${tx.payee || tx.type}`}
-                          />
+                        {formatINR(group.dayTotal, { signDisplay: 'always' })}
+                      </span>
+                    </div>
+                  </div>
 
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-foreground truncate">
-                                {tx.payee || (tx.type === 'transfer' ? 'Transfer' : 'Unspecified Payee')}
-                              </span>
-                              {tx.type === 'transfer' && (
-                                <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-4">
-                                  Transfer
-                                </Badge>
-                              )}
-                              {tx.isRecurring && (
-                                <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 text-purple-600">
-                                  Recurring
-                                </Badge>
-                              )}
-                            </div>
+                  {/* Day Transactions List */}
+                  {!isDayCollapsed && (
+                    <div className="divide-y divide-border/60">
+                      {group.transactions.map((tx) => {
+                        const isSelected = Boolean(rowSelection[tx.id]);
+                        const isRowExpanded = Boolean(expandedRowIds[tx.id]);
+                        const account = accounts.find((a) => a.id === tx.accountId);
+                        const toAccount = tx.toAccountId
+                          ? accounts.find((a) => a.id === tx.toAccountId)
+                          : null;
+                        const category = categories.find((c) => c.id === tx.categoryId);
 
-                            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground truncate">
-                              {category && (
-                                <span className="flex items-center gap-1">
-                                  <span
-                                    className="size-1.5 rounded-full inline-block shrink-0 ring-1 ring-border"
-                                    style={{
-                                      backgroundColor:
-                                        category.color || getDeterministicCategoryColor(category.name),
-                                    }}
-                                  />
-                                  <span>{category.name}</span>
-                                </span>
-                              )}
-                              <span>•</span>
-                              <span>
-                                {account?.name || 'Account'}
-                                {toAccount ? ` → ${toAccount.name}` : ''}
-                              </span>
-                              {tx.note && (
-                                <>
-                                  <span>•</span>
-                                  <span className="italic truncate max-w-[160px] sm:max-w-xs">{tx.note}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Amount & Row Actions */}
-                        <div className="flex items-center gap-3 shrink-0">
+                        return (
                           <div
+                            key={tx.id}
                             className={cn(
-                              'font-bold text-right text-xs sm:text-sm',
-                              tx.type === 'income'
-                                ? 'text-emerald-600 dark:text-emerald-400'
-                                : tx.type === 'transfer'
-                                ? 'text-blue-600 dark:text-blue-400'
-                                : 'text-foreground'
+                              'transition-colors',
+                              isSelected && 'bg-primary/5',
+                              isRowExpanded && 'bg-muted/15'
                             )}
                           >
-                            {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}
-                            {formatINR(tx.amount)}
-                          </div>
-
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              nativeButton={true}
-                              className="size-7 rounded-md hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground"
-                              aria-label="Transaction actions"
+                            <div
+                              className={cn(
+                                'flex items-center justify-between px-4 py-2.5 hover:bg-muted/40 transition-colors text-xs gap-3',
+                                isSelected && 'bg-primary/5'
+                              )}
                             >
-                              <MoreHorizontalIcon className="size-4" />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
-                              <DropdownMenuGroup>
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuItem
-                                  onClick={() => setEditingTx(tx)}
-                                  className="text-xs gap-2"
-                                >
-                                  <Edit2Icon className="size-3.5" />
-                                  <span>Edit</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={async () => {
-                                    await deleteTransaction(tx.id);
-                                    toast.success('Transaction deleted');
+                              {/* Expand toggle, Checkbox & Details */}
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleRowExpand(tx.id);
                                   }}
-                                  className="text-xs gap-2 text-destructive focus:text-destructive"
+                                  aria-label={
+                                    isRowExpanded
+                                      ? `Collapse details for ${tx.payee || tx.type}`
+                                      : `Expand details for ${tx.payee || tx.type}`
+                                  }
+                                  aria-expanded={isRowExpanded}
+                                  className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring shrink-0"
+                                  title={isRowExpanded ? 'Collapse row details' : 'Expand row details'}
                                 >
-                                  <Trash2Icon className="size-3.5" />
-                                  <span>Delete</span>
-                                </DropdownMenuItem>
-                              </DropdownMenuGroup>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </div>
-                    );
-                  })}
+                                  <ChevronRightIcon
+                                    className={cn(
+                                      'size-3.5 transition-transform duration-200',
+                                      isRowExpanded && 'rotate-90 text-foreground'
+                                    )}
+                                  />
+                                </button>
+
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={(checked) =>
+                                    setRowSelection((prev) => {
+                                      const next: RowSelectionState = { ...prev };
+                                      if (checked) {
+                                        next[tx.id] = true;
+                                      } else {
+                                        delete next[tx.id];
+                                      }
+                                      return next;
+                                    })
+                                  }
+                                  aria-label={`Select transaction ${tx.payee || tx.type}`}
+                                />
+
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-foreground truncate">
+                                      {tx.isOpening ? 'Opening Balance' : tx.payee || (tx.type === 'transfer' ? 'Transfer' : 'Unspecified Payee')}
+                                    </span>
+                                    {tx.isOpening && (
+                                      <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 border-primary/40 text-primary">
+                                        Opening
+                                      </Badge>
+                                    )}
+                                    {tx.type === 'transfer' && (
+                                      <Badge variant="secondary" className="text-[10px] py-0 px-1.5 h-4">
+                                        {tx.counterparty ? (tx.accountId === accountId ? `To ${tx.counterparty}` : `From ${tx.counterparty}`) : 'Transfer'}
+                                      </Badge>
+                                    )}
+                                    {tx.isRecurring && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[10px] py-0 px-1.5 h-4 text-purple-600"
+                                      >
+                                        Recurring
+                                      </Badge>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground truncate">
+                                    {category && (
+                                      <span className="flex items-center gap-1">
+                                        <span
+                                          className="size-1.5 rounded-full inline-block shrink-0 ring-1 ring-border"
+                                          style={{
+                                            backgroundColor:
+                                              category.color ||
+                                              getDeterministicCategoryColor(category.name),
+                                          }}
+                                        />
+                                        <span>{category.name}</span>
+                                      </span>
+                                    )}
+                                    {!accountId && (
+                                      <>
+                                        <span>•</span>
+                                        <span>
+                                          {account?.name || 'Account'}
+                                          {toAccount ? ` → ${toAccount.name}` : ''}
+                                        </span>
+                                      </>
+                                    )}
+                                    {accountId && tx.type === 'transfer' && tx.counterparty && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="font-medium text-foreground">
+                                          {tx.accountId === accountId ? `To: ${tx.counterparty}` : `From: ${tx.counterparty}`}
+                                        </span>
+                                      </>
+                                    )}
+                                    {tx.note && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="italic truncate max-w-[160px] sm:max-w-xs">
+                                          {tx.note}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Amount / Effect & Running Balance & Row Actions */}
+                              <div className="flex items-center gap-3 shrink-0">
+                                <div className="text-right">
+                                  {(() => {
+                                    const eff =
+                                      tx.effect !== undefined
+                                        ? tx.effect
+                                        : tx.type === 'income'
+                                        ? tx.amount
+                                        : tx.type === 'expense'
+                                        ? -tx.amount
+                                        : 0;
+
+                                    return (
+                                      <div
+                                        className={cn(
+                                          'font-bold text-xs sm:text-sm',
+                                          eff > 0
+                                            ? 'text-emerald-600 dark:text-emerald-400'
+                                            : eff < 0
+                                            ? 'text-foreground'
+                                            : 'text-muted-foreground'
+                                        )}
+                                      >
+                                        {formatINR(eff, { signDisplay: 'always' })}
+                                      </div>
+                                    );
+                                  })()}
+                                  {tx.runningBalance !== undefined && (
+                                    <div className="text-[10px] text-muted-foreground font-mono tabular-nums">
+                                      Bal: {formatINR(tx.runningBalance)}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger
+                                    nativeButton={true}
+                                    className="size-7 rounded-md hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground"
+                                    aria-label="Transaction actions"
+                                  >
+                                    <MoreHorizontalIcon className="size-4" />
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-40">
+                                    <DropdownMenuGroup>
+                                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                      <DropdownMenuItem
+                                        onClick={() => toggleRowExpand(tx.id)}
+                                        className="text-xs gap-2"
+                                      >
+                                        {isRowExpanded ? (
+                                          <>
+                                            <ChevronUpIcon className="size-3.5" />
+                                            <span>Collapse Details</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <ChevronDownIcon className="size-3.5" />
+                                            <span>Expand Details</span>
+                                          </>
+                                        )}
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => setEditingTx(tx)}
+                                        className="text-xs gap-2"
+                                      >
+                                        <Edit2Icon className="size-3.5" />
+                                        <span>Edit</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        onClick={async () => {
+                                          await deleteTransaction(tx.id);
+                                          toast.success('Transaction deleted');
+                                        }}
+                                        className="text-xs gap-2 text-destructive focus:text-destructive"
+                                      >
+                                        <Trash2Icon className="size-3.5" />
+                                        <span>Delete</span>
+                                      </DropdownMenuItem>
+                                    </DropdownMenuGroup>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </div>
+
+                            {/* Expanded Details Sub-Panel */}
+                            {isRowExpanded && (
+                              <div className="px-5 py-3 ml-6 mr-4 mb-2 bg-muted/30 rounded-md border border-border/60 text-xs space-y-2.5">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                  {/* Note */}
+                                  {tx.note && (
+                                    <div className="sm:col-span-2">
+                                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-0.5">
+                                        Note
+                                      </span>
+                                      <p className="text-foreground whitespace-pre-wrap rounded bg-card p-2 border text-xs">
+                                        {tx.note}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Tags */}
+                                  {tx.tags && (
+                                    <div>
+                                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-1">
+                                        Tags
+                                      </span>
+                                      <div className="flex flex-wrap gap-1">
+                                        {tx.tags.split(',').map((tag, i) => {
+                                          const trimmed = tag.trim();
+                                          if (!trimmed) return null;
+                                          return (
+                                            <Badge
+                                              key={i}
+                                              variant="secondary"
+                                              className="text-[10px] py-0 px-1.5 h-5 gap-1 font-normal"
+                                            >
+                                              <TagIcon className="size-2.5" />
+                                              <span>{trimmed}</span>
+                                            </Badge>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Transfer Route */}
+                                  {tx.type === 'transfer' && (
+                                    <div>
+                                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-0.5">
+                                        Transfer Route
+                                      </span>
+                                      <p className="text-foreground font-medium flex items-center gap-1.5">
+                                        <span>{account?.name || 'Source Account'}</span>
+                                        <span className="text-muted-foreground">→</span>
+                                        <span>{toAccount?.name || 'Destination Account'}</span>
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Transaction ID & Metadata */}
+                                  <div>
+                                    <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-0.5">
+                                      Transaction ID
+                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                      <code className="text-[11px] font-mono bg-muted px-1.5 py-0.5 rounded text-muted-foreground select-all">
+                                        {tx.id}
+                                      </code>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                                        onClick={(e) => handleCopyId(tx.id, e)}
+                                        title="Copy transaction ID"
+                                      >
+                                        {copiedTxId === tx.id ? (
+                                          <CheckIcon className="size-3 text-emerald-500" />
+                                        ) : (
+                                          <CopyIcon className="size-3" />
+                                        )}
+                                      </Button>
+                                    </div>
+                                  </div>
+
+                                  {/* Created Timestamp */}
+                                  {tx.createdAt && (
+                                    <div>
+                                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-0.5">
+                                        Created At
+                                      </span>
+                                      <p className="text-muted-foreground text-[11px]">
+                                        {new Date(tx.createdAt).toLocaleString('en-IN', {
+                                          dateStyle: 'medium',
+                                          timeStyle: 'short',
+                                        })}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Recurring Rule Indicator */}
+                                  {tx.isRecurring && (
+                                    <div>
+                                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block mb-0.5">
+                                        Recurring Schedule
+                                      </span>
+                                      <Badge
+                                        variant="outline"
+                                        className="text-[10px] text-purple-600 border-purple-200"
+                                      >
+                                        Recurring rule transaction
+                                      </Badge>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Quick Actions Footer */}
+                                <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/40">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs gap-1.5"
+                                    onClick={() => setEditingTx(tx)}
+                                  >
+                                    <Edit2Icon className="size-3" />
+                                    <span>Edit</span>
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-xs gap-1.5 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={async () => {
+                                      await deleteTransaction(tx.id);
+                                      toast.success('Transaction deleted');
+                                    }}
+                                  >
+                                    <Trash2Icon className="size-3" />
+                                    <span>Delete</span>
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -814,6 +1280,10 @@ export function TransactionTable() {
           </DialogHeader>
           <div className="py-3">
             <Select
+              items={categories.map((c) => ({
+                value: c.id,
+                label: `${c.name} (${c.type})`,
+              }))}
               value={bulkCategoryTarget || undefined}
               onValueChange={(val) => setBulkCategoryTarget(val || '')}
             >
@@ -851,6 +1321,10 @@ export function TransactionTable() {
           </DialogHeader>
           <div className="py-3">
             <Select
+              items={accounts.map((a) => ({
+                value: a.id,
+                label: a.name,
+              }))}
               value={bulkAccountTarget || undefined}
               onValueChange={(val) => setBulkAccountTarget(val || '')}
             >

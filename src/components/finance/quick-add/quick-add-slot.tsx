@@ -20,12 +20,25 @@ export function QuickAddSlot() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if any modal/dialog/sheet is currently open
+      if (typeof document !== 'undefined') {
+        const hasOpenModal = document.querySelector(
+          '[data-slot="dialog-content"], [data-slot="sheet-content"], [role="dialog"], [aria-modal="true"]'
+        );
+        if (hasOpenModal) {
+          return;
+        }
+      }
+
       const target = e.target as HTMLElement | null;
       if (
         target &&
         (target.tagName === 'INPUT' ||
           target.tagName === 'TEXTAREA' ||
-          target.isContentEditable)
+          target.tagName === 'SELECT' ||
+          target.isContentEditable ||
+          target.getAttribute?.('contenteditable') === 'true' ||
+          Boolean(target.closest?.('input, textarea, select, [contenteditable="true"]')))
       ) {
         return;
       }

@@ -151,6 +151,9 @@ export async function loginAction(_previousState: AuthActionResult, formData: Fo
     await db.update(users).set({ lastLoginAt: new Date(), updatedAt: new Date() }).where(eq(users.id, user.id));
     await destroySession();
     await createSession(user.id, metadata);
+    if (user.mustChangePassword) {
+        redirect('/settings/security?forced=true');
+    }
     redirect(safeNextPath(readString(formData, 'next')));
 }
 

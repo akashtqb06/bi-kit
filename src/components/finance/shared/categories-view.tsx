@@ -99,6 +99,30 @@ export function CategoriesView() {
     setEditOpen(true);
   };
 
+  const handleAddOpenChange = (open: boolean) => {
+    setAddOpen(open);
+    if (!open) {
+      setTimeout(() => {
+        if (typeof document !== 'undefined') {
+          document.body.removeAttribute('inert');
+          document.body.style.pointerEvents = '';
+        }
+      }, 50);
+    }
+  };
+
+  const handleEditOpenChange = (open: boolean) => {
+    setEditOpen(open);
+    if (!open) {
+      setTimeout(() => {
+        if (typeof document !== 'undefined') {
+          document.body.removeAttribute('inert');
+          document.body.style.pointerEvents = '';
+        }
+      }, 50);
+    }
+  };
+
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCategory) return;
@@ -253,7 +277,7 @@ export function CategoriesView() {
       </div>
 
       {/* Add Category Dialog */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+      <Dialog open={addOpen} onOpenChange={handleAddOpenChange}>
         <DialogContent className="sm:max-w-[440px]">
           <DialogHeader>
             <DialogTitle className="text-base font-bold">
@@ -370,7 +394,7 @@ export function CategoriesView() {
       </Dialog>
 
       {/* Edit Category Dialog */}
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      <Dialog open={editOpen} onOpenChange={handleEditOpenChange}>
         <DialogContent className="sm:max-w-[440px]">
           <DialogHeader>
             <DialogTitle className="text-base font-bold">Edit Category</DialogTitle>

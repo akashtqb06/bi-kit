@@ -23,7 +23,7 @@ import type { AccountWithBalance } from '../shared/fixtures';
 import { cn } from '@/lib/utils';
 
 export function AccountsView() {
-  const { accounts, openQuickAdd, openPayBill } = useFinanceStore();
+  const { accounts, openPayBill } = useFinanceStore();
   const [addAccountOpen, setAddAccountOpen] = useState(false);
 
   // Group accounts

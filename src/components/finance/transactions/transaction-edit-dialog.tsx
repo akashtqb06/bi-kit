@@ -55,6 +55,18 @@ export function TransactionEditDialog({
 
   if (!transaction) return null;
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    onOpenChange(nextOpen);
+    if (!nextOpen) {
+      setTimeout(() => {
+        if (typeof document !== 'undefined') {
+          document.body.removeAttribute('inert');
+          document.body.style.pointerEvents = '';
+        }
+      }, 50);
+    }
+  };
+
   const handleSave = async () => {
     const parsed = parseAmountExpression(amountStr);
     if (!parsed.isValid || !parsed.paise || parsed.paise <= 0) {
@@ -90,7 +102,7 @@ export function TransactionEditDialog({
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[440px]">
         <DialogHeader>
           <DialogTitle className="text-base font-bold">Edit Transaction</DialogTitle>
@@ -131,6 +143,10 @@ export function TransactionEditDialog({
               Account
             </Label>
             <Select
+              items={accounts.map((acc) => ({
+                value: acc.id,
+                label: `${acc.name} (${formatAccountDisplayBalance(acc)})`,
+              }))}
               value={accountId}
               onValueChange={(val) => setAccountId(val || '')}
             >
@@ -172,6 +188,13 @@ export function TransactionEditDialog({
                 )}
               </div>
               <Select
+                items={[
+                  { value: '__uncategorized__', label: 'Uncategorized' },
+                  ...filteredCategories.map((c) => ({
+                    value: c.id,
+                    label: c.name,
+                  })),
+                ]}
                 value={categoryId || '__uncategorized__'}
                 onValueChange={(val) => setCategoryId((!val || val === '__uncategorized__') ? '' : val)}
               >

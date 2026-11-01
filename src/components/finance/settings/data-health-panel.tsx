@@ -45,6 +45,8 @@ interface DiagnosticsData {
     totalAssets: number;
     totalLiabilities: number;
     netWorth: number;
+    netWorthHistoryLastPoint?: number;
+    netWorthHistoryMatches?: boolean;
     accounts: AccountReconciliation[];
   };
 }
@@ -192,7 +194,17 @@ export function DataHealthPanel() {
             {/* Reconciliation Totals */}
             <div className="p-3 rounded-lg bg-muted/20 border space-y-2">
               <div className="text-xs font-semibold text-foreground flex items-center justify-between">
-                <span>SQL Ledger Reconciliation</span>
+                <div className="flex items-center gap-2">
+                  <span>SQL Ledger Reconciliation</span>
+                  {data.reconciliation.netWorthHistoryMatches !== undefined && (
+                    <Badge
+                      variant={data.reconciliation.netWorthHistoryMatches ? 'outline' : 'destructive'}
+                      className="text-[10px] font-medium"
+                    >
+                      {data.reconciliation.netWorthHistoryMatches ? 'History Reconciled' : 'History Mismatch'}
+                    </Badge>
+                  )}
+                </div>
                 <span className="text-[10px] text-muted-foreground">As of {data.asOf}</span>
               </div>
               <div className="grid grid-cols-3 gap-2 pt-1 text-center">

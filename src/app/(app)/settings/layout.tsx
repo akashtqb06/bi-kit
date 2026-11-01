@@ -4,7 +4,7 @@ import { SettingsNav } from '@src/components/settings/settings-nav';
 
 async function SettingsNavWrapper() {
     const user = await requireUser('/settings');
-    return <SettingsNav isAdmin={user.role === 'admin'} />;
+    return <SettingsNav isAdmin={user.role === 'admin'} mustChangePassword={Boolean(user.mustChangePassword)} />;
 }
 
 export default function SettingsLayout({

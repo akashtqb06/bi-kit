@@ -14,10 +14,8 @@ import {
   Trash2Icon,
   MoreVerticalIcon,
   TrendingDownIcon,
-  TrendingUpIcon,
   RotateCcwIcon,
   SearchIcon,
-  FilterIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -88,6 +86,26 @@ export function BudgetsView() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [copyConfirmOpen, setCopyConfirmOpen] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
+
+  const statusFilterItems = useMemo(
+    () => [
+      { value: 'all', label: 'All Statuses' },
+      { value: 'ok', label: 'On Track (<80%)' },
+      { value: 'warning', label: 'Near Limit (80–100%)' },
+      { value: 'over_budget', label: 'Over Budget (>100%)' },
+    ],
+    []
+  );
+
+  const periodFilterItems = useMemo(
+    () => [
+      { value: 'all', label: 'All Periods' },
+      { value: 'monthly', label: 'Monthly' },
+      { value: 'quarterly', label: 'Quarterly' },
+      { value: 'yearly', label: 'Yearly' },
+    ],
+    []
+  );
 
   // Initial fetch on mount or when switching to budgets tab
   useEffect(() => {
@@ -481,6 +499,7 @@ export function BudgetsView() {
         <div className="flex items-center gap-2 overflow-x-auto">
           {/* Status Filter */}
           <Select
+            items={statusFilterItems}
             value={statusFilter}
             onValueChange={(val) => setStatusFilter(val as typeof statusFilter)}
           >
@@ -497,6 +516,7 @@ export function BudgetsView() {
 
           {/* Period Filter */}
           <Select
+            items={periodFilterItems}
             value={selectedPeriod}
             onValueChange={(val) => setSelectedPeriod(val as typeof selectedPeriod)}
           >
@@ -693,6 +713,8 @@ export function BudgetsView() {
         onOpenChange={setDialogOpen}
         budget={editingBudget}
         activeMonth={selectedMonth}
+        onCopyLastMonth={() => setCopyConfirmOpen(true)}
+        copyCandidatesCount={copyPlan.candidates.length}
       />
 
       {/* Delete Confirmation Dialog */}

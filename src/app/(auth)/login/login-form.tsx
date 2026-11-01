@@ -18,7 +18,15 @@ import { Separator } from '@/components/ui/separator';
 type LoginValues = { email: string; password: string };
 const initialState: AuthActionResult = { ok: false };
 
-export function LoginForm({ next, allowRegistration }: { next: string; allowRegistration: boolean }) {
+export function LoginForm({
+    next,
+    allowRegistration,
+    appName = 'BI Kit',
+}: {
+    next: string;
+    allowRegistration: boolean;
+    appName?: string;
+}) {
     const [state, formAction, pending] = useActionState(loginAction, initialState);
     const [showPassword, setShowPassword] = useState(false);
     const form = useForm<LoginValues>({
@@ -39,7 +47,7 @@ export function LoginForm({ next, allowRegistration }: { next: string; allowRegi
         <Card className="w-full max-w-sm">
             <CardHeader>
                 <CardTitle>Welcome back</CardTitle>
-                <CardDescription>Sign in to continue to BI Kit.</CardDescription>
+                <CardDescription>Sign in to continue to {appName}.</CardDescription>
             </CardHeader>
             <CardContent>
                 <Form {...form}>
@@ -113,7 +121,7 @@ export function LoginForm({ next, allowRegistration }: { next: string; allowRegi
                             <>
                                 <Separator />
                                 <p className="text-center text-sm text-muted-foreground">
-                                    New to BI Kit?{' '}
+                                    New to {appName}?{' '}
                                     <Link
                                         href={`/register${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`}
                                         className="font-medium text-foreground underline-offset-4 hover:underline"

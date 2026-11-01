@@ -1,6 +1,7 @@
-import { and, desc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { db, finAccounts, finCategories, finTransactions } from '@src/lib/db';
 import { BadRequestError, NotFoundError } from '@src/app/api/utils';
+import { getAccount } from './accounts';
 import {
   type CreateTransactionDTO,
   type PaginatedTransactionsResponse,
@@ -11,7 +12,15 @@ import {
   updateTransactionSchema,
 } from '../contract';
 
-export function mapTransactionToDTO(row: typeof finTransactions.$inferSelect): TransactionDTO {
+export function mapTransactionToDTO(
+  row: typeof finTransactions.$inferSelect,
+  extra?: {
+    effect?: number;
+    counterparty?: string | null;
+    runningBalance?: number;
+  }
+): TransactionDTO {
+  const isOpening = row.type === 'adjustment' && row.payee === 'Opening Balance';
   return {
     id: row.id,
     userId: row.userId,
@@ -32,7 +41,39 @@ export function mapTransactionToDTO(row: typeof finTransactions.$inferSelect): T
     deletedAt: row.deletedAt instanceof Date ? row.deletedAt.toISOString() : (row.deletedAt ? String(row.deletedAt) : null),
     createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt),
     updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : String(row.updatedAt),
+    effect: extra?.effect,
+    counterparty: extra?.counterparty,
+    runningBalance: extra?.runningBalance,
+    isOpening,
   };
+}
+
+export function computeTransactionEffect(
+  tx: { type: string; accountId: string; toAccountId?: string | null; amount: number | bigint; signedAmount: number | bigint },
+  forAccountId: string
+): number {
+  const amt = Math.abs(Number(tx.amount));
+  const signed = Number(tx.signedAmount);
+
+  if (tx.type === 'transfer') {
+    if (tx.accountId === forAccountId) {
+      return -amt;
+    }
+    if (tx.toAccountId === forAccountId) {
+      return amt;
+    }
+    return 0;
+  }
+  if (tx.type === 'expense') {
+    return -amt;
+  }
+  if (tx.type === 'income') {
+    return amt;
+  }
+  if (tx.type === 'adjustment') {
+    return signed;
+  }
+  return 0;
 }
 
 function computeSignedAmount(
@@ -327,13 +368,14 @@ export async function listTransactions(
   userId: string,
   filters?: TransactionFilters
 ): Promise<PaginatedTransactionsResponse> {
-  const limit = filters?.limit ?? 50;
+  const limit = typeof filters?.limit === 'string' ? parseInt(filters.limit, 10) : (filters?.limit ?? 50);
   const conditions = [
     eq(finTransactions.userId, userId),
     isNull(finTransactions.deletedAt),
   ];
 
   if (filters?.accountId) {
+    await getAccount(userId, filters.accountId);
     conditions.push(
       or(
         eq(finTransactions.accountId, filters.accountId),
@@ -383,7 +425,73 @@ export async function listTransactions(
     }
   }
 
-  // Fetch limit + 1 to check hasMore
+  // Lookup user accounts for counterparty names and metadata
+  const userAccounts = await db
+    .select({
+      id: finAccounts.id,
+      name: finAccounts.name,
+      metadata: finAccounts.metadata,
+    })
+    .from(finAccounts)
+    .where(eq(finAccounts.userId, userId));
+
+  const accountNameMap = new Map<string, string>();
+  for (const a of userAccounts) {
+    accountNameMap.set(a.id, a.name);
+  }
+
+  const runningBalanceMap = new Map<string, number>();
+  const effectMap = new Map<string, number>();
+  const counterpartyMap = new Map<string, string | null>();
+
+  if (filters?.accountId) {
+    const targetAccount = userAccounts.find((a) => a.id === filters.accountId);
+    const targetMeta = (targetAccount?.metadata || {}) as Record<string, unknown>;
+
+    // Fetch all account transactions chronologically for continuous running balance
+    const allAccountTxs = await db
+      .select()
+      .from(finTransactions)
+      .where(
+        and(
+          eq(finTransactions.userId, userId),
+          isNull(finTransactions.deletedAt),
+          or(
+            eq(finTransactions.accountId, filters.accountId),
+            eq(finTransactions.toAccountId, filters.accountId)
+          )!
+        )
+      )
+      .orderBy(
+        asc(finTransactions.date),
+        asc(finTransactions.createdAt),
+        asc(finTransactions.id)
+      );
+
+    const hasOpeningTx = allAccountTxs.some(
+      (t) => t.type === 'adjustment' && t.payee === 'Opening Balance'
+    );
+    let running = !hasOpeningTx && targetMeta.openingBalancePaise ? Number(targetMeta.openingBalancePaise) : 0;
+
+    for (const tx of allAccountTxs) {
+      const eff = computeTransactionEffect(tx, filters.accountId);
+      running += eff;
+      runningBalanceMap.set(tx.id, running);
+      effectMap.set(tx.id, eff);
+
+      let counterparty: string | null = null;
+      if (tx.type === 'transfer') {
+        if (tx.accountId === filters.accountId && tx.toAccountId) {
+          counterparty = accountNameMap.get(tx.toAccountId) ?? null;
+        } else if (tx.toAccountId === filters.accountId) {
+          counterparty = accountNameMap.get(tx.accountId) ?? null;
+        }
+      }
+      counterpartyMap.set(tx.id, counterparty);
+    }
+  }
+
+  // Fetch paginated matching rows
   const rows = await db
     .select()
     .from(finTransactions)
@@ -400,9 +508,65 @@ export async function listTransactions(
     nextCursor = Buffer.from(`${last.date}:${last.id}`).toString('base64');
   }
 
+  // Compute summary for the filtered rows matching conditions
+  const matchingRows = await db
+    .select({
+      id: finTransactions.id,
+      type: finTransactions.type,
+      amount: finTransactions.amount,
+      signedAmount: finTransactions.signedAmount,
+      accountId: finTransactions.accountId,
+      toAccountId: finTransactions.toAccountId,
+    })
+    .from(finTransactions)
+    .where(and(...conditions));
+
+  let totalIn = 0;
+  let totalOut = 0;
+
+  if (filters?.accountId) {
+    for (const r of matchingRows) {
+      const eff = effectMap.get(r.id) ?? computeTransactionEffect(r, filters.accountId);
+      if (eff > 0) totalIn += eff;
+      else if (eff < 0) totalOut += Math.abs(eff);
+    }
+  } else {
+    for (const r of matchingRows) {
+      if (r.type === 'income') totalIn += Number(r.amount);
+      else if (r.type === 'expense') totalOut += Number(r.amount);
+    }
+  }
+
+  const summary = {
+    count: matchingRows.length,
+    totalIn,
+    totalOut,
+    net: totalIn - totalOut,
+  };
+
+  const dtos = items.map((row) => {
+    if (filters?.accountId) {
+      return mapTransactionToDTO(row, {
+        effect: effectMap.get(row.id) ?? computeTransactionEffect(row, filters.accountId),
+        counterparty: counterpartyMap.get(row.id) ?? null,
+        runningBalance: runningBalanceMap.get(row.id),
+      });
+    }
+
+    let counterparty: string | null = null;
+    if (row.type === 'transfer' && row.toAccountId) {
+      counterparty = accountNameMap.get(row.toAccountId) ?? null;
+    }
+    return mapTransactionToDTO(row, {
+      effect: Number(row.signedAmount),
+      counterparty,
+    });
+  });
+
   return {
-    transactions: items.map(mapTransactionToDTO),
+    transactions: dtos,
     nextCursor,
     hasMore,
+    summary,
   };
 }

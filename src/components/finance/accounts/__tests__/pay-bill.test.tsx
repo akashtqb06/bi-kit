@@ -2,8 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as React from 'react';
 import { renderToString } from 'react-dom/server';
 import { useFinanceStore } from '../../shared/finance-store';
-import { PayBillDialog, PayBillForm } from '../pay-bill-dialog';
-import { QuickAddForm } from '../../quick-add/quick-add-dialog';
+import { PayBillForm } from '../pay-bill-dialog';
 import { formatAccountDisplayBalance, formatLiabilityBalance } from '../../shared/format';
 import type { AccountWithBalance } from '../../shared/fixtures';
 
