@@ -323,8 +323,8 @@ describe('DbFinanceService Integration Tests on PGlite', () => {
 
       const vals1 = await service.listValuations(USER_A, { accountId: rd.id });
       expect(vals1.length).toBe(1);
-      // Expected RD value: ~62,245.54 INR (6,224,554 paise, within Rs 2 of 62,243.64 due to Feb day-count)
-      expect(vals1[0].value).toBe(6224554);
+      // Expected RD value: 6,226,900 paise (exact day-count quarterly compounding)
+      expect(vals1[0].value).toBe(6226900);
 
       // 2. Second recompute (idempotency: recalculating twice gives identical numbers and no extra rows)
       const res2 = await service.recomputeDepositValuations(USER_A, rd.id);
@@ -332,7 +332,7 @@ describe('DbFinanceService Integration Tests on PGlite', () => {
 
       const vals2 = await service.listValuations(USER_A, { accountId: rd.id });
       expect(vals2.length).toBe(1);
-      expect(vals2[0].value).toBe(6224554);
+      expect(vals2[0].value).toBe(6226900);
     });
 
     it('verifies credit card bill payments do not count towards spending in overview stats', async () => {

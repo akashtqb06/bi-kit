@@ -5,6 +5,13 @@ export function todayInTz(tz: string = DEFAULT_TZ): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
 }
 
+/** Returns YYYY-MM-DD for "yesterday" in the given IANA timezone */
+export function yesterdayInTz(tz: string = DEFAULT_TZ): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(d);
+}
+
 /** Returns YYYY-MM-DD for the first day of the current month in the given timezone */
 export function currentMonthStartInTz(tz: string = DEFAULT_TZ): string {
   const today = todayInTz(tz); // YYYY-MM-DD

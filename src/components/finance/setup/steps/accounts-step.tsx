@@ -149,6 +149,7 @@ export function AccountsStep({
   const getAccountIcon = (kind: string) => {
     switch (kind) {
       case 'cash':
+      case 'wallet':
         return WalletIcon;
       case 'credit_card':
         return CreditCardIcon;

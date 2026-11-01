@@ -3,9 +3,16 @@ import { db, finAccounts, finTransactions, finValuations } from '@src/lib/db';
 import { NotFoundError } from '@src/app/api/utils';
 import {
   calculateFDAccruedValue,
-  calculateRDAccruedValue,
   normalizeInterestRate,
 } from '../domain/deposits';
+import {
+  rdValue,
+  deriveMaturityDate,
+  type RDConfig,
+  type RDCompounding,
+  type RDDayHistoryItem,
+  type RDLatePaymentItem,
+} from '../domain/rd';
 import type { CompoundingFrequency } from '../constants';
 import {
   type CreateValuationDTO,
@@ -142,8 +149,6 @@ export async function recomputeDepositValuations(
     const tenureMonths = Number(meta.tenureMonths || meta.tenure || 12);
     const rawRate = Number(meta.interestRate ?? meta.annualInterestRate ?? meta.rate ?? 0.07);
     const interestRate = normalizeInterestRate(rawRate);
-    const installmentMode =
-      (meta.installmentMode as 'assume_schedule' | 'recorded_transfers') || 'assume_schedule';
 
     // Fetch existing manual valuations to avoid overwriting them
     const existingValuations = await db
@@ -211,8 +216,35 @@ export async function recomputeDepositValuations(
       );
       if (monthlyInstallment <= 0) continue;
 
+      const normRate = rawRate > 1 ? rawRate : Number((rawRate * 100).toFixed(2));
+      const installmentDay =
+        meta.installmentDay !== undefined
+          ? (meta.installmentDay as number | 'last')
+          : parseInt(startDate.slice(8, 10), 10);
+      const firstInstallmentOn =
+        (meta.firstInstallmentOn as 'start_date' | 'first_installment_day') || 'start_date';
+      const compounding = (meta.compoundingFrequency ??
+        meta.compounding ??
+        'quarterly') as RDCompounding;
+      const installmentsMode =
+        (meta.installmentsMode as 'schedule' | 'recorded') ||
+        (meta.installmentMode === 'recorded_transfers' ? 'recorded' : 'schedule');
+      const startMonth = startDate.slice(0, 7);
+      const installmentDayHistory =
+        (meta.installmentDayHistory as RDDayHistoryItem[]) &&
+        (meta.installmentDayHistory as RDDayHistoryItem[]).length > 0
+          ? (meta.installmentDayHistory as RDDayHistoryItem[])
+          : [{ effectiveFrom: startMonth, day: installmentDay }];
+      const skippedInstallments = (meta.skippedInstallments as string[]) || [];
+      const paidLateInstallments = (meta.paidLateInstallments as RDLatePaymentItem[]) || [];
+      const payFromAccountId = (meta.payFromAccountId as string | null) || null;
+      const autoDebit =
+        meta.autoDebit !== undefined ? Boolean(meta.autoDebit) : Boolean(payFromAccountId);
+      const maturityDate =
+        (meta.maturityDate as string) || deriveMaturityDate(startDate, tenureMonths);
+
       let recordedTransfers: Array<{ date: string; amount: number }> | undefined;
-      if (installmentMode === 'recorded_transfers') {
+      if (installmentsMode === 'recorded') {
         const transferRows = await db
           .select({ date: finTransactions.date, amount: finTransactions.amount })
           .from(finTransactions)
@@ -230,27 +262,46 @@ export async function recomputeDepositValuations(
         }));
       }
 
-      const todayValue = calculateRDAccruedValue({
+      const rdConfig: RDConfig = {
         monthlyInstallment,
-        annualInterestRate: interestRate,
         startDate,
+        installmentDay,
+        firstInstallmentOn,
         tenureMonths,
-        asOfDate: today,
-        manualAnchor,
-        installmentMode,
+        maturityDate,
+        interestRate: normRate,
+        compounding,
+        payFromAccountId,
+        autoDebit,
+        installmentsMode,
+        installmentDayHistory,
+        skippedInstallments,
+        paidLateInstallments,
         recordedTransfers,
-      });
+      };
 
-      valuationPoints.push({ date: today, value: todayValue });
+      const rdVal = rdValue(rdConfig, today, manualAnchor);
+      valuationPoints.push({ date: today, value: rdVal.currentValue });
 
       // Idempotently normalize metadata
       const updatedMeta = {
         ...meta,
         monthlyInstallmentPaise: monthlyInstallment,
-        interestRate: rawRate > 1 ? rawRate : Number((rawRate * 100).toFixed(2)),
-        installmentMode,
+        interestRate: normRate,
         startDate,
+        installmentDay,
+        firstInstallmentOn,
         tenureMonths,
+        maturityDate,
+        compounding,
+        compoundingFrequency: compounding,
+        installmentsMode,
+        installmentMode: installmentsMode === 'recorded' ? 'recorded_transfers' : 'assume_schedule',
+        installmentDayHistory,
+        skippedInstallments,
+        paidLateInstallments,
+        payFromAccountId,
+        autoDebit,
       };
       await db
         .update(finAccounts)

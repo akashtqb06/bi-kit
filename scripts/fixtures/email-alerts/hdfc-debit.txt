@@ -1,0 +1,11 @@
+From: alerts@hdfcbank.com
+Subject: HDFC Bank - Credit Card Transaction Alert
+
+Dear Customer,
+
+Rs.1,299.00 has been debited from your HDFC Bank Credit Card XX4521 for a purchase at AMAZON IN on 01-Nov-26. Your available credit limit is Rs.48,701.00.
+
+If you did not make this transaction, please call 1800-202-6161.
+
+Thank you,
+HDFC Bank

@@ -1,0 +1,11 @@
+From: alerts@hdfcbank.com
+Subject: HDFC Bank - Account Credit Alert
+
+Dear Customer,
+
+Rs.45,000.00 has been credited to your HDFC Bank Savings Account XX7890 on 01-Nov-26. Your available balance is Rs.1,23,456.00.
+
+Transaction Reference: NEFT/20261101/123456
+
+Thank you,
+HDFC Bank

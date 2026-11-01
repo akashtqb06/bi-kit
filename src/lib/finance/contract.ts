@@ -76,6 +76,78 @@ export const accountHistoryPointSchema = z.object({
 
 export type AccountHistoryPointDTO = z.infer<typeof accountHistoryPointSchema>;
 
+// ============================================================================
+// Recurring Deposit (RD) Schemas
+// ============================================================================
+
+export const rdCompoundingSchema = z.enum([
+  'quarterly',
+  'monthly',
+  'half_yearly',
+  'yearly',
+  'simple',
+]);
+export type RDCompoundingDTO = z.infer<typeof rdCompoundingSchema>;
+
+export const rdFirstInstallmentOnSchema = z.enum(['start_date', 'first_installment_day']);
+export type RDFirstInstallmentOnDTO = z.infer<typeof rdFirstInstallmentOnSchema>;
+
+export const rdInstallmentsModeSchema = z.enum([
+  'schedule',
+  'recorded',
+  'assume_schedule',
+  'recorded_transfers',
+]);
+export type RDInstallmentsModeDTO = z.infer<typeof rdInstallmentsModeSchema>;
+
+export const rdDayHistoryItemSchema = z.object({
+  effectiveFrom: z.string().regex(/^\d{4}-\d{2}$/, 'Must be YYYY-MM format'),
+  day: z.union([z.number().int().min(1).max(31), z.literal('last')]),
+});
+export type RDDayHistoryItemDTO = z.infer<typeof rdDayHistoryItemSchema>;
+
+export const rdLatePaymentItemSchema = z.object({
+  dueDate: dateStringSchema,
+  paidDate: dateStringSchema,
+});
+export type RDLatePaymentItemDTO = z.infer<typeof rdLatePaymentItemSchema>;
+
+export const rdConfigSchema = z.object({
+  monthlyInstallment: positiveMoneyPaiseSchema,
+  startDate: dateStringSchema,
+  installmentDay: z.union([z.number().int().min(1).max(31), z.literal('last')]),
+  firstInstallmentOn: rdFirstInstallmentOnSchema.default('start_date').optional(),
+  tenureMonths: z.number().int().positive('Tenure must be at least 1 month'),
+  maturityDate: dateStringSchema.optional(),
+  interestRate: z.number().min(0, 'Interest rate cannot be negative'),
+  compounding: rdCompoundingSchema.default('quarterly').optional(),
+  payFromAccountId: z.string().nullable().optional(),
+  autoDebit: z.boolean().optional(),
+  installmentsMode: rdInstallmentsModeSchema.default('schedule').optional(),
+  installmentDayHistory: z.array(rdDayHistoryItemSchema).optional(),
+  skippedInstallments: z.array(dateStringSchema).optional(),
+  paidLateInstallments: z.array(rdLatePaymentItemSchema).optional(),
+});
+export type RDConfigDTO = z.infer<typeof rdConfigSchema>;
+
+export const changeInstallmentDaySchema = z.object({
+  newDay: z.union([z.number().int().min(1).max(31), z.literal('last')]),
+  effectiveFrom: z.string().regex(/^\d{4}-\d{2}$/, 'Must be YYYY-MM format'),
+});
+export type ChangeInstallmentDayDTO = z.infer<typeof changeInstallmentDaySchema>;
+
+export const markInstallmentSkippedSchema = z.object({
+  dueDate: dateStringSchema,
+  skipped: z.boolean().default(true),
+});
+export type MarkInstallmentSkippedDTO = z.infer<typeof markInstallmentSkippedSchema>;
+
+export const markInstallmentLateSchema = z.object({
+  dueDate: dateStringSchema,
+  paidDate: dateStringSchema,
+});
+export type MarkInstallmentLateDTO = z.infer<typeof markInstallmentLateSchema>;
+
 export const accountHistoryResponseSchema = z.object({
   accountId: z.string(),
   accountName: z.string(),

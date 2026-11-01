@@ -1,4 +1,4 @@
-import { and, eq, lte } from 'drizzle-orm';
+import { and, eq, lte, or } from 'drizzle-orm';
 import { db, finRecurringRules, finTransactions } from '@src/lib/db';
 import { getFinanceService, type FinanceService } from '../service';
 import type { RecurringRuleDTO, TransactionDTO } from '../contract';
@@ -84,7 +84,8 @@ async function generateDbBackend(
         break;
       }
 
-      const clientRequestId = `${rawRule.id}_${occurrence}`;
+      const clientRequestId = `${rawRule.id}:${occurrence}`;
+      const legacyClientRequestId = `${rawRule.id}_${occurrence}`;
 
       // Check if transaction with this clientRequestId already exists for idempotency
       const [existingTxn] = await db
@@ -93,7 +94,10 @@ async function generateDbBackend(
         .where(
           and(
             eq(finTransactions.userId, rawRule.userId),
-            eq(finTransactions.clientRequestId, clientRequestId)
+            or(
+              eq(finTransactions.clientRequestId, clientRequestId),
+              eq(finTransactions.clientRequestId, legacyClientRequestId)
+            )
           )
         )
         .limit(1);

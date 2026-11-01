@@ -174,6 +174,8 @@ export function parseAccountsCSV(csvText: string): CSVParseResult {
       kind = 'mutual_fund';
     } else if (rawKind === 'equity' || rawKind === 'shares') {
       kind = 'stocks';
+    } else if (rawKind === 'digital_wallet' || rawKind === 'prepaid_wallet' || rawKind === 'paytm' || rawKind === 'amazon_pay' || rawKind === 'phonepe') {
+      kind = 'wallet';
     } else if (ACCOUNT_KINDS.includes(rawKind as AccountKind)) {
       kind = rawKind as AccountKind;
     }

@@ -1,0 +1,7 @@
+From: noreply@icicibank.com
+Subject: Alert: Transaction on your ICICI Bank Credit Card
+
+ICICI Bank Credit Card XX8832 has been used for a transaction of INR 599.00 at NETFLIX on 01-Nov-26 12:30:45.
+
+Available credit limit: INR 49,401.00
+If not done by you, call 1800-102-4242.

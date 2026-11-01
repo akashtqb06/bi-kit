@@ -28,6 +28,7 @@ import { FinanceAreaChart, formatDateShort, formatDayOrdinal } from '../charts';
 import { useBreadcrumbStore } from '@src/components/layout/breadcrumb-store';
 import { UpdateValuationDialog } from './update-valuation-dialog';
 import { EditAccountOpeningDialog } from './edit-account-opening-dialog';
+import { RDDetailSection } from './rd-detail-section';
 import { TransactionTable } from '../transactions/transaction-table';
 import { cn } from '@/lib/utils';
 import { useAppModal } from '@/components/ui/app-modal';
@@ -449,88 +450,10 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
       )}
 
       {account.kind === 'recurring_deposit' && (
-        <div className="p-4 rounded-xl border bg-card space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <PiggyBankIcon className="size-4 text-amber-500" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Recurring Deposit Details
-              </h3>
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={isRecalculating}
-              className="h-7 text-xs gap-1.5"
-              onClick={handleRecalculate}
-            >
-              <RefreshCwIcon
-                className={cn('size-3 text-primary', isRecalculating && 'animate-spin')}
-              />
-              <span>{isRecalculating ? 'Recalculating...' : 'Recalculate'}</span>
-            </Button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            <div className="p-3 rounded-lg bg-muted/40 border">
-              <span className="text-[11px] text-muted-foreground">Current Value</span>
-              <div className="text-xl font-bold text-foreground mt-0.5">
-                {formatINR(account.accruedValue ?? account.balance)}
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-muted/40 border">
-              <span className="text-[11px] text-muted-foreground">Interest Accrued</span>
-              <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                +{formatINR(account.interestEarned ?? 0)}
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-muted/40 border">
-              <span className="text-[11px] text-muted-foreground">Total Deposited</span>
-              <div className="text-xl font-bold text-foreground mt-0.5">
-                {formatINR(account.totalDeposited ?? account.balance)}
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-muted/40 border">
-              <span className="text-[11px] text-muted-foreground">Projected Maturity Amount</span>
-              <div className="text-xl font-bold text-primary mt-0.5">
-                {formatINR(account.projectedMaturityAmount ?? account.balance)}
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-muted/40 border">
-              <span className="text-[11px] text-muted-foreground">Installment Amount</span>
-              <div className="text-xl font-bold text-foreground mt-0.5">
-                {account.monthlyInstallment ? `${formatINR(account.monthlyInstallment)} / mo` : '—'}
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-muted/40 border">
-              <span className="text-[11px] text-muted-foreground">Installments Paid</span>
-              <div className="text-xl font-bold text-foreground mt-0.5">
-                {account.installmentsPaid ?? 0}{' '}
-                {account.totalInstallments ? `of ${account.totalInstallments}` : ''}
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-muted/40 border">
-              <span className="text-[11px] text-muted-foreground">Next Installment Date</span>
-              <div className="text-base font-semibold text-foreground mt-1">
-                {account.nextInstallmentDate || '—'}
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-muted/40 border">
-              <span className="text-[11px] text-muted-foreground">Maturity Date</span>
-              <div className="text-base font-semibold text-foreground mt-1">
-                {account.maturityDate || '—'}
-              </div>
-            </div>
-          </div>
-        </div>
+        <RDDetailSection
+          account={account}
+          onRefreshNeeded={() => recalculateAccount(account.id)}
+        />
       )}
 
       {account.kind === 'fixed_deposit' && (

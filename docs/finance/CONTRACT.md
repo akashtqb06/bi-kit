@@ -37,8 +37,9 @@ Every account belongs to exactly one `class`:
 ### 2.2 Account Kinds
 | Kind | Class | Description |
 |---|---|---|
-| `cash` | `asset` | Physical cash, wallet balances. |
+| `cash` | `asset` | Physical cash. |
 | `bank` | `asset` | Checking, savings accounts. |
+| `wallet` | `asset` | Digital payment wallets (Paytm, Amazon Pay balance, PhonePe wallet, etc.). |
 | `credit_card` | `liability` | Revolving credit card lines. |
 | `fixed_deposit` | `asset` | Term deposits with compounding interest. |
 | `recurring_deposit` | `asset` | Monthly installment deposits with interest. |
@@ -109,18 +110,45 @@ Where $n$ is the compounding frequency per year:
 
 **Interest Earned**: $I = A - P$.
 
-### 4.2 Recurring Deposit (RD) Closed-Form Formula
-For a monthly installment deposit $P$ (in paise) deposited at the start of each month for $M$ months at annual interest rate $r$ compounded quarterly ($n = 4$):
+### 4.2 Recurring Deposit (RD) Closed-Form Formula & Data Model
 
-In Indian banking standards, each monthly installment earns quarterly compounded interest for the period it remains invested.
-The maturity amount $A$ is given by:
+#### 4.2.1 Data Model (`fin_accounts.metadata` for `kind: 'recurring_deposit'`)
+- `monthlyInstallment`: Integer minor units (paise).
+- `startDate`: Account opening date (`YYYY-MM-DD`).
+- `installmentDay`: Day of month (integer 1–31 or `'last'` / `'last day of month'`), clamped to the calendar length of each month.
+- `firstInstallmentOn`: `'start_date'` (default) | `'first_installment_day'`.
+  - `'start_date'`: Installment 1 falls on `startDate`; installments 2..M fall on `installmentDay` in subsequent months.
+  - `'first_installment_day'`: Installment 1 falls on the first occurrence of `installmentDay` after `startDate`; installments 2..M follow in subsequent months.
+- `tenureMonths`: Total tenure $M$ (integer).
+- `maturityDate`: Derived as `startDate + tenureMonths` (clamped calendar addition), with optional user override.
+- `interestRate`: Annual interest rate $r$ (percent e.g. 6.8 for 6.8%).
+- `compounding`: Compounding frequency (`'quarterly'` by default, `'monthly'`, `'half_yearly'`, `'yearly'`, `'simple'`).
+- `payFromAccountId`: Optional source bank account ID.
+- `autoDebit`: Boolean (defaults to `true` when `payFromAccountId` is provided). When enabled, a recurring TRANSFER rule is maintained automatically to generate bank-to-RD transfers.
+- `installmentsMode`: `'schedule'` (default, assumed paid on schedule) | `'recorded'` (strictly matched to recorded transfers).
+- `installmentDayHistory`: `Array<{ effectiveFrom: string; day: number | 'last' }>` preserving historical installment days when changed from an effective month.
+- `skippedInstallments`: `string[]` of due dates (`YYYY-MM-DD`) that were skipped without interest accrual.
+- `paidLateInstallments`: `Array<{ dueDate: string; paidDate: string }>` recording late installment dates compounding from their actual deposit date.
 
-$$A = \sum_{m=1}^{M} P \cdot \left(1 + \frac{r}{4}\right)^{\frac{4 \cdot (M - m + 1)}{12}} = \sum_{k=1}^{M} P \cdot \left(1 + \frac{r}{4}\right)^{\frac{k}{3}}$$
+#### 4.2.2 Closed-Form Valuation & Compounding Formula
+Each paid installment $i$ compounds from its actual deposit date $D_i$ to evaluation date $asOf$:
 
-Where $k = M - m + 1$ is the number of months the $m$-th installment remains invested.
-- **Total Invested**: $P \cdot M$
-- **Total Interest**: $I = A - (P \cdot M)$
-- **Simulation Cross-Check**: S1 implements the closed-form math; S4 verifies by day-by-day continuous ledger simulation with an allowed tolerance of **1 rupee (100 paise)** to account for fractional-day rounding variations across institutions.
+$$V_i = R \times \left(1 + \frac{r}{100 \times q}\right)^{q \times \frac{\text{days}_i}{365}}$$
+
+Where:
+- $R$ is the monthly installment amount in paise.
+- $r$ is the nominal annual rate percent (e.g. 6.8).
+- $q$ is compounding periods per year ($q = 4$ for quarterly, $12$ for monthly, $2$ for half-yearly, $1$ for yearly, $0$ for simple interest $R \times (1 + \frac{r \cdot \text{days}}{36500})$).
+- $\text{days}_i = \max(0, asOf - D_i)$.
+
+With a manual passbook anchor $(\text{anchorDate}, \text{anchorValue})$:
+
+$$\text{value}(asOf) = \text{anchorValue} \times \left(1 + \frac{r}{100 \times q}\right)^{q \times \frac{asOf - \text{anchorDate}}{365}} + \sum_{D_i > \text{anchorDate}} V_i$$
+
+Total deposited is the sum of installments paid (or anchor baseline plus post-anchor installments), and accrued interest is $\text{currentValue} - \text{totalDeposited}$.
+Projected maturity value compounds all scheduled installments to `maturityDate`.
+
+> **Reconciliation Note**: Bank statements may differ by a few rupees because different financial institutions use their own day-count conventions (30/360 vs Actual/365) and specific quarter-end accrual schedules. Users can record a passbook anchor to reconcile exact statement values.
 
 ---
 

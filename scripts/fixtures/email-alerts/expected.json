@@ -1,0 +1,31 @@
+[
+  {
+    "fixture": "hdfc-debit.txt",
+    "expected": {
+      "direction": "debit",
+      "amount": 129900,
+      "currency": "INR",
+      "merchant": "AMAZON IN",
+      "accountHint": { "last4": "4521" }
+    }
+  },
+  {
+    "fixture": "hdfc-credit.txt",
+    "expected": {
+      "direction": "credit",
+      "amount": 4500000,
+      "currency": "INR",
+      "accountHint": { "last4": "7890" }
+    }
+  },
+  {
+    "fixture": "icici-debit.txt",
+    "expected": {
+      "direction": "debit",
+      "amount": 59900,
+      "currency": "INR",
+      "merchant": "NETFLIX",
+      "accountHint": { "last4": "8832" }
+    }
+  }
+]

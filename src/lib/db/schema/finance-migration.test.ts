@@ -3,6 +3,9 @@ import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { migrate } from 'drizzle-orm/pglite/migrator';
+import { eq } from 'drizzle-orm';
+import { finAccounts } from './finance';
+import { users } from '../schema';
 
 describe('Finance Migration on PGlite', () => {
   it('successfully applies all PostgreSQL migrations on a fresh PGlite database', async () => {
@@ -41,6 +44,39 @@ describe('Finance Migration on PGlite', () => {
     const constraintNames = checkConstraints.rows.map((r) => r.conname);
     expect(constraintNames).toContain('fin_transactions_amount_check');
     expect(constraintNames).toContain('fin_transactions_transfer_check');
+
+    // Create a user and insert a wallet account into fin_accounts
+    await db.insert(users).values({
+      id: 'usr_wallet_test',
+      email: 'wallet_tester@example.com',
+      name: 'Wallet Tester',
+      passwordHash: 'dummyhash',
+      role: 'member',
+    });
+
+    const [insertedWallet] = await db
+      .insert(finAccounts)
+      .values({
+        id: 'acc_wallet_test_1',
+        userId: 'usr_wallet_test',
+        name: 'Paytm Wallet',
+        kind: 'wallet',
+        class: 'asset',
+        currency: 'INR',
+      })
+      .returning();
+
+    expect(insertedWallet).toBeDefined();
+    expect(insertedWallet.kind).toBe('wallet');
+    expect(insertedWallet.class).toBe('asset');
+
+    const queried = await db
+      .select()
+      .from(finAccounts)
+      .where(eq(finAccounts.kind, 'wallet'));
+
+    expect(queried).toHaveLength(1);
+    expect(queried[0].name).toBe('Paytm Wallet');
 
     await pglite.close();
   });

@@ -125,6 +125,38 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  n8n:
+    image: n8nio/n8n:1.70.3
+    container_name: bikit-n8n
+    profiles: ["automation"]
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      WEBHOOK_URL: http://localhost:5678
+      DB_TYPE: sqlite
+      DB_SQLITE_DATABASE: /home/node/.n8n/database.sqlite
+      GENERIC_TIMEZONE: ${APP_TIMEZONE:-Asia/Kolkata}
+      N8N_LOG_LEVEL: info
+      # Restrict n8n to internal network only
+      N8N_LISTEN_ADDRESS: 127.0.0.1
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - default
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   proxy:
     image: caddy:2-alpine
     container_name: bikit-proxy
@@ -153,3 +185,4 @@ volumes:
   app_data:
   caddy_data:
   caddy_config:
+  n8n_data:

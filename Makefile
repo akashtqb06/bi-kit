@@ -5,7 +5,7 @@ BACKUP_FILE ?= backup.sql
 backup:
 	@echo "Backing up database (excluding store_* schemas)..."
 	@if docker ps --format '{{.Names}}' | grep -q "bikit-postgres"; then \
-		docker compose exec -T postgres pg_dump -U postgres -d bikit_prod -N 'store_*' > $(BACKUP_FILE); \
+		docker compose exec -T db pg_dump -U postgres -d bikit_prod -N 'store_*' > $(BACKUP_FILE); \
 	elif docker ps --format '{{.Names}}' | grep -q "bi-kit-postgres"; then \
 		docker compose -f docker-compose.dev.yml exec -T postgres pg_dump -U postgres -d bikit_dev -N 'store_*' > $(BACKUP_FILE); \
 	else \
@@ -16,7 +16,7 @@ backup:
 restore:
 	@echo "Restoring database from $(BACKUP_FILE)..."
 	@if docker ps --format '{{.Names}}' | grep -q "bikit-postgres"; then \
-		docker compose exec -T postgres psql -U postgres -d bikit_prod < $(BACKUP_FILE); \
+		docker compose exec -T db psql -U postgres -d bikit_prod < $(BACKUP_FILE); \
 	elif docker ps --format '{{.Names}}' | grep -q "bi-kit-postgres"; then \
 		docker compose -f docker-compose.dev.yml exec -T postgres psql -U postgres -d bikit_dev < $(BACKUP_FILE); \
 	else \

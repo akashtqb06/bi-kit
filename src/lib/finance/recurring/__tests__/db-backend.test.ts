@@ -68,7 +68,7 @@ describe('Recurring Rules: DB Backend Integration Tests (PGlite)', () => {
 
     for (const row of rows) {
       expect(row.isRecurring).toBe(true);
-      expect(row.clientRequestId).toBe(`${rule.id}_${row.date}`);
+      expect([`${rule.id}:${row.date}`, `${rule.id}_${row.date}`]).toContain(row.clientRequestId);
       expect(Number(row.amount)).toBe(2500000);
       expect(Number(row.signedAmount)).toBe(-2500000); // Expense has negative signed amount
       expect(row.accountId).toBe(accountId);

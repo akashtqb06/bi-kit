@@ -38,6 +38,16 @@ describe('Finance Contract & Zod Validation Tests', () => {
       expect(res.success).toBe(true);
     });
 
+    it('validates wallet account creation', () => {
+      const walletAcc = {
+        name: 'Paytm Wallet',
+        kind: 'wallet',
+        currency: 'INR',
+      };
+      const res = createAccountSchema.safeParse(walletAcc);
+      expect(res.success).toBe(true);
+    });
+
     it('rejects invalid account kind', () => {
       const invalid = {
         name: 'My Account',

@@ -188,6 +188,13 @@ export function OverviewView() {
       .sort((a, b) => (a.dueDay || 31) - (b.dueDay || 31));
   }, [accounts]);
 
+  // Upcoming RD installments (as of today)
+  const upcomingRDInstallments = useMemo(() => {
+    return accounts
+      .filter((a) => a.kind === 'recurring_deposit' && a.nextInstallmentDate)
+      .sort((a, b) => (a.nextInstallmentDate || '').localeCompare(b.nextInstallmentDate || ''));
+  }, [accounts]);
+
   // Balances by account kind (as of today)
   const balancesByKind = useMemo(() => {
     const kinds = {
@@ -199,7 +206,7 @@ export function OverviewView() {
     };
 
     accounts.forEach((a) => {
-      if (a.kind === 'bank' || a.kind === 'cash') {
+      if (a.kind === 'bank' || a.kind === 'cash' || a.kind === 'wallet') {
         kinds.bank.balance += a.balance;
       } else if (a.kind === 'credit_card') {
         kinds.cards.balance += a.outstanding;
@@ -737,26 +744,26 @@ export function OverviewView() {
 
       {/* Two Column Layout: Upcoming Card Dues & Recent Transactions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Upcoming Card Dues (as of today) */}
+        {/* Upcoming Dues & RD Installments (as of today) */}
         <div className="p-4 rounded-xl border bg-card space-y-3 shadow-xs">
           <div className="flex items-center justify-between border-b pb-2">
             <div className="flex items-center gap-2">
               <CreditCardIcon className="size-4 text-purple-500" />
               <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Upcoming Card Dues
+                Upcoming Dues & Deposits
               </h3>
               <span className="text-[10px] text-muted-foreground font-medium">
                 (as of today)
               </span>
             </div>
             <span className="text-xs text-muted-foreground">
-              {upcomingCardDues.length} card{upcomingCardDues.length === 1 ? '' : 's'} with balance
+              {upcomingCardDues.length + upcomingRDInstallments.length} pending
             </span>
           </div>
 
-          {upcomingCardDues.length === 0 ? (
+          {upcomingCardDues.length === 0 && upcomingRDInstallments.length === 0 ? (
             <div className="py-8 text-center text-xs text-muted-foreground">
-              No outstanding card dues! You are all caught up.
+              No upcoming card dues or deposit installments! You are all caught up.
             </div>
           ) : (
             <div className="divide-y divide-border/60">
@@ -788,6 +795,37 @@ export function OverviewView() {
                       onClick={() => openPayBill(card.id)}
                     >
                       Pay Bill
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              {upcomingRDInstallments.map((rd) => (
+                <div
+                  key={rd.id}
+                  className="py-2.5 flex items-center justify-between gap-3 text-xs"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <PiggyBankIcon className="size-4 text-amber-500 shrink-0" />
+                    <div>
+                      <h4 className="font-semibold text-foreground">{rd.name}</h4>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                        Next installment on <strong className="text-foreground">{rd.nextInstallmentDate}</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold text-foreground">
+                      {rd.monthlyInstallment ? formatINR(rd.monthlyInstallment) : '—'}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs font-medium"
+                      render={<Link href={`/finance/accounts/${rd.id}`} />}
+                    >
+                      View RD
                     </Button>
                   </div>
                 </div>

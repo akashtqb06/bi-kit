@@ -35,7 +35,7 @@ export function AccountsView() {
     const loans: AccountWithBalance[] = [];
 
     accounts.forEach((acc) => {
-      if (acc.kind === 'bank' || acc.kind === 'cash') {
+      if (acc.kind === 'bank' || acc.kind === 'cash' || acc.kind === 'wallet') {
         cashAndBank.push(acc);
       } else if (acc.kind === 'credit_card') {
         cards.push(acc);
@@ -416,6 +416,15 @@ export function AccountsView() {
                     </Badge>
                   )}
                 </div>
+
+                {acc.kind === 'recurring_deposit' && acc.nextInstallmentDate && (
+                  <div className="mt-3 pt-2 border-t flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>Next installment:</span>
+                    <span className="font-semibold text-foreground font-mono">
+                      {acc.nextInstallmentDate}
+                    </span>
+                  </div>
+                )}
               </Link>
             ))}
           </div>

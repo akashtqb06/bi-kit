@@ -9,6 +9,13 @@ import {
 } from '@src/lib/db';
 import { calculateNetWorth } from '../domain/net-worth';
 import { isCardDueWithinDays } from '../domain/credit-card';
+import {
+  rdValue,
+  type RDConfig,
+  type RDCompounding,
+  type RDDayHistoryItem,
+  type RDLatePaymentItem,
+} from '../domain/rd';
 import type { OverviewStatsDTO, OverviewStatsQuery, TransactionDTO } from '../contract';
 import type { AccountKind, AccountClass } from '../constants';
 import { mapTransactionToDTO } from './transactions';
@@ -158,7 +165,62 @@ export async function getOverviewStats(
 
   for (const acc of accounts) {
     const balance = (sourceMap.get(acc.id) ?? 0) + (targetMap.get(acc.id) ?? 0);
-    const currentValue = latestValuations.get(acc.id);
+    let currentValue = latestValuations.get(acc.id);
+
+    if (acc.kind === 'recurring_deposit') {
+      const meta = (acc.metadata || {}) as Record<string, unknown>;
+      const monthlyInstallment = Number(
+        meta.monthlyInstallmentPaise ??
+          meta.monthlyInstallment ??
+          meta.installment ??
+          meta.installmentAmount ??
+          0
+      );
+      if (monthlyInstallment > 0) {
+        const rawRate = Number(meta.interestRate ?? meta.rate ?? 6.8);
+        const interestRate = rawRate > 1 ? rawRate : Number((rawRate * 100).toFixed(2));
+        const startDate =
+          (meta.startDate as string) ||
+          (acc.createdAt instanceof Date ? acc.createdAt.toISOString().slice(0, 10) : String(acc.createdAt).slice(0, 10));
+        const tenureMonths = Number(meta.tenureMonths || 12);
+        const installmentDay =
+          meta.installmentDay !== undefined
+            ? (meta.installmentDay as number | 'last')
+            : parseInt(startDate.slice(8, 10), 10);
+        const firstInstallmentOn =
+          (meta.firstInstallmentOn as 'start_date' | 'first_installment_day') || 'start_date';
+        const compounding = (meta.compoundingFrequency ??
+          meta.compounding ??
+          'quarterly') as RDCompounding;
+        const installmentsMode =
+          (meta.installmentsMode as 'schedule' | 'recorded') ||
+          (meta.installmentMode === 'recorded_transfers' ? 'recorded' : 'schedule');
+        const startMonth = startDate.slice(0, 7);
+        const installmentDayHistory =
+          (meta.installmentDayHistory as RDDayHistoryItem[]) &&
+          (meta.installmentDayHistory as RDDayHistoryItem[]).length > 0
+            ? (meta.installmentDayHistory as RDDayHistoryItem[])
+            : [{ effectiveFrom: startMonth, day: installmentDay }];
+        const skippedInstallments = (meta.skippedInstallments as string[]) || [];
+        const paidLateInstallments = (meta.paidLateInstallments as RDLatePaymentItem[]) || [];
+
+        const rdConfig: RDConfig = {
+          monthlyInstallment,
+          startDate,
+          installmentDay,
+          firstInstallmentOn,
+          tenureMonths,
+          interestRate,
+          compounding,
+          installmentsMode,
+          installmentDayHistory,
+          skippedInstallments,
+          paidLateInstallments,
+        };
+        const rdRes = rdValue(rdConfig, today);
+        currentValue = rdRes.currentValue;
+      }
+    }
 
     accountsForNetWorth.push({
       id: acc.id,

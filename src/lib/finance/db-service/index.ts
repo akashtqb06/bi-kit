@@ -133,7 +133,15 @@ export class DbFinanceService implements FinanceService {
     data: CreateTransactionDTO,
     options?: { clientRequestId?: string }
   ): Promise<TransactionDTO> {
-    return transactions.createTransaction(userId, data, options);
+    const txn = await transactions.createTransaction(userId, data, options);
+    if (data.type === 'transfer' && data.toAccountId) {
+      try {
+        await valuations.recomputeDepositValuations(userId, data.toAccountId);
+      } catch (err) {
+        console.warn(`[DbFinanceService] recomputeDepositValuations failed for ${data.toAccountId}:`, err);
+      }
+    }
+    return txn;
   }
 
   async updateTransaction(
@@ -141,11 +149,27 @@ export class DbFinanceService implements FinanceService {
     transactionId: string,
     data: UpdateTransactionDTO
   ): Promise<TransactionDTO> {
-    return transactions.updateTransaction(userId, transactionId, data);
+    const txn = await transactions.updateTransaction(userId, transactionId, data);
+    if (txn.type === 'transfer' && txn.toAccountId) {
+      try {
+        await valuations.recomputeDepositValuations(userId, txn.toAccountId);
+      } catch (err) {
+        console.warn(`[DbFinanceService] recomputeDepositValuations failed for ${txn.toAccountId}:`, err);
+      }
+    }
+    return txn;
   }
 
   async deleteTransaction(userId: string, transactionId: string): Promise<void> {
-    return transactions.deleteTransaction(userId, transactionId);
+    const txn = await transactions.getTransaction(userId, transactionId).catch(() => null);
+    await transactions.deleteTransaction(userId, transactionId);
+    if (txn && txn.type === 'transfer' && txn.toAccountId) {
+      try {
+        await valuations.recomputeDepositValuations(userId, txn.toAccountId);
+      } catch (err) {
+        console.warn(`[DbFinanceService] recomputeDepositValuations failed for ${txn.toAccountId}:`, err);
+      }
+    }
   }
 
   async bulkUpdateTransactions(

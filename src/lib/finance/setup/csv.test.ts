@@ -38,6 +38,23 @@ describe('Setup CSV Parser', () => {
     expect(mf?.totalInvestedPaise).toBe(28000000); // ₹2,80,000
   });
 
+  it('parses wallet accounts and aliases correctly', () => {
+    const csv = `Name,Kind,Balance
+Paytm Wallet,wallet,2500
+Amazon Pay,amazon_pay,1200
+PhonePe,digital_wallet,500
+`;
+    const result = parseAccountsCSV(csv);
+    expect(result.errors).toHaveLength(0);
+    expect(result.accounts).toHaveLength(3);
+    expect(result.accounts[0].kind).toBe('wallet');
+    expect(result.accounts[0].balancePaise).toBe(250000);
+    expect(result.accounts[1].kind).toBe('wallet');
+    expect(result.accounts[1].balancePaise).toBe(120000);
+    expect(result.accounts[2].kind).toBe('wallet');
+    expect(result.accounts[2].balancePaise).toBe(50000);
+  });
+
   it('handles currency symbols, commas, and Indian lakh grouping', () => {
     const csv = `Name,Kind,Balance
 HDFC Bank,bank,"₹ 1,25,000.50"

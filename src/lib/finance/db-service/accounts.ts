@@ -1,5 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm';
-import { db, finAccounts, finTransactions } from '@src/lib/db';
+import { db, finAccounts, finRecurringRules, finTransactions } from '@src/lib/db';
 import { NotFoundError } from '@src/app/api/utils';
 import { ACCOUNT_KIND_CLASS_MAP } from '../constants';
 import {
@@ -10,6 +10,11 @@ import {
   createAccountSchema,
   updateAccountSchema,
 } from '../contract';
+import {
+  generateSchedule,
+  type RDConfig,
+  type RDDayHistoryItem,
+} from '../domain/rd';
 
 export function mapAccountToDTO(row: typeof finAccounts.$inferSelect): AccountDTO {
   return {
@@ -66,6 +71,122 @@ export async function getAccount(userId: string, accountId: string): Promise<Acc
   return mapAccountToDTO(row);
 }
 
+export async function syncRDAutoDebitRule(
+  userId: string,
+  accountId: string,
+  meta: Record<string, unknown>,
+  accountName: string,
+  accountIsActive: boolean = true
+): Promise<void> {
+  const payFromAccountId = (meta.payFromAccountId as string | null) || null;
+  const autoDebit = meta.autoDebit !== undefined ? Boolean(meta.autoDebit) : Boolean(payFromAccountId);
+  const monthlyInstallment = Number(
+    meta.monthlyInstallmentPaise ??
+      meta.monthlyInstallment ??
+      meta.installment ??
+      meta.installmentAmount ??
+      0
+  );
+
+  // If account is inactive, or autoDebit is disabled, or no payFromAccountId:
+  if (!accountIsActive || !autoDebit || !payFromAccountId || monthlyInstallment <= 0) {
+    await db
+      .update(finRecurringRules)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(
+        and(
+          eq(finRecurringRules.userId, userId),
+          eq(finRecurringRules.toAccountId, accountId),
+          eq(finRecurringRules.type, 'transfer')
+        )
+      );
+    return;
+  }
+
+  const startDate = (meta.startDate as string) || new Date().toISOString().slice(0, 10);
+  const tenureMonths = Number(meta.tenureMonths || 12);
+  const installmentDay =
+    meta.installmentDay !== undefined
+      ? (meta.installmentDay as number | 'last')
+      : parseInt(startDate.slice(8, 10), 10);
+  const firstInstallmentOn =
+    (meta.firstInstallmentOn as 'start_date' | 'first_installment_day') || 'start_date';
+  const installmentDayHistory =
+    (meta.installmentDayHistory as RDDayHistoryItem[] | undefined) || [];
+  const skippedInstallments = (meta.skippedInstallments as string[]) || [];
+
+  const rdConfig: RDConfig = {
+    monthlyInstallment,
+    startDate,
+    installmentDay,
+    firstInstallmentOn,
+    tenureMonths,
+    interestRate: Number(meta.interestRate || 6.8),
+    installmentDayHistory,
+    skippedInstallments,
+  };
+
+  const today = new Date().toISOString().slice(0, 10);
+  const schedule = generateSchedule(rdConfig, today);
+  if (schedule.length === 0) return;
+
+  const validItems = schedule.filter((s) => s.status !== 'skipped');
+  if (validItems.length === 0) return;
+
+  const ruleStartDate = validItems[0].dueDate;
+  const ruleEndDate = validItems[validItems.length - 1].dueDate;
+
+  const domTag = installmentDay === 'last' ? 31 : installmentDay;
+  const note = `RD auto-debit: ${accountName} [DOM:${domTag}]`;
+
+  // Look for existing recurring rule
+  const [existingRule] = await db
+    .select()
+    .from(finRecurringRules)
+    .where(
+      and(
+        eq(finRecurringRules.userId, userId),
+        eq(finRecurringRules.toAccountId, accountId),
+        eq(finRecurringRules.type, 'transfer')
+      )
+    )
+    .limit(1);
+
+  if (existingRule) {
+    const nextPending = validItems.find((s) => s.dueDate >= today);
+    const nextOccurrence = nextPending ? nextPending.dueDate : ruleEndDate;
+
+    await db
+      .update(finRecurringRules)
+      .set({
+        accountId: payFromAccountId,
+        amount: monthlyInstallment,
+        startDate: ruleStartDate,
+        endDate: ruleEndDate,
+        nextOccurrence,
+        note,
+        isActive: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(finRecurringRules.id, existingRule.id));
+  } else {
+    await db.insert(finRecurringRules).values({
+      userId,
+      accountId: payFromAccountId,
+      toAccountId: accountId,
+      type: 'transfer',
+      amount: monthlyInstallment,
+      frequency: 'monthly',
+      interval: 1,
+      startDate: ruleStartDate,
+      endDate: ruleEndDate,
+      nextOccurrence: ruleStartDate,
+      note,
+      isActive: true,
+    });
+  }
+}
+
 export async function createAccount(
   userId: string,
   data: CreateAccountDTO
@@ -86,6 +207,20 @@ export async function createAccount(
       metadata: validated.metadata || {},
     })
     .returning();
+
+  if (row.kind === 'recurring_deposit') {
+    try {
+      await syncRDAutoDebitRule(
+        userId,
+        row.id,
+        (row.metadata || {}) as Record<string, unknown>,
+        row.name,
+        row.isActive
+      );
+    } catch (err) {
+      console.warn(`[createAccount] syncRDAutoDebitRule failed for ${row.id}:`, err);
+    }
+  }
 
   return mapAccountToDTO(row);
 }
@@ -116,12 +251,41 @@ export async function updateAccount(
     .where(and(eq(finAccounts.id, accountId), eq(finAccounts.userId, userId)))
     .returning();
 
+  if (updated.kind === 'recurring_deposit') {
+    try {
+      await syncRDAutoDebitRule(
+        userId,
+        updated.id,
+        (updated.metadata || {}) as Record<string, unknown>,
+        updated.name,
+        updated.isActive
+      );
+    } catch (err) {
+      console.warn(`[updateAccount] syncRDAutoDebitRule failed for ${updated.id}:`, err);
+    }
+  }
+
   return mapAccountToDTO(updated);
 }
 
 export async function deleteAccount(userId: string, accountId: string): Promise<void> {
   // Check account exists and belongs to user
   await getAccount(userId, accountId);
+
+  // Deactivate any recurring rule pointing to this RD
+  try {
+    await db
+      .update(finRecurringRules)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(
+        and(
+          eq(finRecurringRules.userId, userId),
+          eq(finRecurringRules.toAccountId, accountId)
+        )
+      );
+  } catch (err) {
+    console.warn(`[deleteAccount] disabling recurring rules for ${accountId} failed:`, err);
+  }
 
   // Check if any non-deleted transactions exist for this account
   const tx = await db

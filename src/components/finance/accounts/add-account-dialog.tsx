@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,11 +9,14 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useFinanceStore } from '../shared/finance-store';
+import { RDFormFields } from './rd-form-fields';
+import type { RDCompounding, RDFirstInstallmentOn } from '@src/lib/finance/domain/rd';
 import { rupeesToPaise } from '../shared/format';
+import { todayInTz, DEFAULT_TZ } from '@src/lib/finance/timezone';
 import type { AccountKind } from '@src/lib/finance/constants';
 
 export function AddAccountForm({ onSuccess, onCancel }: { onSuccess?: () => void; onCancel?: () => void }) {
-    const { addAccount } = useFinanceStore();
+    const { accounts, addAccount } = useFinanceStore();
 
     const [name, setName] = useState('');
     const [kind, setKind] = useState<AccountKind>('bank');
@@ -21,7 +24,7 @@ export function AddAccountForm({ onSuccess, onCancel }: { onSuccess?: () => void
 
     // Generic / Bank fields
     const [openingBalanceRupees, setOpeningBalanceRupees] = useState('');
-    const [openingDate, setOpeningDate] = useState(() => new Date().toISOString().split('T')[0]);
+    const [openingDate, setOpeningDate] = useState(() => todayInTz(DEFAULT_TZ));
 
     // Card fields
     const [creditLimitRupees, setCreditLimitRupees] = useState('');
@@ -32,10 +35,22 @@ export function AddAccountForm({ onSuccess, onCancel }: { onSuccess?: () => void
     // Deposit fields (FD/RD)
     const [principalRupees, setPrincipalRupees] = useState('');
     const [rate, setRate] = useState('');
-    const [compounding, setCompounding] = useState<'quarterly' | 'monthly' | 'yearly'>('quarterly');
-    const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0]);
+    const [compounding, setCompounding] = useState<RDCompounding>('quarterly');
+    const [startDate, setStartDate] = useState(() => todayInTz(DEFAULT_TZ));
     const [maturityDate, setMaturityDate] = useState('');
     const [tenureMonths, setTenureMonths] = useState('12');
+
+    // RD-specific fields
+    const [installmentDay, setInstallmentDay] = useState<number | 'last'>(2);
+    const [firstInstallmentOn, setFirstInstallmentOn] = useState<RDFirstInstallmentOn>('start_date');
+    const [payFromAccountId, setPayFromAccountId] = useState<string | null>(null);
+    const [autoDebit, setAutoDebit] = useState(true);
+    const [anchorRupees, setAnchorRupees] = useState('');
+
+    const bankAccounts = useMemo(
+        () => accounts.filter((a) => a.kind === 'bank' || a.kind === 'cash'),
+        [accounts]
+    );
 
     // Investment fields
     const [initialValueRupees, setInitialValueRupees] = useState('');
@@ -72,7 +87,7 @@ export function AddAccountForm({ onSuccess, onCancel }: { onSuccess?: () => void
             let limitPaise: number | undefined;
             const metadata: Record<string, unknown> = {};
 
-            if (kind === 'bank' || kind === 'cash' || kind === 'other_asset') {
+            if (kind === 'bank' || kind === 'cash' || kind === 'wallet' || kind === 'other_asset') {
                 openingPaise = openingBalanceRupees ? rupeesToPaise(parseFloat(openingBalanceRupees)) : 0;
                 metadata.openingDate = openingDate;
             } else if (kind === 'credit_card') {
@@ -95,10 +110,26 @@ export function AddAccountForm({ onSuccess, onCancel }: { onSuccess?: () => void
                 metadata.maturityDate = maturityDate;
             } else if (kind === 'recurring_deposit') {
                 openingPaise = principalRupees ? rupeesToPaise(parseFloat(principalRupees)) : 0;
+                const normRate = parseFloat(rate) || 6.8;
+                metadata.monthlyInstallmentPaise = openingPaise;
                 metadata.installment = openingPaise;
-                metadata.rate = parseFloat(rate) || 0;
+                metadata.interestRate = normRate;
+                metadata.rate = normRate;
                 metadata.startDate = startDate;
                 metadata.tenureMonths = parseInt(tenureMonths, 10) || 12;
+                metadata.installmentDay = installmentDay;
+                metadata.firstInstallmentOn = firstInstallmentOn;
+                metadata.compounding = compounding;
+                metadata.compoundingFrequency = compounding;
+                metadata.payFromAccountId = payFromAccountId;
+                metadata.autoDebit = autoDebit && Boolean(payFromAccountId);
+                metadata.installmentsMode = 'schedule';
+                metadata.installmentDayHistory = [{ effectiveFrom: startDate.slice(0, 7), day: installmentDay }];
+                metadata.skippedInstallments = [];
+                metadata.paidLateInstallments = [];
+                if (anchorRupees) {
+                    metadata.openingBalancePaise = rupeesToPaise(parseFloat(anchorRupees));
+                }
             } else if (kind === 'mutual_fund' || kind === 'stocks') {
                 openingPaise = initialValueRupees ? rupeesToPaise(parseFloat(initialValueRupees)) : 0;
                 metadata.costBasis = openingPaise;
@@ -139,7 +170,8 @@ export function AddAccountForm({ onSuccess, onCancel }: { onSuccess?: () => void
                 <Select
                     items={[
                         { value: 'bank', label: 'Bank Account (Checking / Savings)' },
-                        { value: 'cash', label: 'Cash / Physical Wallet' },
+                        { value: 'cash', label: 'Cash' },
+                        { value: 'wallet', label: 'Digital Wallet (Paytm, Amazon Pay, etc.)' },
                         { value: 'credit_card', label: 'Credit Card' },
                         { value: 'fixed_deposit', label: 'Fixed Deposit (FD)' },
                         { value: 'recurring_deposit', label: 'Recurring Deposit (RD)' },
@@ -161,7 +193,8 @@ export function AddAccountForm({ onSuccess, onCancel }: { onSuccess?: () => void
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="bank">Bank Account (Checking / Savings)</SelectItem>
-                        <SelectItem value="cash">Cash / Physical Wallet</SelectItem>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="wallet">Digital Wallet (Paytm, Amazon Pay, etc.)</SelectItem>
                         <SelectItem value="credit_card">Credit Card</SelectItem>
                         <SelectItem value="fixed_deposit">Fixed Deposit (FD)</SelectItem>
                         <SelectItem value="recurring_deposit">Recurring Deposit (RD)</SelectItem>
@@ -203,8 +236,8 @@ export function AddAccountForm({ onSuccess, onCancel }: { onSuccess?: () => void
             </div>
 
             {/* Dynamic Kind-Specific Fields */}
-            {/* Bank & Cash Fields */}
-            {(kind === 'bank' || kind === 'cash' || kind === 'other_asset') && (
+            {/* Bank, Cash & Wallet Fields */}
+            {(kind === 'bank' || kind === 'cash' || kind === 'wallet' || kind === 'other_asset') && (
                 <div data-testid="kind-fields-bank" className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t">
                     <div className="space-y-1.5">
                         <Label htmlFor="opening-balance" className="text-xs font-medium text-muted-foreground">
@@ -390,64 +423,30 @@ export function AddAccountForm({ onSuccess, onCancel }: { onSuccess?: () => void
 
             {/* Recurring Deposit Fields */}
             {kind === 'recurring_deposit' && (
-                <div data-testid="kind-fields-rd" className="space-y-3 pt-2 border-t">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="rd-installment" className="text-xs font-medium text-muted-foreground">
-                                Monthly Installment (₹)
-                            </Label>
-                            <Input
-                                id="rd-installment"
-                                type="number"
-                                placeholder="10000"
-                                className="h-9 text-xs bg-card"
-                                value={principalRupees}
-                                onChange={(e) => setPrincipalRupees(e.target.value)}
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="rd-rate" className="text-xs font-medium text-muted-foreground">
-                                Interest Rate (%)
-                            </Label>
-                            <Input
-                                id="rd-rate"
-                                type="number"
-                                step="0.05"
-                                placeholder="7.00"
-                                className="h-9 text-xs bg-card"
-                                value={rate}
-                                onChange={(e) => setRate(e.target.value)}
-                            />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="rd-start" className="text-xs font-medium text-muted-foreground">
-                                Start Date
-                            </Label>
-                            <DatePicker
-                                id="rd-start"
-                                className="h-9 text-xs bg-card"
-                                value={startDate}
-                                onChange={setStartDate}
-                                placeholder="Select start date"
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="rd-tenure" className="text-xs font-medium text-muted-foreground">
-                                Tenure (Months)
-                            </Label>
-                            <Input
-                                id="rd-tenure"
-                                type="number"
-                                placeholder="12"
-                                className="h-9 text-xs bg-card"
-                                value={tenureMonths}
-                                onChange={(e) => setTenureMonths(e.target.value)}
-                            />
-                        </div>
-                    </div>
+                <div data-testid="kind-fields-rd">
+                    <RDFormFields
+                        monthlyInstallmentRupees={principalRupees}
+                        setMonthlyInstallmentRupees={setPrincipalRupees}
+                        startDate={startDate}
+                        setStartDate={setStartDate}
+                        installmentDay={installmentDay}
+                        setInstallmentDay={setInstallmentDay}
+                        firstInstallmentOn={firstInstallmentOn}
+                        setFirstInstallmentOn={setFirstInstallmentOn}
+                        tenureMonths={tenureMonths}
+                        setTenureMonths={setTenureMonths}
+                        interestRate={rate}
+                        setInterestRate={setRate}
+                        compounding={compounding}
+                        setCompounding={setCompounding}
+                        currentValueRupees={anchorRupees}
+                        setCurrentValueRupees={setAnchorRupees}
+                        payFromAccountId={payFromAccountId}
+                        setPayFromAccountId={setPayFromAccountId}
+                        autoDebit={autoDebit}
+                        setAutoDebit={setAutoDebit}
+                        bankAccounts={bankAccounts}
+                    />
                 </div>
             )}
 

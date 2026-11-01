@@ -346,10 +346,24 @@ export async function completeSetup(
         metadata.startDate = acc.startDate;
         metadata.maturityDate = acc.maturityDate;
       } else if (acc.kind === 'recurring_deposit') {
+        const startDay = acc.startDate ? parseInt(acc.startDate.slice(8, 10), 10) : 2;
+        const instDay = acc.installmentDay !== undefined ? acc.installmentDay : startDay;
+        const startM = (acc.startDate || new Date().toISOString().slice(0, 10)).slice(0, 7);
         metadata.monthlyInstallmentPaise = acc.monthlyInstallmentPaise;
+        metadata.installment = acc.monthlyInstallmentPaise;
         metadata.interestRate = acc.interestRate;
         metadata.startDate = acc.startDate;
         metadata.tenureMonths = acc.tenureMonths;
+        metadata.installmentDay = instDay;
+        metadata.firstInstallmentOn = acc.firstInstallmentOn || 'start_date';
+        metadata.compounding = acc.compoundingFrequency || 'quarterly';
+        metadata.compoundingFrequency = acc.compoundingFrequency || 'quarterly';
+        metadata.payFromAccountId = acc.payFromAccountId || null;
+        metadata.autoDebit = acc.autoDebit !== undefined ? acc.autoDebit : Boolean(acc.payFromAccountId);
+        metadata.installmentsMode = 'schedule';
+        metadata.installmentDayHistory = [{ effectiveFrom: startM, day: instDay }];
+        metadata.skippedInstallments = [];
+        metadata.paidLateInstallments = [];
       } else if (acc.kind === 'mutual_fund' || acc.kind === 'stocks') {
         metadata.openingContributionPaise = costBasisPaise;
         metadata.openingValuationPaise = valuationPaise;

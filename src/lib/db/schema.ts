@@ -347,4 +347,5 @@ export type AuditLogEntry = typeof auditLog.$inferSelect;
 export type InsertAuditLogEntry = typeof auditLog.$inferInsert;
 
 export * from './schema/data-store';
+export * from './schema/automation';
 

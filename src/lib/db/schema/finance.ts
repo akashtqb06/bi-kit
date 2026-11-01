@@ -29,6 +29,7 @@ export const finAccounts = pgTable(
             enum: [
                 'cash',
                 'bank',
+                'wallet',
                 'credit_card',
                 'fixed_deposit',
                 'recurring_deposit',

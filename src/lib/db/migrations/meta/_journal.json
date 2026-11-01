@@ -36,6 +36,13 @@
       "when": 1793294394233,
       "tag": "0004_colorful_titanium_man",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793400000000,
+      "tag": "0005_automation",
+      "breakpoints": true
     }
   ]
 }

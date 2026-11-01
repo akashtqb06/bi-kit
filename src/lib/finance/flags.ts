@@ -7,7 +7,8 @@ export type FinanceFeature =
   | 'setup'
   | 'budgets'
   | 'recurring'
-  | 'import';
+  | 'import'
+  | 'inbox';
 
 export const ALL_FINANCE_FEATURES: readonly FinanceFeature[] = [
   'overview',
@@ -17,6 +18,7 @@ export const ALL_FINANCE_FEATURES: readonly FinanceFeature[] = [
   'budgets',
   'recurring',
   'import',
+  'inbox',
 ] as const;
 
 /**
@@ -31,6 +33,7 @@ export const DEFAULT_ENABLED_FEATURES: readonly FinanceFeature[] = [
   'budgets',
   'recurring',
   'import',
+  'inbox',
 ] as const;
 
 export function enabledFeatures(): Set<FinanceFeature> {

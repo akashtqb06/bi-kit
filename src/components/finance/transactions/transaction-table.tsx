@@ -53,6 +53,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useFinanceStore } from '../shared/finance-store';
+import { todayInTz, yesterdayInTz, DEFAULT_TZ } from '@src/lib/finance/timezone';
 import { formatINR } from '../shared/format';
 import { TransactionEditDialog } from './transaction-edit-dialog';
 import { getDeterministicCategoryColor } from '@src/lib/finance/colors';
@@ -115,13 +116,9 @@ export function TransactionTable({ accountId }: { accountId?: string } = {}) {
   const [bulkAccountTarget, setBulkAccountTarget] = useState('');
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
 
-  // Today and Yesterday reference strings
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
-  const yesterdayStr = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
-  }, []);
+  // Today and Yesterday reference strings in user timezone (Asia/Kolkata)
+  const todayStr = useMemo(() => todayInTz(DEFAULT_TZ), []);
+  const yesterdayStr = useMemo(() => yesterdayInTz(DEFAULT_TZ), []);
 
   // Filtered transactions
   const filteredTransactions = useMemo(() => {

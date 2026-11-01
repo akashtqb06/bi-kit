@@ -2,10 +2,6 @@ import { z } from 'zod';
 import {
   ACCOUNT_KINDS,
   COMPOUNDING_FREQUENCIES,
-  DEFAULT_EXPENSE_CATEGORIES,
-  DEFAULT_INCOME_CATEGORIES,
-  type AccountKind,
-  type CompoundingFrequency,
 } from '../constants';
 
 export const setupPreferencesSchema = z.object({
@@ -25,7 +21,7 @@ export const draftAccountSchema = z.object({
   kind: z.enum(ACCOUNT_KINDS),
   institution: z.string().optional(),
   // All monetary values here in integer paise
-  balancePaise: z.number().int().optional().default(0), // For cash, bank, other_asset
+  balancePaise: z.number().int().optional().default(0), // For cash, bank, wallet, other_asset
   owedPaise: z.number().int().min(0).optional().default(0), // For cards and loans (entered positive, stored negative)
   creditLimitPaise: z.number().int().min(0).optional(),
   statementDay: z.number().int().min(1).max(31).optional(),
@@ -41,6 +37,20 @@ export const draftAccountSchema = z.object({
   maturityDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   tenureMonths: z.number().int().min(1).optional(),
   currentValuePaise: z.number().int().min(0).optional(),
+  installmentDay: z.union([z.number().int().min(1).max(31), z.literal('last')]).optional(),
+  firstInstallmentOn: z.enum(['start_date', 'first_installment_day']).optional(),
+  payFromAccountId: z.string().nullable().optional(),
+  autoDebit: z.boolean().optional(),
+  installmentDayHistory: z
+    .array(
+      z.object({
+        effectiveFrom: z.string(),
+        day: z.union([z.number(), z.literal('last')]),
+      })
+    )
+    .optional(),
+  skippedInstallments: z.array(z.string()).optional(),
+  paidLateInstallments: z.array(z.object({ dueDate: z.string(), paidDate: z.string() })).optional(),
   // For investments
   totalInvestedPaise: z.number().int().min(0).optional(),
   // For loans

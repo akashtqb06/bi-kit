@@ -26,6 +26,8 @@ import {
 import type { DraftAccount } from '@src/lib/finance/setup/types';
 import { parseMoneyToPaise } from '@src/lib/finance/import/number-parser';
 import { AlertCircleIcon, InfoIcon } from 'lucide-react';
+import { RDFormFields } from '../accounts/rd-form-fields';
+import type { RDCompounding, RDFirstInstallmentOn } from '@src/lib/finance/domain/rd';
 
 interface AccountFormDialogProps {
   open: boolean;
@@ -91,6 +93,20 @@ export function AccountFormDialog({
       : ''
   );
 
+  // RD-specific state
+  const [installmentDay, setInstallmentDay] = useState<number | 'last'>(
+    initialAccount?.installmentDay ?? 2
+  );
+  const [firstInstallmentOn, setFirstInstallmentOn] = useState<RDFirstInstallmentOn>(
+    initialAccount?.firstInstallmentOn || 'start_date'
+  );
+  const [payFromAccountId, setPayFromAccountId] = useState<string | null>(
+    initialAccount?.payFromAccountId || null
+  );
+  const [autoDebit, setAutoDebit] = useState<boolean>(
+    initialAccount?.autoDebit !== undefined ? initialAccount.autoDebit : true
+  );
+
   // Investments
   const [totalInvested, setTotalInvested] = useState(
     initialAccount?.totalInvestedPaise
@@ -132,9 +148,7 @@ export function AccountFormDialog({
     let totalInvestedPaise: number | undefined;
     let emiPaise: number | undefined;
 
-    if (kind === 'cash') {
-      balancePaise = toPaise(balance);
-    } else if (kind === 'bank') {
+    if (kind === 'cash' || kind === 'bank' || kind === 'wallet') {
       balancePaise = toPaise(balance);
     } else if (kind === 'credit_card') {
       owedPaise = Math.abs(toPaise(owed));
@@ -205,6 +219,10 @@ export function AccountFormDialog({
       currentValuePaise,
       totalInvestedPaise,
       emiPaise,
+      installmentDay: kind === 'recurring_deposit' ? installmentDay : undefined,
+      firstInstallmentOn: kind === 'recurring_deposit' ? firstInstallmentOn : undefined,
+      payFromAccountId: kind === 'recurring_deposit' ? payFromAccountId : undefined,
+      autoDebit: kind === 'recurring_deposit' ? autoDebit : undefined,
     };
 
     onSave(account);
@@ -246,7 +264,8 @@ export function AccountFormDialog({
             <Select
               items={[
                 { value: 'bank', label: 'Bank / Savings Account' },
-                { value: 'cash', label: 'Cash / Physical Wallet' },
+                { value: 'cash', label: 'Cash' },
+                { value: 'wallet', label: 'Digital Wallet (Paytm, Amazon Pay, etc.)' },
                 { value: 'credit_card', label: 'Credit Card (Liability)' },
                 { value: 'fixed_deposit', label: 'Fixed Deposit (FD)' },
                 { value: 'recurring_deposit', label: 'Recurring Deposit (RD)' },
@@ -264,7 +283,8 @@ export function AccountFormDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="bank">Bank / Savings Account</SelectItem>
-                <SelectItem value="cash">Cash / Physical Wallet</SelectItem>
+                <SelectItem value="cash">Cash</SelectItem>
+                <SelectItem value="wallet">Digital Wallet (Paytm, Amazon Pay, etc.)</SelectItem>
                 <SelectItem value="credit_card">Credit Card (Liability)</SelectItem>
                 <SelectItem value="fixed_deposit">Fixed Deposit (FD)</SelectItem>
                 <SelectItem value="recurring_deposit">Recurring Deposit (RD)</SelectItem>
@@ -292,15 +312,15 @@ export function AccountFormDialog({
             />
           </div>
 
-          {/* Institution (Bank / Broker) */}
-          {['bank', 'credit_card', 'fixed_deposit', 'recurring_deposit', 'mutual_fund', 'stocks', 'loan'].includes(kind) && (
+          {/* Institution (Bank / Broker / Wallet Provider) */}
+          {['bank', 'credit_card', 'fixed_deposit', 'recurring_deposit', 'mutual_fund', 'stocks', 'loan', 'wallet'].includes(kind) && (
             <div className="space-y-1.5">
               <Label htmlFor="acc-inst" className="text-xs font-semibold">
-                Financial Institution / Broker
+                {kind === 'wallet' ? 'Wallet Provider' : 'Financial Institution / Broker'}
               </Label>
               <Input
                 id="acc-inst"
-                placeholder="e.g. HDFC Bank, SBI, Zerodha, Groww"
+                placeholder={kind === 'wallet' ? 'e.g. Paytm, Amazon Pay, PhonePe' : 'e.g. HDFC Bank, SBI, Zerodha, Groww'}
                 value={institution}
                 onChange={(e) => setInstitution(e.target.value)}
                 className="text-xs"
@@ -308,8 +328,8 @@ export function AccountFormDialog({
             </div>
           )}
 
-          {/* Cash / Bank Balance */}
-          {['cash', 'bank', 'other_asset', 'other_liability'].includes(kind) && (
+          {/* Cash / Bank / Wallet Balance */}
+          {['cash', 'bank', 'wallet', 'other_asset', 'other_liability'].includes(kind) && (
             <div className="space-y-1.5">
               <Label htmlFor="acc-balance" className="text-xs font-semibold">
                 Current Balance (₹)
@@ -494,76 +514,29 @@ export function AccountFormDialog({
 
           {/* Recurring Deposit Specific Fields */}
           {kind === 'recurring_deposit' && (
-            <div className="space-y-3 p-3 rounded-lg bg-muted/40 border">
-              <div className="space-y-1.5">
-                <Label htmlFor="acc-rd-inst" className="text-xs font-semibold">
-                  Monthly Installment (₹)
-                </Label>
-                <Input
-                  id="acc-rd-inst"
-                  placeholder="e.g. 5,000"
-                  value={monthlyInstallment}
-                  onChange={(e) => setMonthlyInstallment(e.target.value)}
-                  className="text-xs"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label htmlFor="acc-rd-rate" className="text-xs font-semibold">
-                    Interest Rate (% p.a.)
-                  </Label>
-                  <Input
-                    id="acc-rd-rate"
-                    placeholder="7.0"
-                    value={interestRate}
-                    onChange={(e) => setInterestRate(e.target.value)}
-                    className="text-xs"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <Label htmlFor="acc-rd-tenure" className="text-xs font-semibold">
-                    Tenure (Months)
-                  </Label>
-                  <Input
-                    id="acc-rd-tenure"
-                    type="number"
-                    min={1}
-                    placeholder="12"
-                    value={tenureMonths}
-                    onChange={(e) => setTenureMonths(e.target.value)}
-                    className="text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="acc-rd-start" className="text-xs font-semibold">
-                  Start Date
-                </Label>
-                <DatePicker
-                  id="acc-rd-start"
-                  value={startDate}
-                  onChange={setStartDate}
-                  className="text-xs"
-                  placeholder="Select start date"
-                />
-              </div>
-
-              <div className="space-y-1.5 pt-1">
-                <Label htmlFor="acc-rd-val" className="text-[11px] text-muted-foreground">
-                  Current Value (Optional override)
-                </Label>
-                <Input
-                  id="acc-rd-val"
-                  placeholder="Leave empty to auto-compute"
-                  value={currentValue}
-                  onChange={(e) => setCurrentValue(e.target.value)}
-                  className="text-xs"
-                />
-              </div>
+            <div data-testid="kind-fields-rd">
+              <RDFormFields
+                monthlyInstallmentRupees={monthlyInstallment}
+                setMonthlyInstallmentRupees={setMonthlyInstallment}
+                startDate={startDate}
+                setStartDate={setStartDate}
+                installmentDay={installmentDay}
+                setInstallmentDay={setInstallmentDay}
+                firstInstallmentOn={firstInstallmentOn}
+                setFirstInstallmentOn={setFirstInstallmentOn}
+                tenureMonths={tenureMonths}
+                setTenureMonths={setTenureMonths}
+                interestRate={interestRate}
+                setInterestRate={setInterestRate}
+                compounding={compounding as RDCompounding}
+                setCompounding={(c) => setCompounding(c as CompoundingFrequency)}
+                currentValueRupees={currentValue}
+                setCurrentValueRupees={setCurrentValue}
+                payFromAccountId={payFromAccountId}
+                setPayFromAccountId={setPayFromAccountId}
+                autoDebit={autoDebit}
+                setAutoDebit={setAutoDebit}
+              />
             </div>
           )}
 

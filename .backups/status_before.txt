@@ -1,0 +1,26 @@
+ M src/app/(app)/layout.tsx
+ M src/app/(app)/settings/layout.tsx
+ M src/app/(auth)/layout.tsx
+ M src/app/(auth)/login/login-form.tsx
+ M src/app/(auth)/login/page.tsx
+ M src/app/api/admin/settings/route.ts
+ M src/app/workbooks/[wid]/layout.tsx
+ M src/components/layout/app-sidebar.tsx
+ M src/components/layout/keyboard-shortcuts-dialog.tsx
+ M src/components/settings/general-settings-form.tsx
+ M src/components/settings/security-form.tsx
+ M src/components/settings/settings-nav.tsx
+ M src/components/settings/users-admin-table.tsx
+ M src/components/workbook/workbook-header.tsx
+ M src/lib/auth/actions.ts
+ M src/lib/auth/dal.ts
+ M src/lib/auth/policy-integration.test.ts
+ M src/lib/auth/settings-actions.ts
+ M src/lib/settings/app-settings.ts
+ M src/lib/settings/general-settings.test.ts
+ M src/proxy.ts
+?? .backups/
+?? src/app/api/settings/public/
+?? src/components/settings/app-settings-provider.test.tsx
+?? src/components/settings/app-settings-provider.tsx
+?? src/lib/auth/forced-security.test.ts

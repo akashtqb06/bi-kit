@@ -91,14 +91,14 @@ export function calculateReviewTotals(
         const val = acc.currentValuePaise || acc.balancePaise || 0;
         totalAssetsPaise += Math.max(0, val);
       } else {
-        // Cash, Bank, Other asset
+        // Cash, Bank, Wallet, Other asset
         const bal = acc.balancePaise || 0;
-        if (acc.kind === 'cash' && bal < 0) {
+        if ((acc.kind === 'cash' || acc.kind === 'wallet') && bal < 0) {
           warnings.push({
             accountId: acc.id,
             accountName: acc.name,
             type: 'negative_cash',
-            message: `Cash account "${acc.name}" has a negative balance (₹${(bal / 100).toFixed(2)}).`,
+            message: `${acc.kind === 'wallet' ? 'Wallet' : 'Cash'} account "${acc.name}" has a negative balance (₹${(bal / 100).toFixed(2)}).`,
           });
         }
         totalAssetsPaise += bal;

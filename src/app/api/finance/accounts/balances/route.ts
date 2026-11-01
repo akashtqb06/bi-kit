@@ -9,22 +9,27 @@ import type { AccountWithBalance } from '@src/components/finance/shared/fixtures
 import {
   calculateFDAccruedValue,
   calculateFDMaturity,
-  calculateRDAccruedValue,
-  calculateRDMaturity,
-  calculateRDTotalDeposited,
-  getNextInstallmentDate,
   addMonthsToDate,
   normalizeInterestRate,
 } from '@src/lib/finance/domain/deposits';
+import {
+  rdValue,
+  deriveMaturityDate,
+  type RDConfig,
+  type RDCompounding,
+  type RDDayHistoryItem,
+  type RDLatePaymentItem,
+} from '@src/lib/finance/domain/rd';
 import type { CompoundingFrequency } from '@src/lib/finance/constants';
 import { calculateCardDates } from '@src/lib/finance/domain/credit-card';
+import { todayInTz, DEFAULT_TZ } from '@src/lib/finance/timezone';
 
 
 export async function GET() {
   try {
     const user = await requireUserApi();
     const userId = user.id;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayInTz(DEFAULT_TZ);
 
     // Fetch all active accounts
     const accs = await db
@@ -68,6 +73,7 @@ export async function GET() {
               value: finValuations.value,
               costBasis: finValuations.costBasis,
               date: finValuations.date,
+              note: finValuations.note,
             })
             .from(finValuations)
             .where(
@@ -86,13 +92,49 @@ export async function GET() {
     for (const r of targetSums) {
       if (r.accountId) targetMap.set(r.accountId, Number(r.total));
     }
-    const valMap = new Map<string, { value: number; costBasis: number | null }>();
+    const valMap = new Map<string, { value: number; costBasis: number | null; date: string; note: string | null }>();
+    const manualAnchorMap = new Map<string, { value: number; date: string }>();
     for (const v of valRows) {
       if (!valMap.has(v.accountId)) {
         valMap.set(v.accountId, {
           value: Number(v.value),
           costBasis: v.costBasis !== null && v.costBasis !== undefined ? Number(v.costBasis) : null,
+          date: v.date,
+          note: v.note,
         });
+      }
+      if (!manualAnchorMap.has(v.accountId) && v.note !== 'computed') {
+        manualAnchorMap.set(v.accountId, {
+          value: Number(v.value),
+          date: v.date,
+        });
+      }
+    }
+
+    // Query transfers for recurring deposits if any
+    const hasRD = accs.some((a) => a.kind === 'recurring_deposit');
+    const rdTransfersByAccount = new Map<string, Array<{ date: string; amount: number }>>();
+    if (hasRD) {
+      const transferRows = await db
+        .select({
+          toAccountId: finTransactions.toAccountId,
+          date: finTransactions.date,
+          amount: finTransactions.amount,
+        })
+        .from(finTransactions)
+        .where(
+          and(
+            eq(finTransactions.userId, userId),
+            eq(finTransactions.type, 'transfer'),
+            isNull(finTransactions.deletedAt)
+          )
+        );
+      for (const t of transferRows) {
+        if (t.toAccountId) {
+          const list = rdTransfersByAccount.get(t.toAccountId) ?? [];
+          list.push({ date: t.date, amount: Number(t.amount) });
+          rdTransfersByAccount.set(t.toAccountId, list);
+        }
       }
     }
 
@@ -178,52 +220,61 @@ export async function GET() {
             meta.installmentAmount ??
             0
         );
-        const rawRate = Number(meta.interestRate ?? meta.rate ?? 0.07);
+        const rawRate = Number(meta.interestRate ?? meta.rate ?? 6.8);
         interestRate = rawRate > 1 ? rawRate : Number((rawRate * 100).toFixed(2));
-        const normRate = normalizeInterestRate(rawRate);
         const startDate =
           (meta.startDate as string) ||
           (acc.createdAt instanceof Date ? acc.createdAt.toISOString().slice(0, 10) : String(acc.createdAt).slice(0, 10));
         const tenureMonths = Number(meta.tenureMonths || 12);
         totalInstallments = tenureMonths;
-        maturityDate = (meta.maturityDate as string) || addMonthsToDate(startDate, tenureMonths);
+        const installmentDay =
+          meta.installmentDay !== undefined
+            ? (meta.installmentDay as number | 'last')
+            : parseInt(startDate.slice(8, 10), 10);
+        const firstInstallmentOn =
+          (meta.firstInstallmentOn as 'start_date' | 'first_installment_day') || 'start_date';
+        const compounding = (meta.compoundingFrequency ??
+          meta.compounding ??
+          'quarterly') as RDCompounding;
+        const installmentsMode =
+          (meta.installmentsMode as 'schedule' | 'recorded') ||
+          (meta.installmentMode === 'recorded_transfers' ? 'recorded' : 'schedule');
+        const startMonth = startDate.slice(0, 7);
+        const installmentDayHistory =
+          (meta.installmentDayHistory as RDDayHistoryItem[]) &&
+          (meta.installmentDayHistory as RDDayHistoryItem[]).length > 0
+            ? (meta.installmentDayHistory as RDDayHistoryItem[])
+            : [{ effectiveFrom: startMonth, day: installmentDay }];
+        const skippedInstallments = (meta.skippedInstallments as string[]) || [];
+        const paidLateInstallments = (meta.paidLateInstallments as RDLatePaymentItem[]) || [];
+        maturityDate = (meta.maturityDate as string) || deriveMaturityDate(startDate, tenureMonths);
 
-        const depInfo = calculateRDTotalDeposited({
+        const rdConfig: RDConfig = {
           monthlyInstallment,
           startDate,
+          installmentDay,
+          firstInstallmentOn,
           tenureMonths,
-          asOfDate: today,
-        });
-        installmentsPaid = depInfo.installmentsPaid;
-        totalDeposited = depInfo.totalDeposited;
+          maturityDate,
+          interestRate,
+          compounding,
+          installmentsMode,
+          installmentDayHistory,
+          skippedInstallments,
+          paidLateInstallments,
+          recordedTransfers: rdTransfersByAccount.get(acc.id) || [],
+        };
 
-        const mat = calculateRDMaturity({
-          monthlyInstallment,
-          annualInterestRate: normRate,
-          startDate,
-          tenureMonths,
-        });
-        projectedMaturityAmount = mat.maturityAmount;
+        const manualAnchor = manualAnchorMap.get(acc.id);
+        const rdRes = rdValue(rdConfig, today, manualAnchor);
 
-        accruedValue = valuation
-          ? valuation.value
-          : calculateRDAccruedValue({
-              monthlyInstallment,
-              annualInterestRate: normRate,
-              startDate,
-              tenureMonths,
-              asOfDate: today,
-            });
-
+        installmentsPaid = rdRes.installmentsPaid;
+        totalDeposited = rdRes.totalDeposited;
+        projectedMaturityAmount = rdRes.projectedMaturityValue;
+        accruedValue = rdRes.currentValue;
         interestEarned = Math.max(0, accruedValue - totalDeposited);
-        daysToMaturity = Math.max(
-          0,
-          Math.round(
-            (new Date(`${maturityDate}T00:00:00Z`).getTime() - new Date(`${today}T00:00:00Z`).getTime()) /
-              (86400 * 1000)
-          )
-        );
-        nextInstallmentDate = getNextInstallmentDate(startDate, tenureMonths, today) || undefined;
+        daysToMaturity = rdRes.daysToMaturity;
+        nextInstallmentDate = rdRes.nextInstallmentDate || undefined;
       } else if (dto.kind === 'credit_card') {
         const stmtDay = meta.statementDay !== undefined ? Number(meta.statementDay) : 21;
         const dDay =

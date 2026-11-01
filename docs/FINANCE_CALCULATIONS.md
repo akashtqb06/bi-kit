@@ -7,39 +7,44 @@ This document specifies the official calculation rules and conventions for the B
 ## 1. Recurring Deposit (RD) Calculations
 
 ### 1.1 Formula & Compounding Convention
-Indian banking standard for Recurring Deposits compounds quarterly ($n = 4$) at nominal annual rate $r\%$ (or fraction $r/100$).
-Installments of amount $R$ (in minor units, paise) are deposited monthly on the installment day from the account's start date up to $\min(\text{as-of date}, \text{maturity date})$.
+Installments of amount $R$ (in minor units, paise) are deposited monthly starting from the account opening date (`startDate`).
+- **Installment Day**: Configurable day of month (1–31 or `'last'`). Clamped to the calendar length of each month.
+- **First Installment Choice**:
+  - `'start_date'` (default): 1st installment is paid on `startDate`; installments 2..M fall on `installmentDay` in subsequent months.
+  - `'first_installment_day'`: 1st installment falls on the first occurrence of `installmentDay` strictly after `startDate`; installments 2..M follow in subsequent months.
+- **Compounding**: Default is quarterly ($q = 4$). Each paid installment compounds from its actual deposit date ($D_i$) to evaluation date ($asOf$):
 
-For each installment $m$, let $t_m$ be the tenure (in months) that the installment remains invested as of the evaluation date:
+$$\text{value}(asOf) = \sum_{D_i \le asOf} R \times \left(1 + \frac{r}{100 \times q}\right)^{q \times \frac{asOf - D_i}{365}}$$
 
-$$\text{value}(asOf) = \sum_{\text{deposited installments}} R \times \left(1 + \frac{r}{400}\right)^{\frac{\text{months since that deposit}}{3}}$$
+Where $r$ is the annual rate percent (e.g. 6.8). Late payments compound from their actual payment date `paidDate`.
 
-At full maturity ($M$ months tenure):
-The $M$-th installment deposited 1 month before maturity is invested for 1 month ($k = 1$).
-The 1st installment deposited at start date is invested for $M$ months ($k = M$).
-
-$$\text{maturityAmount} = \sum_{k=1}^{M} R \times \left(1 + \frac{r}{400}\right)^{\frac{k}{3}}$$
+- **Maturity Projection**:
+$$\text{projectedMaturityValue} = \sum_{i=1}^{M} R \times \left(1 + \frac{r}{100 \times q}\right)^{q \times \frac{\text{maturityDate} - D_i}{365}}$$
 
 - **Total Invested**: $\sum R$ (or $R \times M$ for full tenure).
 - **Interest Earned**: $\text{value}(asOf) - \text{total deposited}$.
 - **TDS**: Ignored in calculations.
+- **Reconciliation with Bank Passbooks**: Financial institutions apply differing day-count conventions and quarter-end rules. Passbook balance can be recorded as a manual valuation anchor to guarantee 0-discrepancy reconciliation.
 
 ### 1.2 Installment Sourcing Modes
-Configured per account via `metadata.installmentMode`:
-1. **`assume_schedule` (Default)**:
+Configured per account via `metadata.installmentsMode` (or legacy `metadata.installmentMode`):
+1. **`schedule` (Default)**:
    Installments are assumed to have been deposited on the scheduled installment day of each month from the start date up to $\min(\text{asOfDate}, \text{maturityDate})$.
-   If the start date day is the 31st (or exceeds month length), the installment date clamps to the last calendar day of each respective month (e.g. Feb 28/29, Apr 30).
-2. **`recorded_transfers`**:
+   If an installment is marked skipped (`skippedInstallments`), it does not accrue interest or increase total deposited.
+2. **`recorded`**:
    Installments are sourced strictly from recorded transfer transactions entering the RD account (`toAccountId = rd.id`, `deletedAt IS NULL`, `date <= asOfDate`).
 
 ### 1.3 Manual Valuation Anchor Rule
-If a manual valuation exists (for example, an actual current value entered during the onboarding setup journey or recorded as a valuation snapshot on anchor date $D_{\text{anchor}}$):
+If a manual valuation exists on anchor date $D_{\text{anchor}}$:
 - Treat the manual valuation as the anchor.
 - Accrue the anchor value forward from $D_{\text{anchor}}$ to $asOfDate$:
-  $$\text{value}_{\text{anchor-accrued}} = \text{anchorValue} \times \left(1 + \frac{r}{400}\right)^{\frac{\text{months between } D_{\text{anchor}} \text{ and } asOfDate}{3}}$$
-- Plus add new installments deposited strictly after $D_{\text{anchor}}$, each compounded for the months since that new deposit.
+  $$\text{value}_{\text{anchor-accrued}} = \text{anchorValue} \times \left(1 + \frac{r}{100 \times q}\right)^{q \times \frac{asOf - D_{\text{anchor}}}{365}}$$
+- Plus add new installments deposited strictly after $D_{\text{anchor}}$, each compounded for the days since that new deposit.
 - Total deposited is: $(\text{cost basis at anchor or sum of installments up to anchor}) + \sum (\text{new installments after anchor})$.
 - Interest earned = $\text{value}(asOf) - \text{total deposited}$.
+
+### 1.4 Changing Installment Day
+When changing the installment day, an entry `{ effectiveFrom: 'YYYY-MM', day: newDay }` is appended to `installmentDayHistory`. Past installments prior to `effectiveFrom` retain their historical due dates, and all subsequent installments adopt `newDay`. If auto-debit is enabled, the associated recurring transfer rule updates its schedule from the effective month forward.
 
 ---
 

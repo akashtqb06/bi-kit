@@ -29,6 +29,7 @@ import { useFinanceStore } from '../shared/finance-store';
 import { parseAmountExpression } from '../shared/expression-parser';
 import { getDeterministicCategoryColor } from '@src/lib/finance/colors';
 import { formatINR, formatAccountDisplayBalance } from '../shared/format';
+import { todayInTz, yesterdayInTz, DEFAULT_TZ } from '@src/lib/finance/timezone';
 import type { TransactionType } from '@src/lib/finance/constants';
 import type { CreateTransactionDTO } from '@src/lib/finance/contract';
 import { cn } from '@/lib/utils';
@@ -59,7 +60,7 @@ export function QuickAddForm({
   const [payee, setPayee] = useState('');
   const [note, setNote] = useState('');
   const [dateSelection, setDateSelection] = useState<'today' | 'yesterday' | 'custom'>('today');
-  const [customDate, setCustomDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [customDate, setCustomDate] = useState(() => todayInTz(DEFAULT_TZ));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
@@ -68,19 +69,15 @@ export function QuickAddForm({
   const defaultAssetAccountId = useMemo(() => {
     const lastAcc = accounts.find((a) => a.id === lastUsedAccountId);
     if (lastAcc && lastAcc.class === 'asset') return lastAcc.id;
-    const firstBankOrCash = accounts.find((a) => (a.kind === 'bank' || a.kind === 'cash') && a.isActive);
+    const firstBankOrCash = accounts.find((a) => (a.kind === 'bank' || a.kind === 'cash' || a.kind === 'wallet') && a.isActive);
     if (firstBankOrCash) return firstBankOrCash.id;
     const firstAsset = accounts.find((a) => a.class === 'asset' && a.isActive);
     return firstAsset?.id || accounts[0]?.id || '';
   }, [accounts, lastUsedAccountId]);
 
-  // Today and Yesterday date strings
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
-  const yesterdayStr = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
-  }, []);
+  // Today and Yesterday date strings in user timezone (Asia/Kolkata)
+  const todayStr = useMemo(() => todayInTz(DEFAULT_TZ), []);
+  const yesterdayStr = useMemo(() => yesterdayInTz(DEFAULT_TZ), []);
 
   const activeDate = useMemo(() => {
     if (dateSelection === 'today') return todayStr;
@@ -568,64 +565,55 @@ export function QuickAddForm({
 
       {/* Date Selector */}
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-muted-foreground">Date</Label>
-        <div
-          role="radiogroup"
-          aria-label="Transaction Date"
-          className="grid grid-cols-3 gap-1.5"
-        >
-          <button
-            type="button"
-            role="radio"
-            aria-checked={dateSelection === 'today'}
-            className={cn(
-              'h-8 text-xs font-medium rounded-md border transition-colors',
-              dateSelection === 'today'
-                ? 'bg-primary text-primary-foreground border-primary font-semibold'
-                : 'bg-card text-muted-foreground hover:bg-muted'
-            )}
-            onClick={() => setDateSelection('today')}
-          >
-            Today
-          </button>
-          <button
-            type="button"
-            role="radio"
-            aria-checked={dateSelection === 'yesterday'}
-            className={cn(
-              'h-8 text-xs font-medium rounded-md border transition-colors',
-              dateSelection === 'yesterday'
-                ? 'bg-primary text-primary-foreground border-primary font-semibold'
-                : 'bg-card text-muted-foreground hover:bg-muted'
-            )}
-            onClick={() => setDateSelection('yesterday')}
-          >
-            Yesterday
-          </button>
-          <button
-            type="button"
-            role="radio"
-            aria-checked={dateSelection === 'custom'}
-            className={cn(
-              'h-8 text-xs font-medium rounded-md border transition-colors flex items-center justify-center gap-1',
-              dateSelection === 'custom'
-                ? 'bg-primary text-primary-foreground border-primary font-semibold'
-                : 'bg-card text-muted-foreground hover:bg-muted'
-            )}
-            onClick={() => setDateSelection('custom')}
-          >
-            <CalendarIcon className="size-3" />
-            <span>Pick date</span>
-          </button>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="transaction-date-picker" className="text-xs font-medium text-muted-foreground">
+            Transaction Date
+          </Label>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              className={cn(
+                'px-2.5 py-0.5 text-[11px] rounded font-medium transition-colors border',
+                activeDate === todayStr
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-muted/40 text-muted-foreground border-border hover:bg-muted'
+              )}
+              onClick={() => {
+                setCustomDate(todayStr);
+                setDateSelection('today');
+              }}
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              className={cn(
+                'px-2.5 py-0.5 text-[11px] rounded font-medium transition-colors border',
+                activeDate === yesterdayStr
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-muted/40 text-muted-foreground border-border hover:bg-muted'
+              )}
+              onClick={() => {
+                setCustomDate(yesterdayStr);
+                setDateSelection('yesterday');
+              }}
+            >
+              Yesterday
+            </button>
+          </div>
         </div>
-        {dateSelection === 'custom' && (
-          <DatePicker
-            className="h-8 text-xs mt-1.5 bg-card"
-            value={customDate}
-            onChange={setCustomDate}
-            placeholder="Select date"
-          />
-        )}
+        <DatePicker
+          id="transaction-date-picker"
+          className="h-9 text-xs w-full bg-card"
+          value={activeDate}
+          onChange={(newDate) => {
+            setCustomDate(newDate);
+            if (newDate === todayStr) setDateSelection('today');
+            else if (newDate === yesterdayStr) setDateSelection('yesterday');
+            else setDateSelection('custom');
+          }}
+          placeholder="Select transaction date"
+        />
       </div>
 
       {/* Payee and Note */}

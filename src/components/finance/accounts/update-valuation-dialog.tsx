@@ -16,6 +16,7 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { Label } from '@/components/ui/label';
 import { useFinanceStore } from '../shared/finance-store';
 import { rupeesToPaise } from '../shared/format';
+import { todayInTz, DEFAULT_TZ } from '@src/lib/finance/timezone';
 import type { AccountWithBalance } from '../shared/fixtures';
 
 export function UpdateValuationDialog({
@@ -31,7 +32,7 @@ export function UpdateValuationDialog({
 
   const [valueRupees, setValueRupees] = useState('');
   const [costBasisRupees, setCostBasisRupees] = useState('');
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(() => todayInTz(DEFAULT_TZ));
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +42,7 @@ export function UpdateValuationDialog({
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setValueRupees(((account.currentValue || account.balance) / 100).toString());
       setCostBasisRupees(((account.costBasis || account.balance) / 100).toString());
-      setDate(new Date().toISOString().split('T')[0]);
+      setDate(todayInTz(DEFAULT_TZ));
       setNote('');
       setError(null);
     }

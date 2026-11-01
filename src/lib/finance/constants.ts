@@ -1,6 +1,7 @@
 export const ACCOUNT_KINDS = [
   'cash',
   'bank',
+  'wallet',
   'credit_card',
   'fixed_deposit',
   'recurring_deposit',
@@ -19,6 +20,7 @@ export type AccountClass = (typeof ACCOUNT_CLASSES)[number];
 export const ACCOUNT_KIND_CLASS_MAP: Record<AccountKind, AccountClass> = {
   cash: 'asset',
   bank: 'asset',
+  wallet: 'asset',
   credit_card: 'liability',
   fixed_deposit: 'asset',
   recurring_deposit: 'asset',

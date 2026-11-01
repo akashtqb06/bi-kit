@@ -24,6 +24,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DatePicker } from '@/components/ui/date-picker';
+import { todayInTz, DEFAULT_TZ } from '@src/lib/finance/timezone';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -67,7 +68,7 @@ export function PayBillForm() {
   const [toCardId, setToCardId] = useState('');
   const [fromAccountId, setFromAccountId] = useState('');
   const [amountInput, setAmountInput] = useState('');
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(() => todayInTz(DEFAULT_TZ));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -112,7 +113,7 @@ export function PayBillForm() {
       setFromAccountId(sortedBank[0]?.id || accounts[0]?.id || '');
     }
 
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate(todayInTz(DEFAULT_TZ));
     setErrors({});
   }, [payBillCardId, creditCards, bankAndCashAccounts, accounts, transactions]);
 
