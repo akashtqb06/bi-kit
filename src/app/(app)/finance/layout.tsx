@@ -12,9 +12,11 @@ import {
   CalendarSyncIcon,
   UploadCloudIcon,
   TagsIcon,
+  InboxIcon,
 } from 'lucide-react';
 import { SetupBanner } from '@src/components/finance/setup/setup-banner';
 import { FinanceInitializer } from '@src/components/finance/shared/finance-initializer';
+import { InboxCountBadge } from '@src/components/finance/inbox/inbox-badge';
 import { isFeatureEnabled, type FinanceFeature } from '@src/lib/finance/flags';
 
 interface FinanceTabItem {
@@ -27,6 +29,7 @@ interface FinanceTabItem {
 const financeTabs: readonly FinanceTabItem[] = [
   { label: 'Overview', href: '/finance/overview', icon: LayoutDashboardIcon, feature: 'overview' },
   { label: 'Transactions', href: '/finance/transactions', icon: ArrowLeftRightIcon, feature: 'transactions' },
+  { label: 'Inbox', href: '/finance/inbox', icon: InboxIcon, feature: 'inbox' },
   { label: 'Accounts', href: '/finance/accounts', icon: LandmarkIcon, feature: 'accounts' },
   { label: 'Budgets', href: '/finance/budgets', icon: PiggyBankIcon, feature: 'budgets' },
   { label: 'Recurring', href: '/finance/recurring', icon: CalendarSyncIcon, feature: 'recurring' },
@@ -87,6 +90,7 @@ export default function FinanceLayout({
               >
                 <tab.icon className="size-3.5" />
                 <span>{tab.label}</span>
+                {tab.href === '/finance/inbox' && <InboxCountBadge />}
               </Link>
             );
           })}

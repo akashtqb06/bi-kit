@@ -82,7 +82,11 @@ export function TransactionTable({ accountId }: { accountId?: string } = {}) {
 
   const sourceTransactions = useMemo(() => {
     if (accountId) {
-      return transactionsByAccount[accountId]?.transactions || [];
+      const cached = transactionsByAccount[accountId]?.transactions;
+      if (cached) return cached;
+      return globalTransactions.filter(
+        (t) => t.accountId === accountId || t.toAccountId === accountId
+      );
     }
     return globalTransactions;
   }, [accountId, transactionsByAccount, globalTransactions]);

@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@src/lib/db';
 import {
   finAccounts,
@@ -11,7 +11,6 @@ import {
 } from '@src/lib/db';
 import { newId } from '@src/lib/db/id';
 import type { ApproveItemInput } from '../ingest/schema';
-import type { NotFoundError } from '@src/lib/connectors/types';
 import { BadRequestError } from '@src/app/api/utils';
 
 // Re-export for convenience

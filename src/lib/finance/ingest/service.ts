@@ -1,16 +1,15 @@
 import 'server-only';
 
-import { and, desc, eq, gte, isNull, lte, ne, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, lte } from 'drizzle-orm';
 import { db } from '@src/lib/db';
 import {
   finAccounts,
-  finCategories,
   finInbox,
   finTransactions,
   payeeRules,
 } from '@src/lib/db';
 import { newId } from '@src/lib/db/id';
-import type { IngestItem } from './schema';
+import { type IngestItem, type IngestItemInput, ingestItemSchema } from './schema';
 
 // ============================================================================
 // Types
@@ -230,17 +229,18 @@ function buildImportHash(userId: string, item: IngestItem): string {
 
 export async function ingestItems(
   userId: string,
-  items: IngestItem[]
+  items: IngestItemInput[]
 ): Promise<IngestResult[]> {
   const results: IngestResult[] = [];
 
-  for (const item of items) {
+  for (const rawItem of items) {
     try {
+      const item = ingestItemSchema.parse(rawItem);
       results.push(await ingestSingleItem(userId, item));
     } catch (err) {
-      console.error('[Ingest] Failed to process item', item.idempotencyKey, err);
+      console.error('[Ingest] Failed to process item', rawItem.idempotencyKey, err);
       results.push({
-        idempotencyKey: item.idempotencyKey,
+        idempotencyKey: rawItem.idempotencyKey,
         status: 'error',
         duplicate: false,
         reason: 'Internal processing error',

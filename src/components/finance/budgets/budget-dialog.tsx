@@ -47,7 +47,6 @@ interface BudgetFormProps {
   onCancel?: () => void;
   onCopyLastMonth?: () => void;
   copyCandidatesCount?: number;
-  containerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export function BudgetForm({
@@ -57,7 +56,6 @@ export function BudgetForm({
   onCancel,
   onCopyLastMonth,
   copyCandidatesCount = 0,
-  containerRef,
 }: BudgetFormProps) {
   const { categories, addBudget, updateBudget, budgets } = useFinanceStore();
 
@@ -282,7 +280,7 @@ export function BudgetForm({
           <SelectTrigger id="budget-month" className="w-full h-9 bg-card px-3 text-xs">
             <SelectValue placeholder="Select month..." />
           </SelectTrigger>
-          <SelectContent container={containerRef}>
+          <SelectContent>
             {monthOptions.map((m) => (
               <SelectItem key={m.value} value={m.value} className="text-xs">
                 {m.label}
@@ -340,7 +338,7 @@ export function BudgetForm({
               }
             />
           </SelectTrigger>
-          <SelectContent container={containerRef} className="max-h-60">
+          <SelectContent className="max-h-60">
             {expenseCategories.length > 5 && (
               <div className="p-1.5 border-b sticky top-0 bg-popover z-10">
                 <div className="relative flex items-center">
@@ -454,7 +452,7 @@ export function BudgetForm({
             <SelectTrigger id="budget-period" className="w-full h-9 bg-card px-3 text-xs">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent container={containerRef}>
+            <SelectContent>
               <SelectItem value="monthly" className="text-xs">
                 Monthly
               </SelectItem>
@@ -597,8 +595,6 @@ export function BudgetDialog({
   onCopyLastMonth,
   copyCandidatesCount,
 }: BudgetDialogProps) {
-  const containerRef = React.useRef<HTMLDivElement>(null);
-
   const handleOpenChange = (nextOpen: boolean) => {
     onOpenChange(nextOpen);
     if (!nextOpen) {
@@ -627,7 +623,7 @@ export function BudgetDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent ref={containerRef} className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-base font-semibold">
             {isEditing ? 'Edit Budget' : 'Set Category Budget'}
@@ -649,7 +645,6 @@ export function BudgetDialog({
                 : undefined
             }
             copyCandidatesCount={copyCandidatesCount}
-            containerRef={containerRef}
           />
         )}
       </DialogContent>

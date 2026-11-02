@@ -44,6 +44,7 @@ yarn-error.log*
 # backups
 /backups/*
 !/backups/.gitkeep
+.backups/
 backup-*.sql
 *.sql
 

@@ -37,7 +37,6 @@ export const ingestItemSchema = z.object({
   reference: z.string().max(128).optional(),
   raw: z
     .string()
-    .max(2048, 'raw is truncated to 2048 characters')
     .optional()
     .transform((v) => (v ? v.slice(0, 2048) : v)),
 });

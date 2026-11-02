@@ -6,6 +6,13 @@ import { UnauthorizedError, ForbiddenError } from '@src/lib/auth/policy';
 export { BadRequestError, NotFoundError };
 export { ForbiddenError };
 
+export class TooManyRequestsError extends Error {
+    constructor(message = 'Too many requests') {
+        super(message);
+        this.name = 'TooManyRequestsError';
+    }
+}
+
 export class NotImplementedError extends Error {
     constructor(message = 'Not implemented') {
         super(message);
@@ -29,6 +36,9 @@ export function handleApiError(err: unknown): NextResponse {
     }
     if (err instanceof ForbiddenError) {
         return apiError(err.message, 403);
+    }
+    if (err instanceof TooManyRequestsError) {
+        return apiError(err.message, 429);
     }
     if (err instanceof ZodError) {
         const message = err.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; ');

@@ -493,24 +493,92 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
     const body = await res.json();
     const tx: TransactionDTO = body.transaction;
 
+    // Synchronously update local store caches so UI components update instantly
+    set((state) => {
+      const nextByAccount = { ...state.transactionsByAccount };
+      if (tx.accountId && nextByAccount[tx.accountId]) {
+        nextByAccount[tx.accountId] = {
+          ...nextByAccount[tx.accountId],
+          transactions: [
+            tx,
+            ...nextByAccount[tx.accountId].transactions.filter((t) => t.id !== tx.id),
+          ],
+        };
+      }
+      if (tx.toAccountId && nextByAccount[tx.toAccountId]) {
+        nextByAccount[tx.toAccountId] = {
+          ...nextByAccount[tx.toAccountId],
+          transactions: [
+            tx,
+            ...nextByAccount[tx.toAccountId].transactions.filter((t) => t.id !== tx.id),
+          ],
+        };
+      }
+      return {
+        transactions: [tx, ...state.transactions.filter((t) => t.id !== tx.id)],
+        transactionsByAccount: nextByAccount,
+      };
+    });
+
+    const affectedAccountIds = new Set<string>();
+    if (tx.accountId) affectedAccountIds.add(tx.accountId);
+    if (data.toAccountId) affectedAccountIds.add(data.toAccountId);
+    if (tx.toAccountId) affectedAccountIds.add(tx.toAccountId);
+    for (const key of Object.keys(get().transactionsByAccount)) {
+      if (key !== 'all') affectedAccountIds.add(key);
+    }
+
     await Promise.all([
       get().refreshAccounts(),
       get().refreshOverviewStats(),
       get().refreshNetWorthHistory(),
       get().refreshTransactions(),
       get().refreshBudgets(),
+      ...Array.from(affectedAccountIds).map((accId) =>
+        get().refreshTransactions({ accountId: accId })
+      ),
+      ...Array.from(affectedAccountIds).map((accId) =>
+        get().refreshAccountHistory(accId)
+      ),
     ]);
 
     return {
       transaction: tx,
       undo: async () => {
         await fetch(`/api/finance/transactions/${tx.id}`, { method: 'DELETE' });
+        set((state) => {
+          const nextByAccount = { ...state.transactionsByAccount };
+          for (const key of Object.keys(nextByAccount)) {
+            nextByAccount[key] = {
+              ...nextByAccount[key],
+              transactions: nextByAccount[key].transactions.filter((t) => t.id !== tx.id),
+            };
+          }
+          return {
+            transactions: state.transactions.filter((t) => t.id !== tx.id),
+            transactionsByAccount: nextByAccount,
+          };
+        });
+
+        const undoAffected = new Set<string>();
+        if (tx.accountId) undoAffected.add(tx.accountId);
+        if (tx.toAccountId) undoAffected.add(tx.toAccountId);
+        for (const key of Object.keys(get().transactionsByAccount)) {
+          if (key !== 'all') undoAffected.add(key);
+        }
+
         await Promise.all([
           get().refreshAccounts(),
           get().refreshOverviewStats(),
           get().refreshNetWorthHistory(),
           get().refreshTransactions(),
           get().refreshBudgets(),
+          ...Array.from(undoAffected).map((accId) =>
+            get().refreshTransactions({ accountId: accId })
+          ),
+          ...Array.from(undoAffected).map((accId) =>
+            get().refreshAccountHistory(accId)
+          ),
         ]);
       },
     };
@@ -533,17 +601,61 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
     }
 
     const body = await res.json();
+    const updatedTx: TransactionDTO = body.transaction;
+
+    set((state) => {
+      const nextByAccount = { ...state.transactionsByAccount };
+      for (const key of Object.keys(nextByAccount)) {
+        nextByAccount[key] = {
+          ...nextByAccount[key],
+          transactions: nextByAccount[key].transactions.map((t) =>
+            t.id === id ? updatedTx : t
+          ),
+        };
+      }
+      return {
+        transactions: state.transactions.map((t) => (t.id === id ? updatedTx : t)),
+        transactionsByAccount: nextByAccount,
+      };
+    });
+
+    const updateAffected = new Set<string>();
+    if (updatedTx.accountId) updateAffected.add(updatedTx.accountId);
+    if (updatedTx.toAccountId) updateAffected.add(updatedTx.toAccountId);
+    for (const key of Object.keys(get().transactionsByAccount)) {
+      if (key !== 'all') updateAffected.add(key);
+    }
+
     await Promise.all([
       get().refreshAccounts(),
       get().refreshOverviewStats(),
       get().refreshNetWorthHistory(),
       get().refreshTransactions(),
       get().refreshBudgets(),
+      ...Array.from(updateAffected).map((accId) =>
+        get().refreshTransactions({ accountId: accId })
+      ),
+      ...Array.from(updateAffected).map((accId) =>
+        get().refreshAccountHistory(accId)
+      ),
     ]);
-    return body.transaction;
+    return updatedTx;
   },
 
   deleteTransaction: async (id) => {
+    const existing =
+      get().transactions.find((t) => t.id === id) ||
+      Object.values(get().transactionsByAccount)
+        .flatMap((v) => v.transactions)
+        .find((t) => t.id === id);
+
+    const deleteAffected = new Set<string>();
+    if (existing?.accountId) deleteAffected.add(existing.accountId);
+    if (existing?.toAccountId) deleteAffected.add(existing.toAccountId);
+    for (const key of Object.keys(get().transactionsByAccount)) {
+      if (key !== 'all') deleteAffected.add(key);
+    }
+
     const res = await fetch(`/api/finance/transactions/${id}`, { method: 'DELETE' });
     if (!res.ok) {
       const errBody = await res.json().catch(() => null);
@@ -553,27 +665,75 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
           `Failed to delete transaction (${res.status})`
       );
     }
+
+    set((state) => {
+      const nextByAccount = { ...state.transactionsByAccount };
+      for (const key of Object.keys(nextByAccount)) {
+        nextByAccount[key] = {
+          ...nextByAccount[key],
+          transactions: nextByAccount[key].transactions.filter((t) => t.id !== id),
+        };
+      }
+      return {
+        transactions: state.transactions.filter((t) => t.id !== id),
+        transactionsByAccount: nextByAccount,
+      };
+    });
+
     await Promise.all([
       get().refreshAccounts(),
       get().refreshOverviewStats(),
       get().refreshNetWorthHistory(),
       get().refreshTransactions(),
       get().refreshBudgets(),
+      ...Array.from(deleteAffected).map((accId) =>
+        get().refreshTransactions({ accountId: accId })
+      ),
+      ...Array.from(deleteAffected).map((accId) =>
+        get().refreshAccountHistory(accId)
+      ),
     ]);
   },
 
   bulkDeleteTransactions: async (ids) => {
+    const idSet = new Set(ids);
     await Promise.all(
       ids.map((id) =>
         fetch(`/api/finance/transactions/${id}`, { method: 'DELETE' })
       )
     );
+
+    set((state) => {
+      const nextByAccount = { ...state.transactionsByAccount };
+      for (const key of Object.keys(nextByAccount)) {
+        nextByAccount[key] = {
+          ...nextByAccount[key],
+          transactions: nextByAccount[key].transactions.filter((t) => !idSet.has(t.id)),
+        };
+      }
+      return {
+        transactions: state.transactions.filter((t) => !idSet.has(t.id)),
+        transactionsByAccount: nextByAccount,
+      };
+    });
+
+    const bulkAffected = new Set<string>();
+    for (const key of Object.keys(get().transactionsByAccount)) {
+      if (key !== 'all') bulkAffected.add(key);
+    }
+
     await Promise.all([
       get().refreshAccounts(),
       get().refreshOverviewStats(),
       get().refreshNetWorthHistory(),
       get().refreshTransactions(),
       get().refreshBudgets(),
+      ...Array.from(bulkAffected).map((accId) =>
+        get().refreshTransactions({ accountId: accId })
+      ),
+      ...Array.from(bulkAffected).map((accId) =>
+        get().refreshAccountHistory(accId)
+      ),
     ]);
   },
 
@@ -587,12 +747,25 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
         })
       )
     );
+
+    const bulkUpdateAffected = new Set<string>();
+    if (update.accountId) bulkUpdateAffected.add(update.accountId);
+    for (const key of Object.keys(get().transactionsByAccount)) {
+      if (key !== 'all') bulkUpdateAffected.add(key);
+    }
+
     await Promise.all([
       get().refreshAccounts(),
       get().refreshOverviewStats(),
       get().refreshNetWorthHistory(),
       get().refreshTransactions(),
       get().refreshBudgets(),
+      ...Array.from(bulkUpdateAffected).map((accId) =>
+        get().refreshTransactions({ accountId: accId })
+      ),
+      ...Array.from(bulkUpdateAffected).map((accId) =>
+        get().refreshAccountHistory(accId)
+      ),
     ]);
   },
 

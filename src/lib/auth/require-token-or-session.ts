@@ -2,8 +2,9 @@ import 'server-only';
 
 import { headers } from 'next/headers';
 import { getCurrentUser } from './dal';
-import { validateToken } from './api-tokens';
+import { checkTokenRateLimit, validateToken } from './api-tokens';
 import { UnauthorizedError } from './policy';
+import { TooManyRequestsError } from '@src/app/api/utils';
 import { logAuditEvent } from '../audit/audit-log';
 
 export const VALID_TOKEN_SCOPES = ['finance:ingest', 'finance:read'] as const;
@@ -34,6 +35,24 @@ export async function requireTokenOrSession(
         }
 
         const { userId, tokenId } = result;
+
+        // Rate limit check per token
+        let ip = 'unknown';
+        if (request) {
+            ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown';
+        } else {
+            try {
+                const headersList = await headers();
+                ip = headersList.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown';
+            } catch {
+                // Ignore
+            }
+        }
+
+        const rateLimit = await checkTokenRateLimit(tokenId, ip);
+        if (!rateLimit.allowed) {
+            throw new TooManyRequestsError('Rate limit exceeded for API token');
+        }
 
         // Fire-and-forget audit event; never include raw token
         logAuditEvent({

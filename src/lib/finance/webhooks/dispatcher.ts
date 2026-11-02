@@ -1,7 +1,7 @@
 import 'server-only';
 
 import crypto from 'crypto';
-import { and, eq, isNull, lte, sql } from 'drizzle-orm';
+import { and, eq, lte } from 'drizzle-orm';
 import { db } from '@src/lib/db';
 import { webhookDeliveries, webhookEndpoints } from '@src/lib/db/schema';
 import { newId } from '@src/lib/db/id';
@@ -53,6 +53,20 @@ export function validateWebhookUrl(rawUrl: string): { valid: boolean; reason?: s
   // Allow explicit internal hosts
   if (allowedHosts.includes(hostname)) {
     return { valid: true };
+  }
+
+  // Block localhost and internal names
+  if (
+    hostname === 'localhost' ||
+    hostname === '0.0.0.0' ||
+    hostname.endsWith('.localhost') ||
+    hostname.endsWith('.local') ||
+    hostname.endsWith('.internal')
+  ) {
+    return {
+      valid: false,
+      reason: 'URL resolves to a local/internal hostname. Add to WEBHOOK_ALLOWED_INTERNAL_HOSTS to permit.',
+    };
   }
 
   // Block private/loopback ranges

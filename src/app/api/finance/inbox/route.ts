@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { handleApiError } from '@src/app/api/utils';
 import { requireUserApi } from '@src/lib/auth/dal';
 import { listInbox } from '@src/lib/finance/inbox/service';

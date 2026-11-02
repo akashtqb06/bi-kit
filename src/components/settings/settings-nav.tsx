@@ -27,6 +27,7 @@ interface NavItem {
 const baseNavItems: NavItem[] = [
     { label: 'Profile', href: '/settings/profile', icon: UserRoundIcon },
     { label: 'Security', href: '/settings/security', icon: ShieldCheckIcon },
+    { label: 'API Tokens', href: '/settings/api-tokens', icon: KeyRoundIcon },
     { label: 'Sessions', href: '/settings/sessions', icon: LaptopIcon },
     { label: 'Appearance', href: '/settings/appearance', icon: PaletteIcon },
     { label: 'Finance', href: '/settings/finance', icon: LandmarkIcon },

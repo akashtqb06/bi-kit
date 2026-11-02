@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { nanoid } from 'nanoid';
 import {
-  CalendarIcon,
   CreditCardIcon,
   CheckIcon,
   ArrowRightLeftIcon,
