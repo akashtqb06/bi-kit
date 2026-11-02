@@ -947,7 +947,7 @@ function PieChartWithLegend({
     useEffect(() => {
         const container = containerRef.current;
         if (!container) return;
-        const observer = new ResizeObserver(([entry]) => setIsWide(entry.contentRect.width >= 480));
+        const observer = new ResizeObserver(([entry]) => setIsWide(entry.contentRect.width >= 360));
         observer.observe(container);
         return () => observer.disconnect();
     }, []);
@@ -1039,7 +1039,7 @@ function PieChartWithLegend({
             {showLegend && (
                 <TooltipProvider>
                     <div
-                        className={`flex min-h-0 min-w-0 flex-col overflow-y-auto ${isWide ? 'flex-1' : 'max-h-24 shrink-0'}`}
+                        className={`flex min-h-0 min-w-0 flex-col overflow-y-auto ${isWide ? 'flex-1' : 'max-h-48 shrink-0'}`}
                     >
                         {data.map((item, index) => {
                             const percent = total > 0 ? (item.value / total) * 100 : 0;
