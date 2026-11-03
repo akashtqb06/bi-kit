@@ -29,6 +29,22 @@ export type { AccountWithBalance };
 
 export type SliceStatus = 'idle' | 'loading' | 'ready' | 'error';
 
+export type ClientOverviewStats = Omit<OverviewStatsDTO, 'spendByCategory'> & {
+  trackingStartDate?: string | null;
+  previousPeriodRange?: {
+    from: string;
+    to: string;
+  };
+  spendByCategory?: Array<{
+    categoryId: string;
+    categoryName: string;
+    categoryColor?: string | null;
+    amount: number;
+    percentage: number;
+    transactionCount?: number;
+  }>;
+};
+
 export interface FinanceState {
   userId: string | null;
   isInitialized: boolean;
@@ -49,8 +65,8 @@ export interface FinanceState {
   budgetProgress: BudgetProgressDTO[];
   valuations: Record<string, ValuationDTO[]>;
   netWorthHistory: NetWorthPointDTO[];
-  overviewStats: OverviewStatsDTO | null;
-  overviewCache: Record<string, OverviewStatsDTO>;
+  overviewStats: ClientOverviewStats | null;
+  overviewCache: Record<string, ClientOverviewStats>;
 
   quickAddOpen: boolean;
   quickAddInitialData: Partial<CreateTransactionDTO> | null;
@@ -291,6 +307,10 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
         },
         transactionsStatus: 'ready',
       }));
+
+      // In case auto-catchup of recurring rules created new transactions during the fetch,
+      // refresh accounts so account balances, invested amounts, and gains stay synchronized.
+      void get().refreshAccounts().catch(() => {});
     } catch (err) {
       console.error('Failed to load transactions:', err);
       set({ transactionsStatus: 'error' });

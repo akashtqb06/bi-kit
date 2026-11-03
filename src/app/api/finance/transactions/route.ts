@@ -4,6 +4,7 @@ import { handleApiError } from '@src/app/api/utils';
 import { jsonNoStore } from '../utils';
 import { createTransactionSchema, transactionFiltersSchema } from '@src/lib/finance/contract';
 import { getFinanceService } from '@src/lib/finance/service';
+import { catchUpRecurringRulesIfDue } from '@src/lib/finance/recurring';
 
 
 export async function GET(request: NextRequest) {
@@ -12,6 +13,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const rawFilters = Object.fromEntries(searchParams.entries());
     const filters = transactionFiltersSchema.parse(rawFilters);
+
+    await catchUpRecurringRulesIfDue(user.id);
 
     const service = getFinanceService();
     const result = await service.listTransactions(user.id, filters);

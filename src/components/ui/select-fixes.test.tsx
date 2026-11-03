@@ -73,4 +73,20 @@ describe('Select Component Fixes', () => {
         expect(markup).toContain('min-w-0');
         expect(markup).not.toContain('w-full');
     });
+
+    it('SelectContent defaults to alignItemWithTrigger={false} so popup opens below the trigger and does not overlay it', () => {
+        const markup = renderToStaticMarkup(
+            <Select open>
+                <SelectTrigger>
+                    <SelectValue placeholder="Choose option..." />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="opt1">Option 1</SelectItem>
+                </SelectContent>
+            </Select>
+        );
+
+        // Positioner/popup must not have data-align-trigger="true"
+        expect(markup).toContain('data-align-trigger="false"');
+    });
 });

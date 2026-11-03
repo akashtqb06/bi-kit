@@ -38,6 +38,7 @@ import * as budgets from './budgets';
 import * as recurring from './recurring';
 import * as stats from './stats';
 import * as history from './history';
+import * as pf from './pf';
 
 export class DbFinanceService implements FinanceService {
   // ============================================================================
@@ -312,4 +313,5 @@ export {
   recurring,
   stats,
   history,
+  pf,
 };

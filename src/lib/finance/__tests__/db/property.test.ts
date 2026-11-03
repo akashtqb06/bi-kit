@@ -56,6 +56,51 @@ describe('Finance Service Invariants & Property Tests', () => {
     expect(postTransferStats.netWorth).toBe(initialStats.netWorth);
   });
 
+  it('Property: Transfer from bank account to investment account preserves total assets and net worth', async () => {
+    const bank = await service.createAccount(USER_A, { name: 'Savings Account', kind: 'bank' });
+    const mf = await service.createAccount(USER_A, {
+      name: 'Groww Mutual Funds',
+      kind: 'mutual_fund',
+      metadata: { openingContributionPaise: 28000000 },
+    });
+
+    // Seed bank with income: 100,000 INR
+    await service.createTransaction(USER_A, {
+      accountId: bank.id,
+      type: 'income',
+      amount: 10000000,
+      date: '2026-11-01',
+    });
+
+    // Opening valuation on Groww: 350,000 INR value, 280,000 INR costBasis
+    await service.createValuation(USER_A, {
+      accountId: mf.id,
+      date: '2026-11-01',
+      value: 35000000,
+      costBasis: 28000000,
+      note: 'Opening valuation recorded during setup',
+    });
+
+    const beforeTransferStats = await service.getOverviewStats(USER_A);
+    // Total assets: Bank (10,000,000) + Groww (35,000,000) = 45,000,000 paise (₹450,000)
+    expect(beforeTransferStats.totalAssets).toBe(45000000);
+    expect(beforeTransferStats.netWorth).toBe(45000000);
+
+    // Transfer ₹50,000 from Savings account to Groww Mutual Funds
+    await service.createTransaction(USER_A, {
+      accountId: bank.id,
+      toAccountId: mf.id,
+      type: 'transfer',
+      amount: 5000000,
+      date: '2026-11-03',
+    });
+
+    const afterTransferStats = await service.getOverviewStats(USER_A);
+    // Assets and net worth MUST be preserved (transfers net to zero total asset change)
+    expect(afterTransferStats.totalAssets).toBe(45000000);
+    expect(afterTransferStats.netWorth).toBe(45000000);
+  });
+
   it('Property: Sum of all balance changes equals total income minus total expense', async () => {
     const bank = await service.createAccount(USER_A, { name: 'Bank', kind: 'bank' });
     const cash = await service.createAccount(USER_A, { name: 'Cash', kind: 'cash' });

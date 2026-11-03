@@ -48,7 +48,7 @@ services:
     environment:
       HOSTNAME: "0.0.0.0"
       FINANCE_BACKEND: "db"
-      FINANCE_FEATURES: ${FINANCE_FEATURES:-overview,transactions,accounts,setup,budgets,recurring,import}
+      FINANCE_FEATURES: ${FINANCE_FEATURES:-overview,transactions,accounts,setup,budgets,recurring,import,inbox}
     ports:
       - "127.0.0.1:${APP_PORT:-3100}:3000"
     read_only: true
@@ -145,8 +145,8 @@ services:
       DB_SQLITE_DATABASE: /home/node/.n8n/database.sqlite
       GENERIC_TIMEZONE: ${APP_TIMEZONE:-Asia/Kolkata}
       N8N_LOG_LEVEL: info
-      # Restrict n8n to internal network only
-      N8N_LISTEN_ADDRESS: 127.0.0.1
+      # Listen on all interfaces inside container; host exposure is restricted to 127.0.0.1 via ports
+      N8N_LISTEN_ADDRESS: 0.0.0.0
     volumes:
       - n8n_data:/home/node/.n8n
     networks:

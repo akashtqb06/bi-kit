@@ -4,6 +4,8 @@ export interface ValuationRecord {
   date: string;
   value: number;
   costBasis?: number | null;
+  note?: string | null;
+  createdAt?: string | Date | null;
 }
 
 export interface InvestmentTransactionRecord {
@@ -13,6 +15,8 @@ export interface InvestmentTransactionRecord {
   amount: number;
   date: string;
   deletedAt?: string | Date | null;
+  createdAt?: string | Date | null;
+  isRecurring?: boolean | null;
 }
 
 /**
@@ -78,4 +82,123 @@ export function calculateInvestmentGain(
   contributions: number
 ): number {
   return currentValue - contributions;
+}
+
+/**
+ * Determines whether a transaction occurs after (or compounds into) a valuation anchor.
+ */
+export function isTxAfterValuation(
+  tx: InvestmentTransactionRecord,
+  anchorDate: string,
+  anchorCreatedAt: number | null
+): boolean {
+  const txCreatedAt = tx.createdAt ? new Date(tx.createdAt).getTime() : null;
+
+  // 1. If transaction was created after the valuation anchor was recorded,
+  // it was chronologically impossible to have been in that valuation snapshot.
+  if (anchorCreatedAt != null && txCreatedAt != null && txCreatedAt >= anchorCreatedAt) {
+    return true;
+  }
+
+  // 2. Recurring transactions are generated dynamically and compound into holdings
+  if (tx.isRecurring && tx.date >= anchorDate) {
+    return true;
+  }
+
+  // 3. Transactions dated strictly after the valuation date
+  if (tx.date > anchorDate) {
+    return true;
+  }
+
+  // 4. Same day transaction when timestamps are not provided
+  if (tx.date === anchorDate && (!anchorCreatedAt || !txCreatedAt)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Calculates investment holding metrics (cost basis, current value, gain, return rate).
+ * Adheres to:
+ * - Cost Basis: Net principal contributions (sum(Transfers In) - sum(Transfers Out)) plus opening contribution.
+ *   Subsequent transfers (including recurring rules) add to the cost basis and preserve accumulated gain.
+ * - Current Value:
+ *   Cost Basis + Current Gain (or latest valuation plus net transfers after anchor).
+ * - Gain = Current Value - Cost Basis.
+ * - Return Rate (Gain %) = (Gain / Cost Basis) * 100.
+ */
+export function calculateInvestmentHolding(params: {
+  openingContribution: number;
+  transactions: InvestmentTransactionRecord[];
+  accountId: string;
+  latestValuation?: ValuationRecord | null;
+  asOfDate?: string;
+}): {
+  costBasis: number;
+  currentValue: number;
+  gain: number;
+  gainPct: number | undefined;
+} {
+  const { openingContribution, transactions, accountId, latestValuation, asOfDate } = params;
+
+  const validTxs = transactions.filter(
+    (tx) => tx.deletedAt == null && (!asOfDate || tx.date <= asOfDate)
+  );
+
+  const isOpeningValuation =
+    !latestValuation ||
+    latestValuation.note === 'Opening valuation recorded during setup';
+
+  let costBasis: number;
+  let currentValue: number;
+
+  if (isOpeningValuation) {
+    const netTransfers = calculateInvestmentContributions(validTxs, accountId, asOfDate);
+    const initialBasis =
+      latestValuation?.costBasis != null ? latestValuation.costBasis : openingContribution;
+    costBasis = initialBasis + netTransfers;
+    currentValue =
+      latestValuation != null ? latestValuation.value + netTransfers : costBasis;
+  } else {
+    // Manual valuation anchor recorded on latestValuation.date
+    const anchorDate = latestValuation.date;
+    const anchorCreatedAt = latestValuation.createdAt
+      ? new Date(latestValuation.createdAt).getTime()
+      : null;
+
+    let netTransfersAfterAnchor = 0;
+
+    for (const tx of validTxs) {
+      if (tx.type === 'transfer' && isTxAfterValuation(tx, anchorDate, anchorCreatedAt)) {
+        if (tx.toAccountId === accountId) {
+          netTransfersAfterAnchor += Math.abs(tx.amount);
+        }
+        if (tx.accountId === accountId) {
+          netTransfersAfterAnchor -= Math.abs(tx.amount);
+        }
+      }
+    }
+
+    const baseCost =
+      latestValuation.costBasis != null
+        ? latestValuation.costBasis
+        : openingContribution +
+          calculateInvestmentContributions(
+            validTxs.filter((t) => !isTxAfterValuation(t, anchorDate, anchorCreatedAt)),
+            accountId,
+            anchorDate
+          );
+
+    costBasis = baseCost + netTransfersAfterAnchor;
+    currentValue = latestValuation.value + netTransfersAfterAnchor;
+  }
+
+  costBasis = Math.max(0, costBasis);
+  currentValue = Math.max(0, currentValue);
+  const gain = currentValue - costBasis;
+  const gainPct =
+    costBasis > 0 ? Math.round((gain / costBasis) * 1000) / 10 : undefined;
+
+  return { costBasis, currentValue, gain, gainPct };
 }

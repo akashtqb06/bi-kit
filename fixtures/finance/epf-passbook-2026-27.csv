@@ -1,0 +1,12 @@
+entry_kind,period_month,posted_date,source_label,epf_wages,eps_wages,employee,employer,pension,note
+contribution,2026-05,,,28000,15000,3360,2110,1250,
+contribution,2026-06,,,46667,15000,5600,4350,1250,
+contribution,2026-07,,,46667,15000,5600,4350,1250,
+contribution,2026-08,,,46667,15000,5600,4350,1250,
+contribution,2026-09,,,46667,15000,5600,4350,1250,
+transfer_in_principal,,,Previous account ending 5944,0,0,13932,4257,7500,
+transfer_in_principal,,,Previous account ending 0074,0,0,90356,41487,43862,
+contribution,2026-10,,,46667,19667,5600,3962,1638,
+transfer_in_interest,,,Previous account ending 5944,0,0,575,176,0,
+transfer_in_interest,,,Previous account ending 0074,0,0,3693,1694,0,
+

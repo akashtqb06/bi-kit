@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { DataHealthPanel } from '@src/components/finance/settings/data-health-panel';
 import { FinanceFeaturesPanel } from '@src/components/finance/settings/finance-features-panel';
+import { PfSettingsPanel } from '@src/components/finance/settings/pf-settings-panel';
 
 async function FinanceSettingsContent() {
   const user = await requireUser('/settings/finance');
@@ -133,6 +134,9 @@ async function FinanceSettingsContent() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Provident Fund & Retirement Settings */}
+      <PfSettingsPanel />
 
       {/* Finance Features Overview */}
       <FinanceFeaturesPanel />

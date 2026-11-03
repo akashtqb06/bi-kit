@@ -3,7 +3,7 @@ import { requireUserApi } from '@src/lib/auth/dal';
 import { handleApiError } from '@src/app/api/utils';
 import { jsonNoStore } from '../../utils';
 import { and, desc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
-import { db, finAccounts, finTransactions, finValuations } from '@src/lib/db';
+import { db, finAccounts, finPfEntries, finTransactions, finValuations } from '@src/lib/db';
 import { mapAccountToDTO } from '@src/lib/finance/db-service/accounts';
 import type { AccountWithBalance } from '@src/components/finance/shared/fixtures';
 import {
@@ -22,13 +22,19 @@ import {
 } from '@src/lib/finance/domain/rd';
 import type { CompoundingFrequency } from '@src/lib/finance/constants';
 import { calculateCardDates } from '@src/lib/finance/domain/credit-card';
+import {
+  calculateInvestmentHolding,
+  type InvestmentTransactionRecord,
+} from '@src/lib/finance/domain/investments';
 import { todayInTz, DEFAULT_TZ } from '@src/lib/finance/timezone';
+import { catchUpRecurringRulesIfDue } from '@src/lib/finance/recurring';
 
 
 export async function GET() {
   try {
     const user = await requireUserApi();
     const userId = user.id;
+    await catchUpRecurringRulesIfDue(userId);
     const today = todayInTz(DEFAULT_TZ);
 
     // Fetch all active accounts
@@ -64,6 +70,25 @@ export async function GET() {
       )
       .groupBy(finTransactions.toAccountId);
 
+    // Provident Fund sums for EPF/VPF accounts
+    const pfSums = await db
+      .select({
+        accountId: finPfEntries.accountId,
+        pfTotal: sql<string>`COALESCE(SUM(${finPfEntries.employeeAmount} + ${finPfEntries.employerAmount}), 0)`,
+        pensionTotal: sql<string>`COALESCE(SUM(${finPfEntries.pensionAmount}), 0)`,
+      })
+      .from(finPfEntries)
+      .where(eq(finPfEntries.userId, userId))
+      .groupBy(finPfEntries.accountId);
+
+    const pfMap = new Map<string, { pfTotal: number; pensionTotal: number }>();
+    for (const r of pfSums) {
+      pfMap.set(r.accountId, {
+        pfTotal: Number(r.pfTotal),
+        pensionTotal: Number(r.pensionTotal),
+      });
+    }
+
     const accountIds = accs.map((a) => a.id);
     const valRows =
       accountIds.length > 0
@@ -74,6 +99,7 @@ export async function GET() {
               costBasis: finValuations.costBasis,
               date: finValuations.date,
               note: finValuations.note,
+              createdAt: finValuations.createdAt,
             })
             .from(finValuations)
             .where(
@@ -82,7 +108,7 @@ export async function GET() {
                 lte(finValuations.date, today)
               )
             )
-            .orderBy(finValuations.accountId, desc(finValuations.date))
+            .orderBy(finValuations.accountId, desc(finValuations.date), desc(finValuations.createdAt))
         : [];
 
     // Build maps
@@ -92,7 +118,7 @@ export async function GET() {
     for (const r of targetSums) {
       if (r.accountId) targetMap.set(r.accountId, Number(r.total));
     }
-    const valMap = new Map<string, { value: number; costBasis: number | null; date: string; note: string | null }>();
+    const valMap = new Map<string, { value: number; costBasis: number | null; date: string; note: string | null; createdAt: Date | string }>();
     const manualAnchorMap = new Map<string, { value: number; date: string }>();
     for (const v of valRows) {
       if (!valMap.has(v.accountId)) {
@@ -101,6 +127,7 @@ export async function GET() {
           costBasis: v.costBasis !== null && v.costBasis !== undefined ? Number(v.costBasis) : null,
           date: v.date,
           note: v.note,
+          createdAt: v.createdAt,
         });
       }
       if (!manualAnchorMap.has(v.accountId) && v.note !== 'computed') {
@@ -111,15 +138,29 @@ export async function GET() {
       }
     }
 
-    // Query transfers for recurring deposits if any
+    // Query transfers for recurring deposits and investments
     const hasRD = accs.some((a) => a.kind === 'recurring_deposit');
+    const hasInvestment = accs.some(
+      (a) =>
+        a.kind === 'mutual_fund' ||
+        a.kind === 'stocks' ||
+        a.kind === 'other_asset' ||
+        a.kind === 'nps'
+    );
     const rdTransfersByAccount = new Map<string, Array<{ date: string; amount: number }>>();
-    if (hasRD) {
+    const investmentTransfersByAccount = new Map<string, InvestmentTransactionRecord[]>();
+
+    if (hasRD || hasInvestment) {
       const transferRows = await db
         .select({
+          accountId: finTransactions.accountId,
           toAccountId: finTransactions.toAccountId,
           date: finTransactions.date,
           amount: finTransactions.amount,
+          type: finTransactions.type,
+          deletedAt: finTransactions.deletedAt,
+          createdAt: finTransactions.createdAt,
+          isRecurring: finTransactions.isRecurring,
         })
         .from(finTransactions)
         .where(
@@ -129,24 +170,64 @@ export async function GET() {
             isNull(finTransactions.deletedAt)
           )
         );
+
       for (const t of transferRows) {
+        const amt = Number(t.amount);
         if (t.toAccountId) {
-          const list = rdTransfersByAccount.get(t.toAccountId) ?? [];
-          list.push({ date: t.date, amount: Number(t.amount) });
-          rdTransfersByAccount.set(t.toAccountId, list);
+          if (hasRD) {
+            const list = rdTransfersByAccount.get(t.toAccountId) ?? [];
+            list.push({ date: t.date, amount: amt });
+            rdTransfersByAccount.set(t.toAccountId, list);
+          }
+          if (hasInvestment) {
+            const list = investmentTransfersByAccount.get(t.toAccountId) ?? [];
+            list.push({
+              accountId: t.accountId,
+              toAccountId: t.toAccountId,
+              type: 'transfer',
+              amount: amt,
+              date: t.date,
+              createdAt: t.createdAt,
+              isRecurring: t.isRecurring,
+            });
+            investmentTransfersByAccount.set(t.toAccountId, list);
+          }
+        }
+        if (t.accountId && hasInvestment) {
+          const list = investmentTransfersByAccount.get(t.accountId) ?? [];
+          list.push({
+            accountId: t.accountId,
+            toAccountId: t.toAccountId,
+            type: 'transfer',
+            amount: amt,
+            date: t.date,
+            createdAt: t.createdAt,
+            isRecurring: t.isRecurring,
+          });
+          investmentTransfersByAccount.set(t.accountId, list);
         }
       }
     }
 
     const result: AccountWithBalance[] = accs.map((acc) => {
       const dto = mapAccountToDTO(acc);
-      const balance = (sourceMap.get(acc.id) ?? 0) + (targetMap.get(acc.id) ?? 0);
+      const isPf = dto.kind === 'epf' || dto.kind === 'vpf';
+      const pfData = pfMap.get(acc.id);
+
+      let balance = (sourceMap.get(acc.id) ?? 0) + (targetMap.get(acc.id) ?? 0);
+      let pensionMemo: number | undefined;
+
+      if (isPf) {
+        balance = pfData?.pfTotal ?? 0;
+        pensionMemo = pfData?.pensionTotal ?? 0;
+      }
+
       const isLiability = dto.class === 'liability';
       const outstanding = isLiability ? Math.max(0, -balance) : 0;
       const creditLimit = dto.creditLimit ?? 0;
       const utilization = creditLimit > 0 ? Math.min(1, outstanding / creditLimit) : 0;
       const valuation = valMap.get(acc.id);
-      const costBasis = valuation?.costBasis ?? undefined;
+      let costBasis = valuation?.costBasis ?? undefined;
       const meta = (acc.metadata ?? {}) as Record<string, unknown>;
 
       let accruedValue: number | undefined;
@@ -296,11 +377,40 @@ export async function GET() {
         isOffsetDays = isOffset;
       }
 
-      const currentValue =
+      let currentValue =
         accruedValue !== undefined ? accruedValue : valuation ? valuation.value : balance;
-      const gain = costBasis !== undefined ? currentValue - costBasis : undefined;
-      const gainPct =
+      let gain = costBasis !== undefined ? currentValue - costBasis : undefined;
+      let gainPct =
         costBasis && costBasis > 0 ? Math.round((gain! / costBasis) * 1000) / 10 : undefined;
+
+      const isInvestment =
+        dto.kind === 'mutual_fund' ||
+        dto.kind === 'stocks' ||
+        dto.kind === 'other_asset' ||
+        dto.kind === 'nps';
+
+      if (isInvestment) {
+        const openingContribution = Number(
+          meta.openingContributionPaise ??
+            meta.costBasis ??
+            meta.openingBalancePaise ??
+            (valuation?.note === 'Opening valuation recorded during setup' ? valuation?.costBasis : undefined) ??
+            0
+        );
+        const invTxs = investmentTransfersByAccount.get(acc.id) ?? [];
+        const holding = calculateInvestmentHolding({
+          openingContribution,
+          transactions: invTxs,
+          accountId: acc.id,
+          latestValuation: valuation,
+          asOfDate: today,
+        });
+
+        costBasis = holding.costBasis;
+        currentValue = holding.currentValue;
+        gain = holding.gain;
+        gainPct = holding.gainPct;
+      }
 
       return {
         ...dto,
@@ -332,6 +442,7 @@ export async function GET() {
         nextStatementDate,
         currentDueDate,
         nextDueDate,
+        pensionMemo,
       };
     });
 

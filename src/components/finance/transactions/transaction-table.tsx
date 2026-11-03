@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import type { RowSelectionState } from '@tanstack/react-table';
 import {
   SearchIcon,
@@ -55,6 +56,7 @@ import {
 import { useFinanceStore } from '../shared/finance-store';
 import { todayInTz, yesterdayInTz, DEFAULT_TZ } from '@src/lib/finance/timezone';
 import { formatINR } from '../shared/format';
+import { CategoryCombobox } from '../shared/category-combobox';
 import { TransactionEditDialog } from './transaction-edit-dialog';
 import { getDeterministicCategoryColor } from '@src/lib/finance/colors';
 import type { TransactionDTO } from '@src/lib/finance/contract';
@@ -91,18 +93,60 @@ export function TransactionTable({ accountId }: { accountId?: string } = {}) {
     return globalTransactions;
   }, [accountId, transactionsByAccount, globalTransactions]);
 
+  const searchParams = useSearchParams();
+  const categoryParam = searchParams?.get('category') || searchParams?.get('categoryId') || '';
+  const fromParam = searchParams?.get('from') || '';
+  const toParam = searchParams?.get('to') || '';
+  const accountParam = searchParams?.get('account') || searchParams?.get('accountId') || '';
+  const typeParam = searchParams?.get('type') || '';
+
   // Filter states
   const [search, setSearch] = useState('');
-  const [selectedAccountId, setSelectedAccountId] = useState(accountId || 'all');
+  const [selectedAccountId, setSelectedAccountId] = useState(accountId || accountParam || 'all');
   const activeAccountId = accountId || selectedAccountId;
-  const [selectedCategoryId, setSelectedCategoryId] = useState('all');
-  const [selectedType, setSelectedType] = useState<'all' | 'expense' | 'income' | 'transfer'>('all');
-  const [datePreset, setDatePreset] = useState<'all' | 'today' | 'yesterday' | 'week' | 'month' | 'last30' | 'custom'>('all');
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState(categoryParam || 'all');
+  const [selectedType, setSelectedType] = useState<'all' | 'expense' | 'income' | 'transfer'>(
+    (typeParam as 'all' | 'expense' | 'income' | 'transfer') || 'all'
+  );
+  const [datePreset, setDatePreset] = useState<'all' | 'today' | 'yesterday' | 'week' | 'month' | 'last30' | 'custom'>(
+    fromParam && toParam ? 'custom' : 'all'
+  );
+  const [customStartDate, setCustomStartDate] = useState(fromParam);
+  const [customEndDate, setCustomEndDate] = useState(toParam);
   const [minAmount, setMinAmount] = useState('');
   const [maxAmount, setMaxAmount] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(
+    Boolean(categoryParam || fromParam || toParam || accountParam)
+  );
+
+  const [prevParams, setPrevParams] = useState({ categoryParam, fromParam, toParam, accountParam, typeParam });
+
+  if (
+    prevParams.categoryParam !== categoryParam ||
+    prevParams.fromParam !== fromParam ||
+    prevParams.toParam !== toParam ||
+    prevParams.accountParam !== accountParam ||
+    prevParams.typeParam !== typeParam
+  ) {
+    setPrevParams({ categoryParam, fromParam, toParam, accountParam, typeParam });
+    if (categoryParam) {
+      setSelectedCategoryId(categoryParam);
+      setShowFilters(true);
+    }
+    if (fromParam && toParam) {
+      setCustomStartDate(fromParam);
+      setCustomEndDate(toParam);
+      setDatePreset('custom');
+      setShowFilters(true);
+    }
+    if (accountParam && !accountId) {
+      setSelectedAccountId(accountParam);
+      setShowFilters(true);
+    }
+    if (typeParam) {
+      setSelectedType(typeParam as 'all' | 'expense' | 'income' | 'transfer');
+    }
+  }
 
   // Row selection
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
@@ -461,6 +505,15 @@ export function TransactionTable({ accountId }: { accountId?: string } = {}) {
         <div className="flex items-center gap-1.5 overflow-x-auto">
           {/* Quick Date Presets */}
           <Select
+            items={[
+              { value: 'all', label: 'All Dates' },
+              { value: 'today', label: 'Today' },
+              { value: 'yesterday', label: 'Yesterday' },
+              { value: 'week', label: 'This Week' },
+              { value: 'month', label: 'This Month' },
+              { value: 'last30', label: 'Last 30 Days' },
+              { value: 'custom', label: 'Custom Range...' },
+            ]}
             value={datePreset}
             onValueChange={(val) => setDatePreset(val as typeof datePreset)}
           >
@@ -480,6 +533,12 @@ export function TransactionTable({ accountId }: { accountId?: string } = {}) {
 
           {/* Type Filter */}
           <Select
+            items={[
+              { value: 'all', label: 'All Types' },
+              { value: 'expense', label: 'Expenses' },
+              { value: 'income', label: 'Income' },
+              { value: 'transfer', label: 'Transfers' },
+            ]}
             value={selectedType}
             onValueChange={(val) => setSelectedType(val as typeof selectedType)}
           >
@@ -541,6 +600,10 @@ export function TransactionTable({ accountId }: { accountId?: string } = {}) {
                 Account
               </label>
               <Select
+                items={[
+                  { value: 'all', label: 'All Accounts' },
+                  ...accounts.map((a) => ({ value: a.id, label: a.name })),
+                ]}
                 value={selectedAccountId}
                 onValueChange={(val) => setSelectedAccountId(val || 'all')}
               >
@@ -560,43 +623,17 @@ export function TransactionTable({ accountId }: { accountId?: string } = {}) {
           )}
 
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-[11px] font-medium text-muted-foreground block">
-                Category
-              </label>
-              {selectedCategoryId !== 'all' && (
-                (() => {
-                  const sel = categories.find((c) => c.id === selectedCategoryId);
-                  if (!sel) return null;
-                  const col = sel.color || getDeterministicCategoryColor(sel.name);
-                  return (
-                    <span className="flex items-center gap-1 text-[11px] font-medium">
-                      <span
-                        className="size-1.5 rounded-full inline-block shrink-0 ring-1 ring-border"
-                        style={{ backgroundColor: col }}
-                      />
-                      <span className="truncate max-w-[90px]">{sel.name}</span>
-                    </span>
-                  );
-                })()
-              )}
-            </div>
-            <Select
+            <label className="text-[11px] font-medium text-muted-foreground block mb-1">
+              Category
+            </label>
+            <CategoryCombobox
               value={selectedCategoryId}
               onValueChange={(val) => setSelectedCategoryId(val || 'all')}
-            >
-              <SelectTrigger className="w-full h-8 bg-card px-2 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="text-xs">All Categories</SelectItem>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id} className="text-xs">
-                    {c.name} ({c.type})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              categories={categories}
+              includeAll
+              placeholder="All Categories"
+              className="h-8"
+            />
           </div>
 
           <div>
@@ -1280,25 +1317,12 @@ export function TransactionTable({ accountId }: { accountId?: string } = {}) {
             </DialogDescription>
           </DialogHeader>
           <div className="py-3">
-            <Select
-              items={categories.map((c) => ({
-                value: c.id,
-                label: `${c.name} (${c.type})`,
-              }))}
-              value={bulkCategoryTarget || undefined}
-              onValueChange={(val) => setBulkCategoryTarget(val || '')}
-            >
-              <SelectTrigger className="w-full h-9 bg-card px-3 text-xs">
-                <SelectValue placeholder="Select category..." />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id} className="text-xs">
-                    {c.name} ({c.type})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <CategoryCombobox
+              value={bulkCategoryTarget}
+              onValueChange={(val) => setBulkCategoryTarget(val)}
+              categories={categories}
+              placeholder="Select category..."
+            />
           </div>
           <DialogFooter>
             <Button variant="ghost" size="sm" onClick={() => setBulkCategoryOpen(false)}>

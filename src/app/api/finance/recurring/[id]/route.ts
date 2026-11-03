@@ -5,6 +5,8 @@ import { jsonNoStore } from '../../utils';
 import { updateRecurringRuleSchema } from '@src/lib/finance/contract';
 import { getFinanceService } from '@src/lib/finance/service';
 import { checkFeatureGatedApi } from '@src/lib/finance/flags';
+import { generateDueRecurringTransactions } from '@src/lib/finance/recurring';
+import { todayInTz, DEFAULT_TZ } from '@src/lib/finance/timezone';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -35,6 +37,15 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 
     const service = getFinanceService();
     const rule = await service.updateRecurringRule(user.id, id, data);
+
+    if (rule.isActive) {
+      const today = todayInTz(DEFAULT_TZ);
+      await generateDueRecurringTransactions({
+        userId: user.id,
+        asOfDate: today,
+      });
+    }
+
     return NextResponse.json({ rule });
   } catch (err) {
     return handleApiError(err);

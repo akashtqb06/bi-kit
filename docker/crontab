@@ -1,6 +1,6 @@
 # BI Kit Automated Scheduled Tasks
-# Daily recurring transaction generation (02:00)
-0 2 * * * curl -fsS -X POST -H "Authorization: Bearer ${CRON_SECRET}" http://app:3000/api/cron/recurring
+# Recurring transaction generation (runs hourly to guarantee catch-up even if host system was asleep)
+0 * * * * curl -fsS -X POST -H "Authorization: Bearer ${CRON_SECRET}" http://app:3000/api/cron/recurring
 
 # Daily valuation snapshot capture (02:15)
 15 2 * * * curl -fsS -X POST -H "Authorization: Bearer ${CRON_SECRET}" http://app:3000/api/cron/valuations
@@ -10,4 +10,7 @@
 
 # Daily data store sync (03:00)
 0 3 * * * curl -fsS -X POST -H "Authorization: Bearer ${CRON_SECRET}" http://app:3000/api/cron/data-store
+
+# Outbound webhook retry processing and alert checks (every 15 min)
+*/15 * * * * curl -fsS -X POST -H "Authorization: Bearer ${CRON_SECRET}" http://app:3000/api/cron/webhooks
 

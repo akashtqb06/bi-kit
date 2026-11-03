@@ -34,17 +34,25 @@ function extractSelectChildrenItems(children: React.ReactNode, map: Map<unknown,
 
 function Select<Value = string, Multiple extends boolean = false>({
   children,
+  items: itemsProp,
   ...props
 }: SelectPrimitive.Root.Props<Value, Multiple>) {
-  const map = React.useMemo(() => {
+  const { map, extractedItems } = React.useMemo(() => {
     const m = new Map<unknown, React.ReactNode>();
+    const list: Array<{ label: React.ReactNode; value: unknown }> = [];
     extractSelectChildrenItems(children, m);
-    return m;
+    m.forEach((label, val) => list.push({ label, value: val }));
+    return { map: m, extractedItems: list };
   }, [children]);
+
+  const resolvedItems = (itemsProp ??
+    (extractedItems.length > 0 ? extractedItems : undefined)) as
+    | SelectPrimitive.Root.Props<Value, Multiple>['items']
+    | undefined;
 
   return (
     <SelectItemsMapContext.Provider value={{ map, currentValue: props.value }}>
-      <SelectPrimitive.Root<Value, Multiple> {...props}>
+      <SelectPrimitive.Root<Value, Multiple> items={resolvedItems} {...props}>
         {children}
       </SelectPrimitive.Root>
     </SelectItemsMapContext.Provider>
@@ -141,9 +149,9 @@ function SelectContent({
   children,
   side = "bottom",
   sideOffset = 4,
-  align = "center",
+  align = "start",
   alignOffset = 0,
-  alignItemWithTrigger = true,
+  alignItemWithTrigger = false,
   container,
   ...props
 }: SelectPrimitive.Popup.Props &

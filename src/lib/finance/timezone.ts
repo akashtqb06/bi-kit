@@ -153,3 +153,25 @@ export function formatDateRangeDisplay(from: string, to: string): string {
   return `${d1} ${m1Name} ${y1} - ${d2} ${m2Name} ${y2}`;
 }
 
+/** Formats a period as text for card headers, e.g. "1-2 Nov 2026", "1-31 Oct 2026", "1 Jan - 31 Dec 2026" */
+export function formatPeriodLabel(from: string, to: string): string {
+  if (!from || !to) return '';
+  const [y1, m1, d1] = from.split('-').map(Number);
+  const [y2, m2, d2] = to.split('-').map(Number);
+
+  const m1Name = MONTH_NAMES[m1 - 1] || '';
+  const m2Name = MONTH_NAMES[m2 - 1] || '';
+
+  if (y1 === y2) {
+    if (m1 === m2) {
+      if (d1 === d2) {
+        return `${d1} ${m1Name} ${y1}`;
+      }
+      return `${d1}-${d2} ${m1Name} ${y1}`;
+    }
+    return `${d1} ${m1Name} - ${d2} ${m2Name} ${y1}`;
+  }
+
+  return `${d1} ${m1Name} ${y1} - ${d2} ${m2Name} ${y2}`;
+}
+

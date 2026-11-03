@@ -12,6 +12,7 @@ import {
   ChevronRightIcon,
   CoinsIcon,
   ArrowUpRightIcon,
+  ShieldCheckIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +33,7 @@ export function AccountsView() {
     const cards: AccountWithBalance[] = [];
     const investments: AccountWithBalance[] = [];
     const deposits: AccountWithBalance[] = [];
+    const retirement: AccountWithBalance[] = [];
     const loans: AccountWithBalance[] = [];
 
     accounts.forEach((acc) => {
@@ -43,12 +45,14 @@ export function AccountsView() {
         investments.push(acc);
       } else if (acc.kind === 'fixed_deposit' || acc.kind === 'recurring_deposit') {
         deposits.push(acc);
+      } else if (acc.kind === 'epf' || acc.kind === 'vpf' || acc.kind === 'ppf' || acc.kind === 'nps') {
+        retirement.push(acc);
       } else if (acc.kind === 'loan' || acc.kind === 'other_liability') {
         loans.push(acc);
       }
     });
 
-    return { cashAndBank, cards, investments, deposits, loans };
+    return { cashAndBank, cards, investments, deposits, retirement, loans };
   }, [accounts]);
 
   // Overall totals
@@ -430,7 +434,61 @@ export function AccountsView() {
           </div>
         </div>
 
-        {/* Group 5: Loans */}
+        {/* Group 5: Retirement */}
+        {grouped.retirement.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between border-b pb-2">
+              <div className="flex items-center gap-2">
+                <ShieldCheckIcon className="size-4 text-emerald-600 dark:text-emerald-400" />
+                <h3 className="text-sm font-bold text-foreground">Retirement</h3>
+              </div>
+              <span className="text-xs font-semibold text-foreground">
+                {formatINR(
+                  grouped.retirement.reduce((sum, a) => sum + (a.currentValue || a.balance), 0)
+                )}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {grouped.retirement.map((acc) => (
+                <Link
+                  key={acc.id}
+                  href={`/finance/accounts/${acc.id}`}
+                  className="group block p-4 rounded-xl border bg-card hover:border-primary/50 hover:shadow-xs transition-all"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
+                        {acc.name}
+                      </h4>
+                      <span className="text-[11px] text-muted-foreground uppercase font-medium">
+                        {acc.kind.toUpperCase()}
+                      </span>
+                    </div>
+                    <ChevronRightIcon className="size-4 text-muted-foreground/60 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="text-lg font-bold text-foreground">
+                      {formatINR(acc.currentValue || acc.balance)}
+                    </div>
+                    {acc.pensionMemo !== undefined && acc.pensionMemo > 0 ? (
+                      <div className="text-[11px] text-muted-foreground mt-0.5 font-medium">
+                        EPS (Pension): {formatINR(acc.pensionMemo)}
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-muted-foreground mt-0.5">
+                        Current balance
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Group 6: Loans */}
         {grouped.loans.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center justify-between border-b pb-2">

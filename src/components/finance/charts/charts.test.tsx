@@ -55,7 +55,7 @@ describe('Finance Chart Wrappers', () => {
       expect(html).toContain('No expenses in this period');
     });
 
-    it('groups categories beyond 7 into Others and sums total', () => {
+    it('renders all categories in legend and sums total', () => {
       const data = [
         { name: 'Rent', amount: 3500000 },
         { name: 'Groceries', amount: 1500000 },
@@ -72,8 +72,8 @@ describe('Finance Chart Wrappers', () => {
       // Top categories visible
       expect(html).toContain('Rent');
       expect(html).toContain('Groceries');
-      // 8th and 9th categories collapsed into Others
-      expect(html).toContain('Others');
+      expect(html).toContain('Subscriptions');
+      expect(html).toContain('Healthcare');
       // Contains compact center total
       expect(html).toContain('Monthly Spend');
     });

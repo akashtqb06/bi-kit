@@ -8,9 +8,12 @@ import { cn } from '@/lib/utils';
 
 export interface FinanceDonutItem {
   id?: string;
+  categoryId?: string;
   name: string;
   amount: number; // in paise
   color?: string; // from categoryColorMap or theme
+  percentage?: number;
+  transactionCount?: number;
 }
 
 export interface FinanceDonutChartProps {
@@ -19,6 +22,7 @@ export interface FinanceDonutChartProps {
   height?: number | string;
   className?: string;
   emptyMessage?: string;
+  onItemClick?: (item: FinanceDonutItem) => void;
 }
 
 const DEFAULT_THEME_COLORS = [
@@ -35,9 +39,10 @@ const DEFAULT_THEME_COLORS = [
 export function FinanceDonutChart({
   data,
   totalLabel = 'Total Expense',
-  height = 260,
+  height,
   className,
   emptyMessage = 'No expenses in this period',
+  onItemClick,
 }: FinanceDonutChartProps) {
   // Filter out non-positive amounts and sort descending
   const sortedItems = React.useMemo(() => {
@@ -50,42 +55,52 @@ export function FinanceDonutChart({
     return sortedItems.reduce((sum, item) => sum + item.amount, 0);
   }, [sortedItems]);
 
-  // Top 7 plus "Others"
+  // Donut slices group items under 2% into "Others" visually only
   const { displaySlices, othersList } = React.useMemo(() => {
-    if (sortedItems.length <= 7) {
-      return {
-        displaySlices: sortedItems.map((item, idx) => ({
-          ...item,
-          key: `slice_${idx}`,
-          color: item.color || DEFAULT_THEME_COLORS[idx % DEFAULT_THEME_COLORS.length],
-        })),
-        othersList: [],
-      };
+    if (totalPaise === 0) {
+      return { displaySlices: [], othersList: [] };
     }
 
-    const top7 = sortedItems.slice(0, 7).map((item, idx) => ({
-      ...item,
-      key: `slice_${idx}`,
-      color: item.color || DEFAULT_THEME_COLORS[idx % DEFAULT_THEME_COLORS.length],
-    }));
+    const mainSlices: Array<FinanceDonutItem & { key: string; color: string }> = [];
+    const others: FinanceDonutItem[] = [];
 
-    const others = sortedItems.slice(7);
+    sortedItems.forEach((item, idx) => {
+      const pct = item.amount / totalPaise;
+      const color = item.color || DEFAULT_THEME_COLORS[idx % DEFAULT_THEME_COLORS.length];
+      if (pct >= 0.02) {
+        mainSlices.push({
+          ...item,
+          key: `slice_${item.id || item.categoryId || idx}`,
+          color,
+        });
+      } else {
+        others.push(item);
+      }
+    });
+
+    if (others.length === 0) {
+      return { displaySlices: mainSlices, othersList: [] };
+    }
+
     const othersTotal = others.reduce((acc, curr) => acc + curr.amount, 0);
+    const othersTxCount = others.reduce((acc, curr) => acc + (curr.transactionCount || 0), 0);
 
     return {
       displaySlices: [
-        ...top7,
+        ...mainSlices,
         {
           id: 'others',
+          categoryId: 'others',
           name: 'Others',
           amount: othersTotal,
           key: 'slice_others',
           color: 'hsl(var(--muted-foreground) / 0.8)',
+          transactionCount: othersTxCount,
         },
       ],
       othersList: others,
     };
-  }, [sortedItems]);
+  }, [sortedItems, totalPaise]);
 
   const chartConfig = React.useMemo<ChartConfig>(() => {
     const cfg: ChartConfig = {};
@@ -105,7 +120,7 @@ export function FinanceDonutChart({
           'flex flex-col items-center justify-center rounded-lg border border-dashed text-xs text-muted-foreground p-6 text-center',
           className
         )}
-        style={{ height }}
+        style={{ height: height || 200 }}
       >
         <span>{emptyMessage}</span>
       </div>
@@ -113,7 +128,7 @@ export function FinanceDonutChart({
   }
 
   return (
-    <div className={cn('flex flex-col sm:flex-row items-center gap-4 w-full', className)}>
+    <div className={cn('flex flex-col md:flex-row items-center gap-5 w-full', className)}>
       {/* Donut Container with Center Total */}
       <div className="relative shrink-0 flex items-center justify-center" style={{ width: 180, height: 180 }}>
         <ChartContainer
@@ -128,7 +143,7 @@ export function FinanceDonutChart({
                 const pct = totalPaise > 0 ? ((slice.amount / totalPaise) * 100).toFixed(1) : '0';
 
                 return (
-                  <div className="rounded-lg border border-border/60 bg-background/95 backdrop-blur-xs px-3 py-2 text-xs shadow-md space-y-1">
+                  <div className="rounded-lg border border-border/60 bg-background/95 backdrop-blur-xs px-3 py-2 text-xs shadow-md space-y-1 z-50">
                     <div className="flex items-center gap-2">
                       <span
                         className="size-2 rounded-full"
@@ -140,16 +155,26 @@ export function FinanceDonutChart({
                       <span>{formatInr(slice.amount)}</span>
                       <span className="font-medium text-foreground">{pct}%</span>
                     </div>
+                    {slice.transactionCount !== undefined && (
+                      <div className="text-[10px] text-muted-foreground">
+                        {slice.transactionCount} {slice.transactionCount === 1 ? 'transaction' : 'transactions'}
+                      </div>
+                    )}
 
                     {slice.id === 'others' && othersList.length > 0 && (
-                      <div className="pt-1.5 border-t text-[10px] space-y-0.5 text-muted-foreground max-h-32 overflow-y-auto">
-                        <div className="font-medium text-foreground mb-0.5">Includes:</div>
-                        {othersList.map((o) => (
-                          <div key={o.name} className="flex justify-between gap-2">
-                            <span className="truncate max-w-[100px]">{o.name}</span>
-                            <span>{formatInr(o.amount)}</span>
-                          </div>
-                        ))}
+                      <div className="pt-1.5 border-t text-[10px] space-y-0.5 text-muted-foreground max-h-36 overflow-y-auto">
+                        <div className="font-medium text-foreground mb-0.5">Includes (&lt;2% each):</div>
+                        {othersList.map((o) => {
+                          const oPct = totalPaise > 0 ? ((o.amount / totalPaise) * 100).toFixed(1) : '0';
+                          return (
+                            <div key={o.id || o.name} className="flex justify-between items-center gap-2">
+                              <span className="truncate max-w-[110px]">{o.name}</span>
+                              <span className="shrink-0 tabular-nums">
+                                {formatInr(o.amount)} ({oPct}%)
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -165,6 +190,12 @@ export function FinanceDonutChart({
               paddingAngle={2}
               stroke="hsl(var(--background))"
               strokeWidth={2}
+              className={cn(onItemClick && 'cursor-pointer')}
+              onClick={(entry) => {
+                if (onItemClick && entry && entry.payload) {
+                  onItemClick(entry.payload as FinanceDonutItem);
+                }
+              }}
             >
               {displaySlices.map((entry) => (
                 <Cell key={entry.key} fill={entry.color} />
@@ -184,24 +215,42 @@ export function FinanceDonutChart({
         </div>
       </div>
 
-      {/* Structured Legend: sorted by amount, dot, name, amount and percent */}
-      <div className="flex-1 min-w-0 w-full divide-y divide-border/50 text-xs">
-        {displaySlices.map((item) => {
+      {/* Structured Legend: Lists EVERY category with spend (no cap), scrollable when long */}
+      <div className="flex-1 min-w-0 w-full max-h-64 overflow-y-auto divide-y divide-border/50 text-xs pr-1">
+        {sortedItems.map((item, idx) => {
           const pct = totalPaise > 0 ? ((item.amount / totalPaise) * 100).toFixed(1) : '0';
+          const color = item.color || DEFAULT_THEME_COLORS[idx % DEFAULT_THEME_COLORS.length];
 
           return (
             <div
-              key={item.key}
-              className="py-1.5 flex items-center justify-between gap-2 hover:bg-muted/30 px-1 rounded transition-colors"
+              key={item.id || item.categoryId || item.name}
+              role={onItemClick ? 'button' : undefined}
+              tabIndex={onItemClick ? 0 : undefined}
+              onClick={() => onItemClick?.(item)}
+              onKeyDown={(e) => {
+                if ((e.key === 'Enter' || e.key === ' ') && onItemClick) {
+                  e.preventDefault();
+                  onItemClick(item);
+                }
+              }}
+              className={cn(
+                'py-1.5 flex items-center justify-between gap-2 px-1 rounded transition-colors',
+                onItemClick ? 'cursor-pointer hover:bg-muted/50' : 'hover:bg-muted/30'
+              )}
             >
               <div className="flex items-center gap-2 min-w-0">
                 <span
                   className="size-2 rounded-full shrink-0"
-                  style={{ backgroundColor: item.color }}
+                  style={{ backgroundColor: color }}
                 />
                 <span className="truncate font-medium text-foreground" title={item.name}>
                   {item.name}
                 </span>
+                {item.transactionCount !== undefined && (
+                  <span className="text-[10px] text-muted-foreground shrink-0">
+                    {`(${item.transactionCount} ${item.transactionCount === 1 ? 'txn' : 'txns'})`}
+                  </span>
+                )}
               </div>
 
               <div className="flex items-center gap-3 shrink-0 text-right tabular-nums">

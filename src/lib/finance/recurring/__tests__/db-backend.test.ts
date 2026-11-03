@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { db, finAccounts, finRecurringRules, finTransactions } from '@src/lib/db';
 import { setupFinanceTestDb, USER_A } from '../../__tests__/db/test-helper';
-import { generateDueRecurringTransactions } from '../generator';
+import {
+  generateDueRecurringTransactions,
+  catchUpRecurringRulesIfDue,
+  resetCatchUpThrottleForTest,
+} from '../generator';
 
 describe('Recurring Rules: DB Backend Integration Tests (PGlite)', () => {
   let accountId: string;
@@ -200,5 +204,63 @@ describe('Recurring Rules: DB Backend Integration Tests (PGlite)', () => {
       '2024-02-29', // Feb clamped
       '2024-03-31', // Mar restored
     ]);
+  });
+
+  it('correctly executes a mutual fund transfer SIP recurring rule', async () => {
+    // Create destination mutual fund account
+    const [mfAcc] = await db
+      .insert(finAccounts)
+      .values({
+        userId: USER_A,
+        name: 'UTI Nifty 50 Fund',
+        kind: 'mutual_fund',
+        class: 'asset',
+        currency: 'INR',
+        isActive: true,
+      })
+      .returning();
+
+    // Insert a transfer recurring rule (SIP)
+    const [rule] = await db
+      .insert(finRecurringRules)
+      .values({
+        userId: USER_A,
+        accountId, // Bank source
+        toAccountId: mfAcc.id, // Mutual fund target
+        type: 'transfer',
+        amount: 250000, // ₹2,500
+        payee: 'UTI Nifty Next 50 SIP',
+        note: 'Automated SIP installment [DOM:2]',
+        frequency: 'monthly',
+        interval: 1,
+        startDate: '2026-11-02',
+        nextOccurrence: '2026-11-02',
+        isActive: true,
+      })
+      .returning();
+
+    resetCatchUpThrottleForTest();
+    await catchUpRecurringRulesIfDue(USER_A, { force: true });
+
+    // Verify transaction generated
+    const txns = await db
+      .select()
+      .from(finTransactions)
+      .where(and(eq(finTransactions.userId, USER_A), eq(finTransactions.recurringRuleId, rule.id)));
+
+    expect(txns.length).toBe(1);
+    expect(txns[0].type).toBe('transfer');
+    expect(txns[0].accountId).toBe(accountId);
+    expect(txns[0].toAccountId).toBe(mfAcc.id);
+    expect(Number(txns[0].amount)).toBe(250000);
+    expect(Number(txns[0].signedAmount)).toBe(-250000);
+    expect(txns[0].date).toBe('2026-11-02');
+
+    // Rule nextOccurrence should now be updated to December 2nd
+    const [updatedRule] = await db
+      .select()
+      .from(finRecurringRules)
+      .where(eq(finRecurringRules.id, rule.id));
+    expect(updatedRule.nextOccurrence).toBe('2026-12-02');
   });
 });

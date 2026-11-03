@@ -38,6 +38,10 @@ export const finAccounts = pgTable(
                 'loan',
                 'other_asset',
                 'other_liability',
+                'epf',
+                'vpf',
+                'ppf',
+                'nps',
             ],
         }).notNull(),
         class: text('class', {
@@ -258,6 +262,8 @@ export const finUserSettings = pgTable(
         timezone: text('timezone').notNull().default('Asia/Kolkata'),
         weekStartsOn: integer('week_starts_on').notNull().default(1),
         trackingStartDate: date('tracking_start_date', { mode: 'string' }),
+        includeEpsInNetWorth: boolean('include_eps_in_net_worth').notNull().default(false),
+        includeAccruedInterestInNetWorth: boolean('include_accrued_interest_in_net_worth').notNull().default(false),
         setupStep: integer('setup_step').notNull().default(1),
         setupCompletedAt: timestamp('setup_completed_at', { withTimezone: true, mode: 'date' }),
         setupSkippedAt: timestamp('setup_skipped_at', { withTimezone: true, mode: 'date' }),
@@ -269,6 +275,54 @@ export const finUserSettings = pgTable(
             .notNull()
             .defaultNow(),
     }
+);
+
+export const finPfEntries = pgTable(
+    'fin_pf_entries',
+    {
+        id: text('id')
+            .primaryKey()
+            .$defaultFn(() => newId()),
+        userId: text('user_id')
+            .notNull()
+            .references(() => users.id, { onDelete: 'cascade' }),
+        accountId: text('account_id')
+            .notNull()
+            .references(() => finAccounts.id, { onDelete: 'cascade' }),
+        entryKind: text('entry_kind', {
+            enum: [
+                'opening',
+                'contribution',
+                'transfer_in_principal',
+                'transfer_in_interest',
+                'interest_credit',
+                'withdrawal',
+            ],
+        }).notNull(),
+        periodMonth: text('period_month'),
+        postedDate: date('posted_date', { mode: 'string' }),
+        dateApprox: boolean('date_approx').notNull().default(false),
+        epfWages: bigint('epf_wages', { mode: 'number' }).notNull().default(0),
+        epsWages: bigint('eps_wages', { mode: 'number' }).notNull().default(0),
+        employeeAmount: bigint('employee_amount', { mode: 'number' }).notNull().default(0),
+        employerAmount: bigint('employer_amount', { mode: 'number' }).notNull().default(0),
+        pensionAmount: bigint('pension_amount', { mode: 'number' }).notNull().default(0),
+        sourceLabel: text('source_label'),
+        passbookKey: text('passbook_key').notNull(),
+        note: text('note'),
+        createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
+            .notNull()
+            .defaultNow(),
+        updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' })
+            .notNull()
+            .defaultNow(),
+    },
+    (table) => [
+        uniqueIndex('fin_pf_entries_account_passbook_key_unique').on(table.accountId, table.passbookKey),
+        index('fin_pf_entries_user_account_idx').on(table.userId, table.accountId),
+        index('fin_pf_entries_account_period_idx').on(table.accountId, table.periodMonth),
+        index('fin_pf_entries_account_date_idx').on(table.accountId, table.postedDate),
+    ]
 );
 
 export type FinAccount = typeof finAccounts.$inferSelect;
@@ -285,4 +339,6 @@ export type FinRecurringRule = typeof finRecurringRules.$inferSelect;
 export type NewFinRecurringRule = typeof finRecurringRules.$inferInsert;
 export type FinUserSettings = typeof finUserSettings.$inferSelect;
 export type NewFinUserSettings = typeof finUserSettings.$inferInsert;
+export type FinPfEntry = typeof finPfEntries.$inferSelect;
+export type NewFinPfEntry = typeof finPfEntries.$inferInsert;
 

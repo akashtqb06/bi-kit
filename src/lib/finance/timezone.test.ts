@@ -6,6 +6,7 @@ import {
   getPresetDateRange,
   getPreviousPeriodRange,
   formatDateRangeDisplay,
+  formatPeriodLabel,
 } from './timezone';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
@@ -103,6 +104,28 @@ describe('timezone helpers', () => {
     it('formats cross-year date range correctly', () => {
       const display = formatDateRangeDisplay('2025-12-01', '2026-01-15');
       expect(display).toBe('1 Dec 2025 - 15 Jan 2026');
+    });
+  });
+
+  describe('formatPeriodLabel', () => {
+    it('formats single day as "2 Nov 2026"', () => {
+      expect(formatPeriodLabel('2026-11-02', '2026-11-02')).toBe('2 Nov 2026');
+    });
+
+    it('formats same month range as "1-2 Nov 2026"', () => {
+      expect(formatPeriodLabel('2026-11-01', '2026-11-02')).toBe('1-2 Nov 2026');
+    });
+
+    it('formats full month range as "1-31 Oct 2026"', () => {
+      expect(formatPeriodLabel('2026-10-01', '2026-10-31')).toBe('1-31 Oct 2026');
+    });
+
+    it('formats same-year cross-month range as "1 Jan - 31 Dec 2026"', () => {
+      expect(formatPeriodLabel('2026-01-01', '2026-12-31')).toBe('1 Jan - 31 Dec 2026');
+    });
+
+    it('formats cross-year range as "1 Nov 2025 - 15 Feb 2026"', () => {
+      expect(formatPeriodLabel('2025-11-01', '2026-02-15')).toBe('1 Nov 2025 - 15 Feb 2026');
     });
   });
 });

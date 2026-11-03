@@ -8,6 +8,7 @@ export interface AccountForNetWorth {
   balance: number; // in paise
   currentValue?: number | null; // in paise (for investments/deposits if available)
   isActive?: boolean;
+  pensionMemo?: number | null; // in paise (for EPF/VPF EPS pension)
 }
 
 export interface NetWorthBreakdown {
@@ -16,15 +17,24 @@ export interface NetWorthBreakdown {
   netWorth: number;
 }
 
+export interface NetWorthOptions {
+  includeEpsInNetWorth?: boolean;
+}
+
 /**
  * Calculates user net worth across accounts according to contract rules:
  * - Asset accounts: use currentValue if provided (e.g. for investments / deposits), otherwise ledger balance.
+ * - For EPF / VPF accounts: PF balance (employee + employer) is included in net worth. EPS pension memo
+ *   is excluded by default and included only if options.includeEpsInNetWorth is true.
  * - Liability accounts:
  *   - credit_card: outstanding = max(0, -balance)
  *   - loan / other_liability: outstanding = max(0, balance)
  * - Net Worth = totalAssets - totalLiabilities
  */
-export function calculateNetWorth(accounts: AccountForNetWorth[]): NetWorthBreakdown {
+export function calculateNetWorth(
+  accounts: AccountForNetWorth[],
+  options?: NetWorthOptions
+): NetWorthBreakdown {
   let totalAssets = 0;
   let totalLiabilities = 0;
 
@@ -34,9 +44,14 @@ export function calculateNetWorth(accounts: AccountForNetWorth[]): NetWorthBreak
     }
 
     if (acc.class === 'asset') {
-      const val = acc.currentValue !== null && acc.currentValue !== undefined
+      let val = acc.currentValue !== null && acc.currentValue !== undefined
         ? acc.currentValue
         : acc.balance;
+
+      if ((acc.kind === 'epf' || acc.kind === 'vpf') && options?.includeEpsInNetWorth && acc.pensionMemo) {
+        val += acc.pensionMemo;
+      }
+
       totalAssets += Math.max(0, val);
     } else if (acc.class === 'liability') {
       let outstanding = 0;

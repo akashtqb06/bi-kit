@@ -28,6 +28,7 @@ import { useFinanceStore } from '../shared/finance-store';
 import { parseAmountExpression } from '../shared/expression-parser';
 import { getDeterministicCategoryColor } from '@src/lib/finance/colors';
 import { formatINR, formatAccountDisplayBalance } from '../shared/format';
+import { CategoryCombobox } from '../shared/category-combobox';
 import { todayInTz, yesterdayInTz, DEFAULT_TZ } from '@src/lib/finance/timezone';
 import type { TransactionType } from '@src/lib/finance/constants';
 import type { CreateTransactionDTO } from '@src/lib/finance/contract';
@@ -62,7 +63,6 @@ export function QuickAddForm({
   const [customDate, setCustomDate] = useState(() => todayInTz(DEFAULT_TZ));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [categorySearch, setCategorySearch] = useState('');
 
   // Default asset account helper (never defaults to a liability)
   const defaultAssetAccountId = useMemo(() => {
@@ -137,7 +137,6 @@ export function QuickAddForm({
       setDateSelection('today');
     }
     setErrors({});
-    setCategorySearch('');
     setShowCardsAndLoans(false);
   }, [initialData, lastUsedAccountId, accounts, defaultAssetAccountId, todayStr, yesterdayStr]);
 
@@ -166,14 +165,6 @@ export function QuickAddForm({
   // Destination credit card quick payment amount helper
   const destinationIsCard = selectedToAccount?.kind === 'credit_card';
   const cardOutstanding = destinationIsCard ? selectedToAccount?.outstanding || 0 : 0;
-
-  // Filtered categories
-  const filteredCategories = useMemo(() => {
-    const list = categories.filter((c) => c.type === (type === 'income' ? 'income' : 'expense'));
-    if (!categorySearch.trim()) return list;
-    const q = categorySearch.toLowerCase();
-    return list.filter((c) => c.name.toLowerCase().includes(q));
-  }, [categories, type, categorySearch]);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -505,60 +496,17 @@ export function QuickAddForm({
       {/* Category Selection (Expense / Income) */}
       {type !== 'transfer' && (
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <Label className="text-xs font-medium text-muted-foreground">Category</Label>
-            {categoryId && (
-              (() => {
-                const sel = categories.find((c) => c.id === categoryId);
-                if (!sel) return null;
-                const col = sel.color || getDeterministicCategoryColor(sel.name);
-                return (
-                  <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                    <span
-                      className="size-2 rounded-full shrink-0 ring-1 ring-border shadow-xs"
-                      style={{ backgroundColor: col }}
-                    />
-                    <span className="truncate max-w-[130px]">{sel.name}</span>
-                  </span>
-                );
-              })()
-            )}
-          </div>
-          <div className="space-y-2">
-            <Input
-              type="text"
-              placeholder="Search category or select below..."
-              value={categorySearch}
-              onChange={(e) => setCategorySearch(e.target.value)}
-              className="h-8 text-xs bg-card"
-            />
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-36 overflow-y-auto p-1 border rounded-md bg-muted/20">
-              {filteredCategories.map((cat) => {
-                const isSelected = categoryId === cat.id;
-                const catColor = cat.color || getDeterministicCategoryColor(cat.name);
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setCategoryId(cat.id)}
-                    className={cn(
-                      'flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs text-left transition-colors truncate',
-                      isSelected
-                        ? 'bg-primary text-primary-foreground font-medium'
-                        : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-                    )}
-                  >
-                    <span
-                      className="size-2 rounded-full shrink-0 ring-1 ring-border shadow-xs"
-                      style={{ backgroundColor: catColor }}
-                    />
-                    <span className="truncate">{cat.name}</span>
-                    {isSelected && <CheckIcon className="size-3 ml-auto shrink-0" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <Label htmlFor="quick-add-category" className="text-xs font-medium text-muted-foreground">
+            Category
+          </Label>
+          <CategoryCombobox
+            id="quick-add-category"
+            value={categoryId}
+            onValueChange={(val) => setCategoryId(val)}
+            categories={categories}
+            filterType={type as 'expense' | 'income'}
+            placeholder="Search category or select below..."
+          />
         </div>
       )}
 

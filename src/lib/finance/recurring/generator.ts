@@ -7,13 +7,46 @@ import {
   extractAnchorDay,
   extractAnchorMonth,
 } from './date-math';
+import { todayInTz, DEFAULT_TZ } from '../timezone';
 import type { GenerationResult, RuleGenerationDetail } from './types';
 
 export interface GenerateOptions {
   userId?: string;
-  asOfDate?: string; // YYYY-MM-DD, defaults to today (UTC)
+  asOfDate?: string; // YYYY-MM-DD, defaults to today in configured timezone
   backend?: 'mock' | 'db';
   service?: FinanceService;
+}
+
+const lastCatchUpByUser = new Map<string, number>();
+
+export function resetCatchUpThrottleForTest(): void {
+  lastCatchUpByUser.clear();
+}
+
+/**
+ * Automatically catches up due recurring transactions for a given user.
+ * Throttled to run at most once per 60 seconds per user (unless forced)
+ * to keep read API routes fast while ensuring missed crons/asleep host states catch up.
+ */
+export async function catchUpRecurringRulesIfDue(
+  userId: string,
+  options?: { force?: boolean }
+): Promise<void> {
+  const now = Date.now();
+  const lastRun = lastCatchUpByUser.get(userId) || 0;
+  if (!options?.force && now - lastRun < 60_000) {
+    return;
+  }
+  lastCatchUpByUser.set(userId, now);
+  try {
+    const today = todayInTz(process.env.APP_TIMEZONE || DEFAULT_TZ);
+    await generateDueRecurringTransactions({
+      userId,
+      asOfDate: today,
+    });
+  } catch (err) {
+    console.error('[recurring] Failed to auto-catch-up recurring rules:', err);
+  }
 }
 
 /**
@@ -24,7 +57,8 @@ export interface GenerateOptions {
 export async function generateDueRecurringTransactions(
   options: GenerateOptions = {}
 ): Promise<GenerationResult> {
-  const asOfDate = options.asOfDate || new Date().toISOString().slice(0, 10);
+  const asOfDate =
+    options.asOfDate || todayInTz(process.env.APP_TIMEZONE || DEFAULT_TZ);
   const backend = options.backend || process.env.FINANCE_BACKEND || 'db';
 
   if (backend === 'mock') {

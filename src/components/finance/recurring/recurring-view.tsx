@@ -36,6 +36,7 @@ import {
 import { RecurringRuleDialog } from './recurring-rule-dialog';
 import { RecurringDeleteDialog } from './recurring-delete-dialog';
 import { extractAnchorDay } from '@src/lib/finance/recurring/date-math';
+import { useFinanceStore } from '@src/components/finance/shared/finance-store';
 
 interface RecurringViewProps {
   initialData: RecurringPageData;
@@ -58,6 +59,8 @@ export function RecurringView({ initialData }: RecurringViewProps) {
     try {
       const refreshed = await getRecurringPageDataAction();
       setData(refreshed);
+      useFinanceStore.getState().refreshAccounts().catch(() => {});
+      useFinanceStore.getState().refreshTransactions().catch(() => {});
     } catch (_err) {
       toast.error('Failed to reload recurring rules');
     }

@@ -21,6 +21,7 @@ import {
   calculateInvestmentContributions,
   calculateInvestmentCurrentValue,
   calculateInvestmentGain,
+  calculateInvestmentHolding,
 } from '../investments';
 import { calculateNetWorth } from '../net-worth';
 
@@ -213,6 +214,105 @@ describe('Finance Domain Logic: Investment Calculations', () => {
     // Current value is 750000
     const gain = calculateInvestmentGain(750000, contributions);
     expect(gain).toBe(150000);
+  });
+
+  it('reflects transfers into invested amount (cost basis) and current value for investment holding', () => {
+    const invAcc = 'acc_groww_mf';
+    const bankAcc = 'acc_savings_bank';
+
+    // 1. Initial setup valuation: ₹3,50,000 value, ₹2,80,000 invested (cost basis)
+    const openingValuation = {
+      date: '2026-10-01',
+      value: 35000000,
+      costBasis: 28000000,
+      note: 'Opening valuation recorded during setup',
+    };
+
+    // Before any transfer: holding reflects opening valuation and cost basis
+    const initialHolding = calculateInvestmentHolding({
+      openingContribution: 28000000,
+      transactions: [],
+      accountId: invAcc,
+      latestValuation: openingValuation,
+      asOfDate: '2026-10-01',
+    });
+
+    expect(initialHolding.costBasis).toBe(28000000); // ₹2,80,000
+    expect(initialHolding.currentValue).toBe(35000000); // ₹3,50,000
+    expect(initialHolding.gain).toBe(7000000); // +₹70,000 gain
+    expect(initialHolding.gainPct).toBe(25); // +25.0%
+
+    // 2. Add transfer from savings account to Groww: ₹50,000 (5,000,000 paise)
+    const txs = [
+      {
+        accountId: bankAcc,
+        toAccountId: invAcc,
+        type: 'transfer' as const,
+        amount: 5000000,
+        date: '2026-11-03',
+      },
+    ];
+
+    const holdingAfterTransfer = calculateInvestmentHolding({
+      openingContribution: 28000000,
+      transactions: txs,
+      accountId: invAcc,
+      latestValuation: openingValuation,
+      asOfDate: '2026-11-03',
+    });
+
+    // Total invested MUST reflect the ₹50,000 transfer: ₹2,80,000 + ₹50,000 = ₹3,30,000
+    expect(holdingAfterTransfer.costBasis).toBe(33000000);
+    // Current value must reflect the newly added cash: ₹3,50,000 + ₹50,000 = ₹4,00,000
+    expect(holdingAfterTransfer.currentValue).toBe(40000000);
+    // Gain preserves the underlying capital growth (+₹70,000)
+    expect(holdingAfterTransfer.gain).toBe(7000000);
+    expect(holdingAfterTransfer.gainPct).toBe(21.2); // (7000000 / 33000000) * 100 = 21.2%
+  });
+
+  it('adjusts invested amount and current value based on current gain when recurring rule transfer is added on anchor date', () => {
+    const invAcc = 'acc_groww_mf';
+    const bankAcc = 'acc_bank';
+
+    // Manual valuation recorded on 2026-11-03 with market value ₹3,50,000 and cost basis ₹2,80,000
+    const manualValuation = {
+      date: '2026-11-03',
+      value: 35000000,
+      costBasis: 28000000,
+      createdAt: '2026-11-03T10:00:00Z',
+    };
+
+    // Recurring rule transaction generated on 2026-11-03 for ₹10,000 (1,000,000 paise)
+    const recurringTx = {
+      accountId: bankAcc,
+      toAccountId: invAcc,
+      type: 'transfer' as const,
+      amount: 1000000,
+      date: '2026-11-03',
+      createdAt: '2026-11-03T10:05:00Z',
+      isRecurring: true,
+    };
+
+    const holding = calculateInvestmentHolding({
+      openingContribution: 28000000,
+      transactions: [recurringTx],
+      accountId: invAcc,
+      latestValuation: manualValuation,
+      asOfDate: '2026-11-03',
+    });
+
+    // 1. Invested amount must increase by ₹10,000: ₹2,80,000 + ₹10,000 = ₹2,90,000
+    expect(holding.costBasis).toBe(29000000);
+
+    // 2. Current market value must adjust based on current gain (₹70,000):
+    // Current Value = Invested (₹2,90,000) + Gain (₹70,000) = ₹3,60,000
+    expect(holding.currentValue).toBe(36000000);
+
+    // 3. Current gain is maintained intact at ₹70,000
+    expect(holding.gain).toBe(7000000);
+
+    // 4. Return rate is adjusted to (70,000 / 290,000) * 100 = 24.1%
+    expect(holding.gainPct).toBe(24.1);
   });
 });
 

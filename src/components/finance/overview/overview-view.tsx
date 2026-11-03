@@ -15,9 +15,18 @@ import {
   RotateCcwIcon,
   FilterIcon,
   CalendarIcon,
+  ShieldCheckIcon,
+  InfoIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { DatePicker } from '@/components/ui/date-picker';
 import {
   Select,
@@ -29,11 +38,15 @@ import {
 import { useFinanceStore } from '../shared/finance-store';
 import { formatINR, formatPercent } from '../shared/format';
 import { FinancePageSkeleton } from '../shared/finance-skeleton';
-import { FinanceAreaChart, FinanceDonutChart } from '../charts';
+import { FinanceAreaChart, FinanceDonutChart, type FinanceDonutItem } from '../charts';
 import { cn } from '@/lib/utils';
 import {
   formatDateRangeDisplay,
+  formatPeriodLabel,
   getPresetDateRange,
+  getPreviousPeriodRange,
+  todayInTz,
+  DEFAULT_TZ,
   type OverviewPreset,
 } from '@src/lib/finance/timezone';
 import { getCategoryColorMap } from '@src/lib/finance/colors';
@@ -71,6 +84,53 @@ export function OverviewView() {
 
   const customFrom = customFromInput ?? fromParam;
   const customTo = customToInput ?? toParam;
+
+  // EPS net worth setting state
+  const [includeEps, setIncludeEps] = useState(false);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadSettings() {
+      try {
+        const res = await fetch('/api/finance/settings');
+        if (res.ok) {
+          const data = (await res.json()) as { includeEpsInNetWorth?: boolean };
+          if (!ignore && data.includeEpsInNetWorth !== undefined) {
+            setIncludeEps(Boolean(data.includeEpsInNetWorth));
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    void loadSettings();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const handleToggleEps = async (checked: boolean) => {
+    setIncludeEps(checked);
+    try {
+      await fetch('/api/finance/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ includeEpsInNetWorth: checked }),
+      });
+      void Promise.all([
+        refreshOverviewStats({
+          preset: activePreset,
+          from: fromParam || undefined,
+          to: toParam || undefined,
+          accounts: accountsParam || undefined,
+        }),
+        refreshAccounts(),
+        refreshNetWorthHistory(),
+      ]);
+    } catch {
+      setIncludeEps(!checked);
+    }
+  };
 
   // Determine active date range string
   const activeRange = overviewStats?.activePeriod
@@ -170,8 +230,14 @@ export function OverviewView() {
   const totalAssets = useMemo(() => {
     return accounts
       .filter((a) => a.class === 'asset')
-      .reduce((sum, a) => sum + (a.currentValue || a.balance), 0);
-  }, [accounts]);
+      .reduce((sum, a) => {
+        let val = a.currentValue || a.balance;
+        if (includeEps && (a.kind === 'epf' || a.kind === 'vpf') && a.pensionMemo) {
+          val += a.pensionMemo;
+        }
+        return sum + val;
+      }, 0);
+  }, [accounts, includeEps]);
 
   const totalLiabilities = useMemo(() => {
     return accounts
@@ -202,6 +268,7 @@ export function OverviewView() {
       cards: { label: 'Credit Cards (Due)', balance: 0, icon: CreditCardIcon, color: '#ef4444' },
       investments: { label: 'Investments', balance: 0, icon: TrendingUpIcon, color: '#3b82f6' },
       deposits: { label: 'Deposits (FD/RD)', balance: 0, icon: PiggyBankIcon, color: '#f59e0b' },
+      retirement: { label: 'Retirement (PF/NPS)', balance: 0, icon: ShieldCheckIcon, color: '#059669' },
       loans: { label: 'Loans', balance: 0, icon: LandmarkIcon, color: '#8b5cf6' },
     };
 
@@ -214,13 +281,15 @@ export function OverviewView() {
         kinds.investments.balance += a.currentValue || a.balance;
       } else if (a.kind === 'fixed_deposit' || a.kind === 'recurring_deposit') {
         kinds.deposits.balance += a.accruedValue || a.balance;
+      } else if (a.kind === 'epf' || a.kind === 'vpf' || a.kind === 'ppf' || a.kind === 'nps') {
+        kinds.retirement.balance += (a.currentValue || a.balance) + (includeEps && a.pensionMemo ? a.pensionMemo : 0);
       } else if (a.kind === 'loan' || a.kind === 'other_liability') {
         kinds.loans.balance += a.outstanding;
       }
     });
 
     return kinds;
-  }, [accounts]);
+  }, [accounts, includeEps]);
 
   // Category Color Map
   const categoryColorMap = useMemo(() => {
@@ -236,14 +305,28 @@ export function OverviewView() {
   }, [netWorthHistory]);
 
   // Spend by Category Donut Data (strictly server-computed aggregates)
-  const spendByCategoryData = useMemo(() => {
+  const spendByCategoryData = useMemo<FinanceDonutItem[]>(() => {
     if (!overviewStats?.spendByCategory) return [];
     return overviewStats.spendByCategory.map((c) => ({
+      id: c.categoryId,
+      categoryId: c.categoryId,
       name: c.categoryName,
       amount: c.amount,
-      color: categoryColorMap[c.categoryName] || categoryColorMap[c.categoryId],
+      color: categoryColorMap[c.categoryName] || categoryColorMap[c.categoryId] || c.categoryColor || undefined,
+      percentage: c.percentage,
+      transactionCount: c.transactionCount,
     }));
   }, [overviewStats, categoryColorMap]);
+
+  const handleCategoryClick = (item: FinanceDonutItem) => {
+    const catId = item.id || item.categoryId;
+    if (!catId || catId === 'others') return;
+    const params = new URLSearchParams();
+    params.set('category', catId);
+    if (activeRange.from) params.set('from', activeRange.from);
+    if (activeRange.to) params.set('to', activeRange.to);
+    router.push(`/finance/transactions?${params.toString()}`);
+  };
 
   // Period stats & deltas
   const currentIncome = overviewStats?.monthlyIncome ?? 0;
@@ -263,6 +346,47 @@ export function OverviewView() {
   const savingsRateDelta = prevSavingsRate > 0
     ? Math.round((currentSavingsRate - prevSavingsRate) * 10) / 10
     : null;
+
+  // Active period display label and tracking start date rules
+  const today = todayInTz(DEFAULT_TZ);
+  const displayTo =
+    (activePreset === 'this_month' || activePreset === 'this_year') &&
+    activeRange.to > today &&
+    activeRange.from <= today
+      ? today
+      : activeRange.to;
+  const periodLabel = formatPeriodLabel(activeRange.from, displayTo);
+
+  const trackingStartDate = overviewStats?.trackingStartDate;
+  const prevPeriodRange =
+    overviewStats?.previousPeriodRange ||
+    getPreviousPeriodRange(activeRange.from, activeRange.to);
+  const isPriorPeriodValid = Boolean(
+    trackingStartDate &&
+    prevPeriodRange?.from &&
+    prevPeriodRange.from >= trackingStartDate
+  );
+
+  const formattedTrackingStartDate = useMemo(() => {
+    if (!trackingStartDate) return 'Tracking start date not set';
+    const [y, m, d] = trackingStartDate.split('-').map(Number);
+    const monthNames = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    const monthName = monthNames[m - 1] || '';
+    return `${d} ${monthName} ${y}`;
+  }, [trackingStartDate]);
 
   const netWorthChange = useMemo(() => {
     if (netWorthHistory.length < 2) return null;
@@ -505,26 +629,54 @@ export function OverviewView() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-5 rounded-2xl border bg-card shadow-xs">
         <div className="lg:col-span-1 flex flex-col justify-between space-y-4">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Total Net Worth
-              </span>
-              <span className="text-[10px] text-muted-foreground font-medium">
-                (as of today)
-              </span>
-              {netWorthChange !== null && (
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    'text-[10px] font-semibold',
-                    netWorthChange >= 0
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : 'text-destructive'
-                  )}
-                >
-                  {netWorthChange >= 0 ? `+${netWorthChange}%` : `${netWorthChange}%`}
-                </Badge>
-              )}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Total Net Worth
+                </span>
+                <span className="text-[10px] text-muted-foreground font-medium">
+                  (as of today)
+                </span>
+                {netWorthChange !== null && (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'text-[10px] font-semibold',
+                      netWorthChange >= 0
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-destructive'
+                    )}
+                  >
+                    {netWorthChange >= 0 ? `+${netWorthChange}%` : `${netWorthChange}%`}
+                  </Badge>
+                )}
+              </div>
+
+              {/* EPS Pension Toggle */}
+              <div className="flex items-center gap-1.5 bg-muted/40 px-2 py-0.5 rounded-md border text-[11px]">
+                <ShieldCheckIcon className="size-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span className="font-medium text-foreground text-[10px]">Include EPS</span>
+                <TooltipProvider delay={100}>
+                  <Tooltip>
+                    <TooltipTrigger
+                      type="button"
+                      className="text-muted-foreground hover:text-foreground inline-flex items-center cursor-help"
+                      aria-label="EPS pension explanation"
+                    >
+                      <InfoIcon className="size-3" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-xs p-2">
+                      EPF employer share splits into 3.67% PF and 8.33% EPS pension. EPS is a separate pension scheme and excluded from liquid net worth by default. Toggle to include it in net worth calculations.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <Switch
+                  size="sm"
+                  checked={includeEps}
+                  onCheckedChange={handleToggleEps}
+                  aria-label="Include EPS pension in net worth"
+                />
+              </div>
             </div>
             <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mt-2">
               {formatINR(netWorth)}
@@ -566,8 +718,13 @@ export function OverviewView() {
         {/* Income */}
         <div className="p-4 rounded-xl border bg-card flex flex-col justify-between shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Period Income</span>
-            <div className="size-6 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xs font-medium text-muted-foreground truncate">Period Income</span>
+              {periodLabel && (
+                <span className="text-[11px] text-muted-foreground shrink-0">{`(${periodLabel})`}</span>
+              )}
+            </div>
+            <div className="size-6 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
               <TrendingUpIcon className="size-3.5" />
             </div>
           </div>
@@ -576,7 +733,22 @@ export function OverviewView() {
               {formatINR(currentIncome)}
             </div>
             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-1">
-              {incomeDeltaPct !== null ? (
+              {!isPriorPeriodValid ? (
+                <TooltipProvider delay={100}>
+                  <Tooltip>
+                    <TooltipTrigger
+                      title={`Tracking started on ${formattedTrackingStartDate}`}
+                      render={<span className="cursor-help text-muted-foreground inline-flex items-center gap-1" />}
+                    >
+                      <span className="font-semibold text-foreground">-</span>
+                      <span>vs prior period</span>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-xs">
+                      {`Tracking started on ${formattedTrackingStartDate}`}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : incomeDeltaPct !== null ? (
                 <>
                   <span
                     className={cn(
@@ -600,8 +772,13 @@ export function OverviewView() {
         {/* Expense */}
         <div className="p-4 rounded-xl border bg-card flex flex-col justify-between shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Period Expenses</span>
-            <div className="size-6 rounded-md bg-destructive/10 text-destructive flex items-center justify-center">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xs font-medium text-muted-foreground truncate">Period Expenses</span>
+              {periodLabel && (
+                <span className="text-[11px] text-muted-foreground shrink-0">{`(${periodLabel})`}</span>
+              )}
+            </div>
+            <div className="size-6 rounded-md bg-destructive/10 text-destructive flex items-center justify-center shrink-0">
               <TrendingDownIcon className="size-3.5" />
             </div>
           </div>
@@ -610,7 +787,22 @@ export function OverviewView() {
               {formatINR(currentExpense)}
             </div>
             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-1">
-              {expenseDeltaPct !== null ? (
+              {!isPriorPeriodValid ? (
+                <TooltipProvider delay={100}>
+                  <Tooltip>
+                    <TooltipTrigger
+                      title={`Tracking started on ${formattedTrackingStartDate}`}
+                      render={<span className="cursor-help text-muted-foreground inline-flex items-center gap-1" />}
+                    >
+                      <span className="font-semibold text-foreground">-</span>
+                      <span>vs prior period</span>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-xs">
+                      {`Tracking started on ${formattedTrackingStartDate}`}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : expenseDeltaPct !== null ? (
                 <>
                   <span
                     className={cn(
@@ -634,17 +826,39 @@ export function OverviewView() {
         {/* Savings Rate */}
         <div className="p-4 rounded-xl border bg-card flex flex-col justify-between shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">Period Savings Rate</span>
-            <div className="size-6 rounded-md bg-primary/10 text-primary flex items-center justify-center">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xs font-medium text-muted-foreground truncate">Period Savings Rate</span>
+              {periodLabel && (
+                <span className="text-[11px] text-muted-foreground shrink-0">{`(${periodLabel})`}</span>
+              )}
+            </div>
+            <div className="size-6 rounded-md bg-primary/10 text-primary flex items-center justify-center shrink-0">
               <CoinsIcon className="size-3.5" />
             </div>
           </div>
           <div className="mt-2">
             <div className="text-xl font-bold tracking-tight text-foreground">
-              {formatPercent(currentSavingsRate)}
+              {currentIncome === 0 ? '-' : formatPercent(currentSavingsRate)}
             </div>
             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-1">
-              {savingsRateDelta !== null ? (
+              {currentIncome === 0 ? (
+                <span>- (no income in period)</span>
+              ) : !isPriorPeriodValid ? (
+                <TooltipProvider delay={100}>
+                  <Tooltip>
+                    <TooltipTrigger
+                      title={`Tracking started on ${formattedTrackingStartDate}`}
+                      render={<span className="cursor-help text-muted-foreground inline-flex items-center gap-1" />}
+                    >
+                      <span className="font-semibold text-foreground">-</span>
+                      <span>vs prior period</span>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-xs">
+                      {`Tracking started on ${formattedTrackingStartDate}`}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : savingsRateDelta !== null ? (
                 <>
                   <span
                     className={cn(
@@ -724,19 +938,26 @@ export function OverviewView() {
         {/* Spend by Category Donut Chart (Respects period and categoryColorMap) */}
         <div className="p-4 rounded-xl border bg-card space-y-3 shadow-xs">
           <div className="flex items-center justify-between border-b pb-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Spend by Category
-            </h3>
-            <span className="text-xs font-semibold text-muted-foreground">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground truncate">
+                Spend by Category
+              </h3>
+              {periodLabel && (
+                <span className="text-xs font-normal text-muted-foreground shrink-0">
+                  {`(${periodLabel})`}
+                </span>
+              )}
+            </div>
+            <span className="text-xs font-semibold text-muted-foreground shrink-0">
               Total: {formatINR(currentExpense)}
             </span>
           </div>
 
-          <div className="h-64 w-full">
+          <div className="w-full">
             <FinanceDonutChart
               data={spendByCategoryData}
               totalLabel="Total Spend"
-              height={256}
+              onItemClick={handleCategoryClick}
             />
           </div>
         </div>

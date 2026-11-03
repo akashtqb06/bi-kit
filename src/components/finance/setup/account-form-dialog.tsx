@@ -25,7 +25,7 @@ import {
 } from '@src/lib/finance/constants';
 import type { DraftAccount } from '@src/lib/finance/setup/types';
 import { parseMoneyToPaise } from '@src/lib/finance/import/number-parser';
-import { AlertCircleIcon, InfoIcon } from 'lucide-react';
+import { AlertCircleIcon, InfoIcon, ShieldCheckIcon } from 'lucide-react';
 import { RDFormFields } from '../accounts/rd-form-fields';
 import type { RDCompounding, RDFirstInstallmentOn } from '@src/lib/finance/domain/rd';
 
@@ -184,10 +184,12 @@ export function AccountFormDialog({
         setFormError('Start date is required for Recurring Deposits');
         return;
       }
-    } else if (kind === 'mutual_fund' || kind === 'stocks') {
+    } else if (kind === 'mutual_fund' || kind === 'stocks' || kind === 'nps') {
       currentValuePaise = Math.abs(toPaise(currentValue));
       totalInvestedPaise = totalInvested ? Math.abs(toPaise(totalInvested)) : currentValuePaise;
       balancePaise = currentValuePaise;
+    } else if (kind === 'epf' || kind === 'vpf') {
+      balancePaise = 0;
     } else {
       balancePaise = toPaise(balance);
     }
@@ -269,6 +271,10 @@ export function AccountFormDialog({
                 { value: 'credit_card', label: 'Credit Card (Liability)' },
                 { value: 'fixed_deposit', label: 'Fixed Deposit (FD)' },
                 { value: 'recurring_deposit', label: 'Recurring Deposit (RD)' },
+                { value: 'epf', label: 'EPF (Employees’ Provident Fund)' },
+                { value: 'vpf', label: 'VPF (Voluntary Provident Fund)' },
+                { value: 'ppf', label: 'PPF (Public Provident Fund)' },
+                { value: 'nps', label: 'NPS (National Pension Scheme)' },
                 { value: 'mutual_fund', label: 'Mutual Funds' },
                 { value: 'stocks', label: 'Stocks / Demat' },
                 { value: 'loan', label: 'Loan / Mortgage (Liability)' },
@@ -288,6 +294,10 @@ export function AccountFormDialog({
                 <SelectItem value="credit_card">Credit Card (Liability)</SelectItem>
                 <SelectItem value="fixed_deposit">Fixed Deposit (FD)</SelectItem>
                 <SelectItem value="recurring_deposit">Recurring Deposit (RD)</SelectItem>
+                <SelectItem value="epf">EPF (Employees’ Provident Fund)</SelectItem>
+                <SelectItem value="vpf">VPF (Voluntary Provident Fund)</SelectItem>
+                <SelectItem value="ppf">PPF (Public Provident Fund)</SelectItem>
+                <SelectItem value="nps">NPS (National Pension Scheme)</SelectItem>
                 <SelectItem value="mutual_fund">Mutual Funds</SelectItem>
                 <SelectItem value="stocks">Stocks / Demat</SelectItem>
                 <SelectItem value="loan">Loan / Mortgage (Liability)</SelectItem>
@@ -328,8 +338,8 @@ export function AccountFormDialog({
             </div>
           )}
 
-          {/* Cash / Bank / Wallet Balance */}
-          {['cash', 'bank', 'wallet', 'other_asset', 'other_liability'].includes(kind) && (
+          {/* Cash / Bank / Wallet / PPF Balance */}
+          {['cash', 'bank', 'wallet', 'other_asset', 'other_liability', 'ppf'].includes(kind) && (
             <div className="space-y-1.5">
               <Label htmlFor="acc-balance" className="text-xs font-semibold">
                 Current Balance (₹)
@@ -540,8 +550,8 @@ export function AccountFormDialog({
             </div>
           )}
 
-          {/* Mutual Funds & Stocks */}
-          {['mutual_fund', 'stocks'].includes(kind) && (
+          {/* Mutual Funds, Stocks & NPS */}
+          {['mutual_fund', 'stocks', 'nps'].includes(kind) && (
             <div className="space-y-3 p-3 rounded-lg bg-muted/40 border">
               <div className="space-y-1.5">
                 <Label htmlFor="acc-cur-market" className="text-xs font-semibold">
@@ -573,6 +583,19 @@ export function AccountFormDialog({
                   <span>Stored as opening contribution so gains and returns are accurately tracked.</span>
                 </p>
               </div>
+            </div>
+          )}
+
+          {/* EPF & VPF Passbook Notice */}
+          {['epf', 'vpf'].includes(kind) && (
+            <div className="space-y-3 p-3.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs">
+              <div className="font-semibold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+                <ShieldCheckIcon className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>EPFO Member Passbook Import</span>
+              </div>
+              <p className="text-muted-foreground leading-relaxed text-[11px]">
+                For {kind.toUpperCase()} accounts, balances and monthly contributions will be imported directly from your EPFO Member Passbook (tab-separated portal text or CSV) once setup is complete.
+              </p>
             </div>
           )}
 

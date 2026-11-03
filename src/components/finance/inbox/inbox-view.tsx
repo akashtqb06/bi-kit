@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useFinanceStore } from '../shared/finance-store';
+import { CategoryCombobox } from '../shared/category-combobox';
 import type { InboxItemDTO } from '@src/lib/finance/inbox/service';
 
 interface EditableInboxRow {
@@ -641,24 +642,16 @@ export function InboxView() {
 
                         {/* Category Selector (Editable) */}
                         <td className="p-3">
-                          <Select
-                            value={item.categoryId || 'none'}
+                          <CategoryCombobox
+                            value={item.categoryId}
                             onValueChange={(val) =>
-                              updateRow(item.id, { categoryId: !val || val === 'none' ? '' : val })
+                              updateRow(item.id, { categoryId: val })
                             }
-                          >
-                            <SelectTrigger className="h-7 text-xs bg-transparent border-transparent hover:border-input focus:border-input">
-                              <SelectValue placeholder="Select category..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Uncategorized</SelectItem>
-                              {categories.map((cat) => (
-                                <SelectItem key={cat.id} value={cat.id}>
-                                  {cat.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            categories={categories}
+                            includeUncategorized
+                            placeholder="Uncategorized"
+                            className="h-7 bg-transparent border-transparent hover:border-input focus:border-input"
+                          />
                         </td>
 
                         {/* Flags / Duplicate warnings */}

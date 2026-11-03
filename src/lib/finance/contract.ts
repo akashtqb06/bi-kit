@@ -571,3 +571,200 @@ export const netWorthHistoryQuerySchema = z.object({
 
 export type NetWorthHistoryQuery = z.infer<typeof netWorthHistoryQuerySchema>;
 
+// ============================================================================
+// Provident Fund (PF / EPF / VPF) Schemas
+// ============================================================================
+
+export const pfEntryKindSchema = z.enum([
+  'opening',
+  'contribution',
+  'transfer_in_principal',
+  'transfer_in_interest',
+  'interest_credit',
+  'withdrawal',
+]);
+
+export type PfEntryKind = z.infer<typeof pfEntryKindSchema>;
+
+export const pfEntrySchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  accountId: z.string(),
+  entryKind: pfEntryKindSchema,
+  periodMonth: z.string().regex(/^\d{4}-\d{2}$/, 'Must be YYYY-MM').nullable().optional(),
+  postedDate: dateStringSchema.nullable().optional(),
+  dateApprox: z.boolean().default(false),
+  epfWages: moneyPaiseSchema.default(0),
+  epsWages: moneyPaiseSchema.default(0),
+  employeeAmount: moneyPaiseSchema.default(0),
+  employerAmount: moneyPaiseSchema.default(0),
+  pensionAmount: moneyPaiseSchema.default(0),
+  sourceLabel: z.string().nullable().optional(),
+  passbookKey: z.string(),
+  note: z.string().nullable().optional(),
+  createdAt: z.string().or(z.date()),
+  updatedAt: z.string().or(z.date()),
+});
+
+export type PfEntryDTO = z.infer<typeof pfEntrySchema>;
+
+export const createPfEntrySchema = z.object({
+  entryKind: pfEntryKindSchema,
+  periodMonth: z.string().regex(/^\d{4}-\d{2}$/).nullable().optional(),
+  postedDate: dateStringSchema.nullable().optional(),
+  dateApprox: z.boolean().optional().default(false),
+  epfWages: moneyPaiseSchema.optional().default(0),
+  epsWages: moneyPaiseSchema.optional().default(0),
+  employeeAmount: moneyPaiseSchema.default(0),
+  employerAmount: moneyPaiseSchema.default(0),
+  pensionAmount: moneyPaiseSchema.default(0),
+  sourceLabel: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
+});
+
+export type CreatePfEntryDTO = z.infer<typeof createPfEntrySchema>;
+
+export const pfParsedRowSchema = z.object({
+  id: z.string().optional(),
+  entryKind: pfEntryKindSchema,
+  periodMonth: z.string().nullable().optional(),
+  postedDate: dateStringSchema.nullable().optional().or(z.literal('')),
+  dateApprox: z.boolean().default(false),
+  epfWages: moneyPaiseSchema.default(0),
+  epsWages: moneyPaiseSchema.default(0),
+  employeeAmount: moneyPaiseSchema.default(0),
+  employerAmount: moneyPaiseSchema.default(0),
+  pensionAmount: moneyPaiseSchema.default(0),
+  sourceLabel: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
+  passbookKey: z.string().optional(),
+  requiresClassification: z.boolean().optional().default(false),
+  rawTextSnippet: z.string().optional(),
+});
+
+export type PfParsedRowDTO = z.infer<typeof pfParsedRowSchema>;
+
+export const pfTotalsComponentSchema = z.object({
+  employee: moneyPaiseSchema,
+  employer: moneyPaiseSchema,
+  pension: moneyPaiseSchema,
+  total: moneyPaiseSchema,
+});
+
+export type PfTotalsComponentDTO = z.infer<typeof pfTotalsComponentSchema>;
+
+export const pfReconciliationSchema = z.object({
+  contributions: pfTotalsComponentSchema,
+  transferIns: pfTotalsComponentSchema,
+  withdrawals: pfTotalsComponentSchema,
+  closingBalance: pfTotalsComponentSchema,
+  parsedTotals: z.object({
+    contributions: pfTotalsComponentSchema.optional(),
+    transferIns: pfTotalsComponentSchema.optional(),
+    withdrawals: pfTotalsComponentSchema.optional(),
+    closingBalance: pfTotalsComponentSchema.optional(),
+  }).optional(),
+  diff: z.object({
+    employee: moneyPaiseSchema,
+    employer: moneyPaiseSchema,
+    pension: moneyPaiseSchema,
+  }).optional(),
+  isMatched: z.boolean(),
+});
+
+export type PfReconciliationDTO = z.infer<typeof pfReconciliationSchema>;
+
+export const previewPfPassbookInputSchema = z.object({
+  rawText: z.string().optional(),
+  csvContent: z.string().optional(),
+});
+
+export type PreviewPfPassbookInput = z.infer<typeof previewPfPassbookInputSchema>;
+
+export const previewPfPassbookResultSchema = z.object({
+  rows: z.array(pfParsedRowSchema),
+  unresolvedCount: z.number(),
+  reconciliation: pfReconciliationSchema,
+  fy: z.string().optional(),
+  warnings: z.array(z.string()).optional(),
+});
+
+export type PreviewPfPassbookResultDTO = z.infer<typeof previewPfPassbookResultSchema>;
+
+export const commitPfPassbookInputSchema = z.object({
+  entries: z.array(pfParsedRowSchema),
+  setClosingBalanceAnchor: z.boolean().optional().default(false),
+  anchorDate: dateStringSchema.optional(),
+  forceMismatch: z.boolean().optional().default(false),
+});
+
+export type CommitPfPassbookInput = z.infer<typeof commitPfPassbookInputSchema>;
+
+export const commitPfPassbookResultSchema = z.object({
+  added: z.number(),
+  updated: z.number(),
+  unchanged: z.number(),
+  removedCandidateKeys: z.array(z.string()),
+  closingBalance: pfTotalsComponentSchema,
+  anchorCreated: z.boolean(),
+});
+
+export type CommitPfPassbookResultDTO = z.infer<typeof commitPfPassbookResultSchema>;
+
+export const pfAccountSummarySchema = z.object({
+  pfBalance: moneyPaiseSchema,
+  employeeShare: moneyPaiseSchema,
+  employerShare: moneyPaiseSchema,
+  pensionBalance: moneyPaiseSchema,
+  thisFyContributions: z.object({
+    employee: moneyPaiseSchema,
+    employer: moneyPaiseSchema,
+    pension: moneyPaiseSchema,
+    total: moneyPaiseSchema,
+  }),
+  thisFyTransferIns: z.object({
+    employee: moneyPaiseSchema,
+    employer: moneyPaiseSchema,
+    pension: moneyPaiseSchema,
+    total: moneyPaiseSchema,
+  }),
+  accruedInterestEstimate: moneyPaiseSchema,
+  interestRate: z.number().nullable(),
+  lastImportDate: dateStringSchema.nullable(),
+  isStale: z.boolean(),
+  staleDays: z.number(),
+  virtualNextContribution: z.object({
+    employee: moneyPaiseSchema,
+    employer: moneyPaiseSchema,
+    pension: moneyPaiseSchema,
+  }).nullable(),
+});
+
+export type PfAccountSummaryDTO = z.infer<typeof pfAccountSummarySchema>;
+
+export const updatePfRateSchema = z.object({
+  fy: z.string().regex(/^\d{4}-\d{2}$/, 'Must be YYYY-YY (e.g. 2026-27)'),
+  rate: z.number().min(0).max(20),
+});
+
+export type UpdatePfRateDTO = z.infer<typeof updatePfRateSchema>;
+
+export const financeUserSettingsSchema = z.object({
+  userId: z.string(),
+  baseCurrency: z.string().default('INR'),
+  timezone: z.string().default('Asia/Kolkata'),
+  includeEpsInNetWorth: z.boolean().default(false),
+  includeAccruedInterestInNetWorth: z.boolean().default(false),
+});
+
+export type FinanceUserSettingsDTO = z.infer<typeof financeUserSettingsSchema>;
+
+export const updateFinanceUserSettingsSchema = z.object({
+  includeEpsInNetWorth: z.boolean().optional(),
+  includeAccruedInterestInNetWorth: z.boolean().optional(),
+  timezone: z.string().optional(),
+});
+
+export type UpdateFinanceUserSettingsDTO = z.infer<typeof updateFinanceUserSettingsSchema>;
+
+

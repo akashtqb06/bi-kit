@@ -30,6 +30,7 @@ import {
 } from '@src/lib/finance/budgets/progress';
 import { getDeterministicCategoryColor } from '@src/lib/finance/colors';
 import { formatINR } from '../shared/format';
+import { CategoryCombobox } from '../shared/category-combobox';
 import type { BudgetDTO } from '@src/lib/finance/contract';
 import type { BudgetPeriod } from '@src/lib/finance/constants';
 import { cn } from '@/lib/utils';
@@ -112,8 +113,6 @@ export function BudgetForm({
     return availableCat?.id || '';
   });
 
-  const [categorySearch, setCategorySearch] = useState('');
-
   const [amountStr, setAmountStr] = useState<string>(() => {
     if (budget) {
       const amtInr = budget.amount / 100;
@@ -147,32 +146,6 @@ export function BudgetForm({
     month?: string;
     dates?: string;
   }>({});
-
-  // Category select items
-  const categoryItems = useMemo(() => {
-    return expenseCategories.map((cat) => ({
-      value: cat.id,
-      label: (
-        <span className="flex items-center gap-2">
-          <span
-            className="size-2 rounded-full shrink-0"
-            style={{
-              backgroundColor:
-                cat.color || getDeterministicCategoryColor(cat.name),
-            }}
-          />
-          <span className="truncate">{cat.name}</span>
-        </span>
-      ),
-    }));
-  }, [expenseCategories]);
-
-  // Filtered categories for search inside dropdown
-  const filteredCategories = useMemo(() => {
-    if (!categorySearch.trim()) return expenseCategories;
-    const q = categorySearch.toLowerCase();
-    return expenseCategories.filter((c) => c.name.toLowerCase().includes(q));
-  }, [expenseCategories, categorySearch]);
 
   // Period select items
   const periodItems = useMemo(
@@ -312,70 +285,24 @@ export function BudgetForm({
             </button>
           )}
         </div>
-        <Select
-          items={categoryItems}
-          value={categoryId || undefined}
+        <CategoryCombobox
+          id="budget-category"
+          value={categoryId}
           onValueChange={(val) => {
             setCategoryId(val || '');
             if (fieldErrors.category) {
               setFieldErrors((prev) => ({ ...prev, category: undefined }));
             }
           }}
+          categories={expenseCategories}
           disabled={isEditing || expenseCategories.length === 0}
-        >
-          <SelectTrigger
-            id="budget-category"
-            className={cn(
-              'w-full h-9 bg-card px-3 text-xs',
-              fieldErrors.category && 'border-destructive ring-1 ring-destructive'
-            )}
-          >
-            <SelectValue
-              placeholder={
-                expenseCategories.length === 0
-                  ? 'No expense categories found'
-                  : 'Select category...'
-              }
-            />
-          </SelectTrigger>
-          <SelectContent className="max-h-60">
-            {expenseCategories.length > 5 && (
-              <div className="p-1.5 border-b sticky top-0 bg-popover z-10">
-                <div className="relative flex items-center">
-                  <SearchIcon className="absolute left-2 size-3 text-muted-foreground pointer-events-none" />
-                  <input
-                    type="text"
-                    placeholder="Search categories..."
-                    value={categorySearch}
-                    onChange={(e) => setCategorySearch(e.target.value)}
-                    onKeyDown={(e) => e.stopPropagation()}
-                    className="w-full pl-6 pr-2 py-1 text-xs bg-muted/50 rounded-md border-0 outline-none placeholder:text-muted-foreground"
-                  />
-                </div>
-              </div>
-            )}
-            {filteredCategories.length === 0 ? (
-              <div className="p-3 text-xs text-muted-foreground text-center">
-                No categories match &quot;{categorySearch}&quot;
-              </div>
-            ) : (
-              filteredCategories.map((cat) => (
-                <SelectItem key={cat.id} value={cat.id} className="text-xs">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="size-2 rounded-full shrink-0"
-                      style={{
-                        backgroundColor:
-                          cat.color || getDeterministicCategoryColor(cat.name),
-                      }}
-                    />
-                    <span className="truncate">{cat.name}</span>
-                  </div>
-                </SelectItem>
-              ))
-            )}
-          </SelectContent>
-        </Select>
+          placeholder={
+            expenseCategories.length === 0
+              ? 'No expense categories found'
+              : 'Select category...'
+          }
+          error={Boolean(fieldErrors.category)}
+        />
         {fieldErrors.category && (
           <p className="text-destructive text-[11px] font-medium">
             {fieldErrors.category}

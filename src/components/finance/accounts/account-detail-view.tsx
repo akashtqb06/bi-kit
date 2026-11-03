@@ -29,6 +29,7 @@ import { useBreadcrumbStore } from '@src/components/layout/breadcrumb-store';
 import { UpdateValuationDialog } from './update-valuation-dialog';
 import { EditAccountOpeningDialog } from './edit-account-opening-dialog';
 import { RDDetailSection } from './rd-detail-section';
+import { EpfDetailSection } from './epf-detail-section';
 import { TransactionTable } from '../transactions/transaction-table';
 import { cn } from '@/lib/utils';
 import { useAppModal } from '@/components/ui/app-modal';
@@ -41,6 +42,7 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
     accounts,
     accountHistory,
     refreshAccountHistory,
+    refreshAccounts,
     valuations,
     deleteAccount,
     openQuickAdd,
@@ -72,6 +74,11 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
     };
   }, [account, setCrumbs]);
 
+  // Ensure account metrics and balances are fresh when viewing detail
+  useEffect(() => {
+    void refreshAccounts();
+  }, [accountId, refreshAccounts]);
+
   // Fetch account history from server
   useEffect(() => {
     if (account) {
@@ -101,6 +108,7 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
   const isCard = account?.kind === 'credit_card';
   const isInvestment = account?.kind === 'mutual_fund' || account?.kind === 'stocks';
   const isDeposit = account?.kind === 'fixed_deposit' || account?.kind === 'recurring_deposit';
+  const isPf = account?.kind === 'epf' || account?.kind === 'vpf';
   const isLiability = isCard || account?.kind === 'loan' || account?.kind === 'other_liability';
 
   const historyData = account ? accountHistory[account.id] : undefined;
@@ -247,8 +255,13 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
         </div>
       </div>
 
-      {/* Kind-Specific Highlight Panel */}
-      {isCard && (
+      {/* EPF / VPF Account Passbook Section */}
+      {isPf ? (
+        <EpfDetailSection accountId={account.id} accountName={account.name} />
+      ) : (
+        <>
+          {/* Kind-Specific Highlight Panel */}
+          {isCard && (
         <div className="p-4 rounded-xl border bg-card space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -387,14 +400,14 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
             <div className="p-3 rounded-lg bg-muted/40 border">
               <span className="text-[11px] text-muted-foreground">Current Market Value</span>
               <div className="text-xl font-bold text-foreground mt-0.5">
-                {formatINR(account.currentValue || account.balance)}
+                {formatINR(account.currentValue ?? account.balance)}
               </div>
             </div>
 
             <div className="p-3 rounded-lg bg-muted/40 border">
               <span className="text-[11px] text-muted-foreground">Total Invested (Cost Basis)</span>
               <div className="text-xl font-bold text-foreground mt-0.5">
-                {formatINR(account.costBasis || account.balance)}
+                {formatINR(account.costBasis ?? account.balance)}
               </div>
             </div>
 
@@ -606,6 +619,8 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
         </h3>
         <TransactionTable accountId={account.id} />
       </div>
+      </>
+      )}
 
       {/* Update Valuation Dialog */}
       <UpdateValuationDialog

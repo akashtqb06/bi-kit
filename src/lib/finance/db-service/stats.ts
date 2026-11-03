@@ -3,11 +3,17 @@ import {
   db,
   finAccounts,
   finCategories,
+  finPfEntries,
   finTransactions,
   finUserSettings,
   finValuations,
 } from '@src/lib/db';
+import { catchUpRecurringRulesIfDue } from '../recurring';
 import { calculateNetWorth } from '../domain/net-worth';
+import {
+  calculateInvestmentHolding,
+  type InvestmentTransactionRecord,
+} from '../domain/investments';
 import { isCardDueWithinDays } from '../domain/credit-card';
 import {
   rdValue,
@@ -35,12 +41,18 @@ export interface ExtendedOverviewStats extends OverviewStatsDTO {
     expense: number;
     savingsRate: number;
   };
+  previousPeriodRange?: {
+    from: string;
+    to: string;
+  };
+  trackingStartDate?: string | null;
   spendByCategory?: Array<{
     categoryId: string;
     categoryName: string;
     categoryColor?: string | null;
     amount: number;
     percentage: number;
+    transactionCount: number;
   }>;
   accountsByKind?: Record<string, { count: number; totalBalance: number }>;
   recentTransactions?: TransactionDTO[];
@@ -63,8 +75,15 @@ export async function getOverviewStats(
   userId: string,
   query?: OverviewStatsQuery
 ): Promise<ExtendedOverviewStats> {
+  await catchUpRecurringRulesIfDue(userId);
+
   const [settings] = await db
-    .select({ timezone: finUserSettings.timezone })
+    .select({
+      timezone: finUserSettings.timezone,
+      trackingStartDate: finUserSettings.trackingStartDate,
+      includeEpsInNetWorth: finUserSettings.includeEpsInNetWorth,
+      includeAccruedInterestInNetWorth: finUserSettings.includeAccruedInterestInNetWorth,
+    })
     .from(finUserSettings)
     .where(eq(finUserSettings.userId, userId))
     .limit(1);
@@ -113,17 +132,31 @@ export async function getOverviewStats(
           accountId: finValuations.accountId,
           date: finValuations.date,
           value: finValuations.value,
+          costBasis: finValuations.costBasis,
+          note: finValuations.note,
+          createdAt: finValuations.createdAt,
         })
         .from(finValuations)
         .where(and(inArray(finValuations.accountId, accountIds), lte(finValuations.date, today)))
-        .orderBy(desc(finValuations.date))
+        .orderBy(desc(finValuations.date), desc(finValuations.createdAt))
     : [];
 
   // Map latest valuation per account
   const latestValuations = new Map<string, number>();
+  const latestValuationMap = new Map<
+    string,
+    { date: string; value: number; costBasis: number | null; note: string | null; createdAt: Date | string }
+  >();
   for (const v of valuations) {
     if (!latestValuations.has(v.accountId)) {
       latestValuations.set(v.accountId, Number(v.value));
+      latestValuationMap.set(v.accountId, {
+        date: v.date,
+        value: Number(v.value),
+        costBasis: v.costBasis !== null && v.costBasis !== undefined ? Number(v.costBasis) : null,
+        note: v.note,
+        createdAt: v.createdAt,
+      });
     }
   }
 
@@ -159,13 +192,127 @@ export async function getOverviewStats(
     if (r.accountId) targetMap.set(r.accountId, Number(r.total));
   }
 
+  // Provident Fund sums for EPF / VPF
+  const pfSums = await db
+    .select({
+      accountId: finPfEntries.accountId,
+      pfTotal: sql<string>`COALESCE(SUM(${finPfEntries.employeeAmount} + ${finPfEntries.employerAmount}), 0)`,
+      pensionTotal: sql<string>`COALESCE(SUM(${finPfEntries.pensionAmount}), 0)`,
+    })
+    .from(finPfEntries)
+    .where(eq(finPfEntries.userId, userId))
+    .groupBy(finPfEntries.accountId);
+
+  const pfMap = new Map<string, { pfTotal: number; pensionTotal: number }>();
+  for (const r of pfSums) {
+    pfMap.set(r.accountId, {
+      pfTotal: Number(r.pfTotal),
+      pensionTotal: Number(r.pensionTotal),
+    });
+  }
+
+  const hasInvestment = accounts.some(
+    (a) =>
+      a.kind === 'mutual_fund' ||
+      a.kind === 'stocks' ||
+      a.kind === 'other_asset' ||
+      a.kind === 'nps'
+  );
+  const investmentTransfersByAccount = new Map<string, InvestmentTransactionRecord[]>();
+  if (hasInvestment) {
+    const transferRows = await db
+      .select({
+        accountId: finTransactions.accountId,
+        toAccountId: finTransactions.toAccountId,
+        date: finTransactions.date,
+        amount: finTransactions.amount,
+        type: finTransactions.type,
+        createdAt: finTransactions.createdAt,
+        isRecurring: finTransactions.isRecurring,
+      })
+      .from(finTransactions)
+      .where(
+        and(
+          eq(finTransactions.userId, userId),
+          eq(finTransactions.type, 'transfer'),
+          isNull(finTransactions.deletedAt)
+        )
+      );
+
+    for (const t of transferRows) {
+      const amt = Number(t.amount);
+      if (t.toAccountId) {
+        const list = investmentTransfersByAccount.get(t.toAccountId) ?? [];
+        list.push({
+          accountId: t.accountId,
+          toAccountId: t.toAccountId,
+          type: 'transfer',
+          amount: amt,
+          date: t.date,
+          createdAt: t.createdAt,
+          isRecurring: t.isRecurring,
+        });
+        investmentTransfersByAccount.set(t.toAccountId, list);
+      }
+      if (t.accountId) {
+        const list = investmentTransfersByAccount.get(t.accountId) ?? [];
+        list.push({
+          accountId: t.accountId,
+          toAccountId: t.toAccountId,
+          type: 'transfer',
+          amount: amt,
+          date: t.date,
+          createdAt: t.createdAt,
+          isRecurring: t.isRecurring,
+        });
+        investmentTransfersByAccount.set(t.accountId, list);
+      }
+    }
+  }
+
   const accountsForNetWorth = [];
   const accountsByKind: Record<string, { count: number; totalBalance: number }> = {};
   const cardsDueSoon: ExtendedOverviewStats['cardsDueSoon'] = [];
 
   for (const acc of accounts) {
-    const balance = (sourceMap.get(acc.id) ?? 0) + (targetMap.get(acc.id) ?? 0);
+    const isPf = acc.kind === 'epf' || acc.kind === 'vpf';
+    let balance = (sourceMap.get(acc.id) ?? 0) + (targetMap.get(acc.id) ?? 0);
+    let pensionMemo: number | null = null;
+
+    if (isPf) {
+      const pfData = pfMap.get(acc.id);
+      balance = pfData?.pfTotal ?? 0;
+      pensionMemo = pfData?.pensionTotal ?? 0;
+    }
+
     let currentValue = latestValuations.get(acc.id);
+
+    const isInvestment =
+      acc.kind === 'mutual_fund' ||
+      acc.kind === 'stocks' ||
+      acc.kind === 'other_asset' ||
+      acc.kind === 'nps';
+
+    if (isInvestment) {
+      const meta = (acc.metadata || {}) as Record<string, unknown>;
+      const valRow = latestValuationMap.get(acc.id);
+      const openingContribution = Number(
+        meta.openingContributionPaise ??
+          meta.costBasis ??
+          meta.openingBalancePaise ??
+          (valRow?.note === 'Opening valuation recorded during setup' ? valRow?.costBasis : undefined) ??
+          0
+      );
+      const invTxs = investmentTransfersByAccount.get(acc.id) || [];
+      const holding = calculateInvestmentHolding({
+        openingContribution,
+        transactions: invTxs,
+        accountId: acc.id,
+        latestValuation: valRow,
+        asOfDate: today,
+      });
+      currentValue = holding.currentValue;
+    }
 
     if (acc.kind === 'recurring_deposit') {
       const meta = (acc.metadata || {}) as Record<string, unknown>;
@@ -229,13 +376,18 @@ export async function getOverviewStats(
       balance,
       currentValue: currentValue !== undefined ? currentValue : null,
       isActive: acc.isActive,
+      pensionMemo,
     });
 
     if (!accountsByKind[acc.kind]) {
       accountsByKind[acc.kind] = { count: 0, totalBalance: 0 };
     }
     accountsByKind[acc.kind].count += 1;
-    accountsByKind[acc.kind].totalBalance += currentValue !== undefined ? currentValue : balance;
+    let kindBalance = currentValue !== undefined ? currentValue : balance;
+    if (isPf && settings?.includeEpsInNetWorth && pensionMemo) {
+      kindBalance += pensionMemo;
+    }
+    accountsByKind[acc.kind].totalBalance += kindBalance;
 
     // Credit card due check
     if (acc.kind === 'credit_card' && balance < 0) {
@@ -261,7 +413,9 @@ export async function getOverviewStats(
   }
 
   // 4. Calculate Net Worth (ignores period, always as of today)
-  const nw = calculateNetWorth(accountsForNetWorth);
+  const nw = calculateNetWorth(accountsForNetWorth, {
+    includeEpsInNetWorth: settings?.includeEpsInNetWorth,
+  });
 
   // 5. Income & Expense for current period (filtered by date range and account IDs)
   const curConditions = [
@@ -277,7 +431,7 @@ export async function getOverviewStats(
   const [curPeriod] = await db
     .select({
       income: sql<string>`COALESCE(SUM(CASE WHEN ${finTransactions.type} = 'income' THEN ${finTransactions.amount} ELSE 0 END), 0)`,
-      expense: sql<string>`COALESCE(SUM(CASE WHEN ${finTransactions.type} = 'expense' THEN ${finTransactions.amount} ELSE 0 END), 0)`,
+      expense: sql<string>`COALESCE(SUM(CASE WHEN ${finTransactions.type} = 'expense' AND (${finTransactions.categoryId} IS NULL OR ${finTransactions.categoryId} != 'cat_system_cc_payment') THEN ${finTransactions.amount} ELSE 0 END), 0)`,
     })
     .from(finTransactions)
     .where(and(...curConditions));
@@ -302,7 +456,7 @@ export async function getOverviewStats(
   const [prevPeriod] = await db
     .select({
       income: sql<string>`COALESCE(SUM(CASE WHEN ${finTransactions.type} = 'income' THEN ${finTransactions.amount} ELSE 0 END), 0)`,
-      expense: sql<string>`COALESCE(SUM(CASE WHEN ${finTransactions.type} = 'expense' THEN ${finTransactions.amount} ELSE 0 END), 0)`,
+      expense: sql<string>`COALESCE(SUM(CASE WHEN ${finTransactions.type} = 'expense' AND (${finTransactions.categoryId} IS NULL OR ${finTransactions.categoryId} != 'cat_system_cc_payment') THEN ${finTransactions.amount} ELSE 0 END), 0)`,
     })
     .from(finTransactions)
     .where(and(...prevConditions));
@@ -321,6 +475,7 @@ export async function getOverviewStats(
     isNull(finTransactions.deletedAt),
     gte(finTransactions.date, startDate),
     lte(finTransactions.date, endDate),
+    sql`(${finTransactions.categoryId} IS NULL OR ${finTransactions.categoryId} != 'cat_system_cc_payment')`,
   ];
   if (filterAccountIds.length > 0) {
     catSpendConditions.push(inArray(finTransactions.accountId, filterAccountIds));
@@ -332,6 +487,7 @@ export async function getOverviewStats(
       categoryName: finCategories.name,
       categoryColor: finCategories.color,
       totalAmount: sql<string>`COALESCE(SUM(${finTransactions.amount}), 0)`,
+      txCount: sql<string>`COUNT(${finTransactions.id})`,
     })
     .from(finTransactions)
     .leftJoin(finCategories, eq(finTransactions.categoryId, finCategories.id))
@@ -347,6 +503,7 @@ export async function getOverviewStats(
       categoryColor: r.categoryColor,
       amount: amt,
       percentage: monthlyExpense > 0 ? Number(((amt / monthlyExpense) * 100).toFixed(2)) : 0,
+      transactionCount: Number(r.txCount || 1),
     };
   });
 
@@ -381,6 +538,11 @@ export async function getOverviewStats(
       expense: prevExpense,
       savingsRate: prevSavingsRate,
     },
+    previousPeriodRange: {
+      from: prevStart,
+      to: prevEnd,
+    },
+    trackingStartDate: settings?.trackingStartDate || null,
     spendByCategory,
     accountsByKind,
     recentTransactions: recentRows.map((r) => mapTransactionToDTO(r)),

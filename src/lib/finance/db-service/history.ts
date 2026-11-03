@@ -1,5 +1,5 @@
 import { and, asc, eq, isNull, or, sql } from 'drizzle-orm';
-import { db, finAccounts, finTransactions, finUserSettings, finValuations } from '@src/lib/db';
+import { db, finAccounts, finPfEntries, finTransactions, finUserSettings, finValuations } from '@src/lib/db';
 import { NotFoundError } from '@src/app/api/utils';
 import {
   type AccountHistoryPointDTO,
@@ -10,6 +10,8 @@ import {
 } from '../contract';
 import { todayInTz, DEFAULT_TZ } from '../timezone';
 import { calculateFDAccruedValue, calculateRDAccruedValue, normalizeInterestRate } from '../domain/deposits';
+import { calculateInvestmentHolding } from '../domain/investments';
+import { catchUpRecurringRulesIfDue } from '../recurring';
 import type { CompoundingFrequency } from '../constants';
 
 export async function getNetWorthHistory(
@@ -19,11 +21,15 @@ export async function getNetWorthHistory(
   const validated = netWorthHistoryQuerySchema.parse(query || {});
 
   const [settings] = await db
-    .select({ timezone: finUserSettings.timezone })
+    .select({
+      timezone: finUserSettings.timezone,
+      includeEpsInNetWorth: finUserSettings.includeEpsInNetWorth,
+    })
     .from(finUserSettings)
     .where(eq(finUserSettings.userId, userId))
     .limit(1);
   const userTz = settings?.timezone || DEFAULT_TZ;
+  const includeEps = Boolean(settings?.includeEpsInNetWorth);
   const today = todayInTz(userTz);
   const endDate = validated.endDate || today;
 
@@ -82,6 +88,16 @@ export async function getNetWorthHistory(
       FROM fin_transactions t
       WHERE t.user_id = ${userId} AND t.to_account_id IS NOT NULL AND t.type = 'transfer' AND t.deleted_at IS NULL
       GROUP BY t.date::date, t.to_account_id
+
+      UNION ALL
+
+      SELECT
+        COALESCE(pe.posted_date, (pe.period_month || '-01')::date) AS tx_date,
+        pe.account_id AS account_id,
+        SUM(pe.employee_amount + pe.employer_amount + CASE WHEN ${includeEps ? sql`true` : sql`false`} THEN pe.pension_amount ELSE 0 END) AS delta
+      FROM fin_pf_entries pe
+      WHERE pe.user_id = ${userId}
+      GROUP BY COALESCE(pe.posted_date, (pe.period_month || '-01')::date), pe.account_id
     ),
     account_daily_balances AS (
       SELECT
@@ -113,7 +129,7 @@ export async function getNetWorthHistory(
         kind,
         class,
         CASE
-          WHEN latest_valuation IS NOT NULL AND kind IN ('mutual_fund', 'stocks', 'fixed_deposit', 'recurring_deposit') THEN latest_valuation
+          WHEN latest_valuation IS NOT NULL AND kind IN ('mutual_fund', 'stocks', 'fixed_deposit', 'recurring_deposit', 'epf', 'vpf') THEN latest_valuation
           ELSE ledger_balance
         END AS effective_balance
       FROM account_daily_balances
@@ -168,6 +184,8 @@ export async function getAccountHistory(
     preset?: string;
   }
 ): Promise<AccountHistoryResponseDTO> {
+  await catchUpRecurringRulesIfDue(userId);
+
   const [account] = await db
     .select()
     .from(finAccounts)
@@ -179,11 +197,15 @@ export async function getAccountHistory(
   }
 
   const [settings] = await db
-    .select({ timezone: finUserSettings.timezone })
+    .select({
+      timezone: finUserSettings.timezone,
+      includeEpsInNetWorth: finUserSettings.includeEpsInNetWorth,
+    })
     .from(finUserSettings)
     .where(eq(finUserSettings.userId, userId))
     .limit(1);
   const userTz = settings?.timezone || DEFAULT_TZ;
+  const includeEps = Boolean(settings?.includeEpsInNetWorth);
   const today = todayInTz(userTz);
 
   const meta = (account.metadata || {}) as Record<string, unknown>;
@@ -269,6 +291,15 @@ export async function getAccountHistory(
     );
 
   let currentBalance = Number(srcSum?.total || 0) + Number(tgtSum?.total || 0);
+  if (account.kind === 'epf' || account.kind === 'vpf') {
+    const [pfSum] = await db
+      .select({
+        total: sql<string>`COALESCE(SUM(${finPfEntries.employeeAmount} + ${finPfEntries.employerAmount} + CASE WHEN ${includeEps ? sql`true` : sql`false`} THEN ${finPfEntries.pensionAmount} ELSE 0 END), 0)`,
+      })
+      .from(finPfEntries)
+      .where(and(eq(finPfEntries.userId, userId), eq(finPfEntries.accountId, accountId)));
+    currentBalance = Number(pfSum?.total || 0);
+  }
   const currentOutstanding = isLiability ? Math.max(0, -currentBalance) : 0;
 
   let history: AccountHistoryPointDTO[] = [];
@@ -279,10 +310,34 @@ export async function getAccountHistory(
       .select({
         date: finValuations.date,
         value: finValuations.value,
+        costBasis: finValuations.costBasis,
+        note: finValuations.note,
+        createdAt: finValuations.createdAt,
       })
       .from(finValuations)
       .where(and(eq(finValuations.accountId, accountId), sql`${finValuations.date} <= ${endDate}`))
-      .orderBy(asc(finValuations.date));
+      .orderBy(asc(finValuations.date), asc(finValuations.createdAt));
+
+    const transferRows = await db
+      .select({
+        accountId: finTransactions.accountId,
+        toAccountId: finTransactions.toAccountId,
+        type: finTransactions.type,
+        amount: finTransactions.amount,
+        date: finTransactions.date,
+        createdAt: finTransactions.createdAt,
+        isRecurring: finTransactions.isRecurring,
+      })
+      .from(finTransactions)
+      .where(
+        and(
+          eq(finTransactions.userId, userId),
+          eq(finTransactions.type, 'transfer'),
+          isNull(finTransactions.deletedAt),
+          sql`(${finTransactions.accountId} = ${accountId} OR ${finTransactions.toAccountId} = ${accountId})`
+        )
+      )
+      .orderBy(asc(finTransactions.date), asc(finTransactions.createdAt));
 
     const result = await db.execute<{
       date: string;
@@ -297,25 +352,55 @@ export async function getAccountHistory(
     );
 
     const valDateMap = new Set(valRows.map((v) => v.date));
-    let latestVal = valRows.length > 0 ? Number(valRows[0].value) : currentBalance;
+    const txDateMap = new Set(transferRows.map((t) => t.date));
+    const openingContribution = Number(
+      meta.openingContributionPaise ??
+        meta.costBasis ??
+        meta.openingBalancePaise ??
+        0
+    );
 
     history = dateList.map((d) => {
       // Find latest valuation on or before date d
+      let latestMatchingVal: { date: string; value: number; costBasis: number | null; note: string | null; createdAt: Date | string } | null = null;
       for (const v of valRows) {
         if (v.date <= d) {
-          latestVal = Number(v.value);
+          latestMatchingVal = {
+            date: v.date,
+            value: Number(v.value),
+            costBasis: v.costBasis !== null && v.costBasis !== undefined ? Number(v.costBasis) : null,
+            note: v.note,
+            createdAt: v.createdAt,
+          };
         }
       }
+
+      const holding = calculateInvestmentHolding({
+        openingContribution,
+        transactions: transferRows.map((t) => ({
+          accountId: t.accountId,
+          toAccountId: t.toAccountId,
+          type: 'transfer',
+          amount: Number(t.amount),
+          date: t.date,
+          createdAt: t.createdAt,
+          isRecurring: t.isRecurring,
+        })),
+        accountId,
+        latestValuation: latestMatchingVal,
+        asOfDate: d,
+      });
+
       return {
         date: d,
-        balance: latestVal,
+        balance: holding.currentValue,
         outstanding: 0,
-        hasActivity: valDateMap.has(d),
+        hasActivity: valDateMap.has(d) || txDateMap.has(d),
       };
     });
 
-    if (valRows.length > 0) {
-      currentBalance = Number(valRows[valRows.length - 1].value);
+    if (history.length > 0) {
+      currentBalance = history[history.length - 1].balance;
     }
   } else if (account.kind === 'fixed_deposit' || account.kind === 'recurring_deposit') {
     // Deposits: generate date series
@@ -425,6 +510,17 @@ export async function getAccountHistory(
           AND t.type = 'transfer'
           AND t.deleted_at IS NULL
         GROUP BY t.date::date
+
+        UNION ALL
+
+        SELECT
+          COALESCE(pe.posted_date, (pe.period_month || '-01')::date) AS tx_date,
+          SUM(pe.employee_amount + pe.employer_amount + CASE WHEN ${includeEps ? sql`true` : sql`false`} THEN pe.pension_amount ELSE 0 END) AS delta,
+          COUNT(*) AS tx_count
+        FROM fin_pf_entries pe
+        WHERE pe.user_id = ${userId}
+          AND pe.account_id = ${accountId}
+        GROUP BY COALESCE(pe.posted_date, (pe.period_month || '-01')::date)
       ),
       aggregated_daily AS (
         SELECT

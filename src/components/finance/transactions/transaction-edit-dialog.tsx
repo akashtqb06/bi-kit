@@ -17,6 +17,7 @@ import {
 import { useFinanceStore } from '../shared/finance-store';
 import { parseAmountExpression } from '../shared/expression-parser';
 import { formatAccountDisplayBalance } from '../shared/format';
+import { CategoryCombobox } from '../shared/category-combobox';
 import { getDeterministicCategoryColor } from '@src/lib/finance/colors';
 import type { TransactionDTO } from '@src/lib/finance/contract';
 
@@ -166,50 +167,18 @@ export function TransactionEditDialog({
           {/* Category */}
           {transaction.type !== 'transfer' && (
             <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="edit-category" className="text-xs font-medium text-muted-foreground">
-                  Category
-                </Label>
-                {categoryId && (
-                  (() => {
-                    const sel = categories.find((c) => c.id === categoryId);
-                    if (!sel) return null;
-                    const col = sel.color || getDeterministicCategoryColor(sel.name);
-                    return (
-                      <span className="flex items-center gap-1.5 text-xs text-foreground">
-                        <span
-                          className="size-2 rounded-full inline-block shrink-0 ring-1 ring-border shadow-xs"
-                          style={{ backgroundColor: col }}
-                        />
-                        <span className="truncate max-w-[120px] font-medium">{sel.name}</span>
-                      </span>
-                    );
-                  })()
-                )}
-              </div>
-              <Select
-                items={[
-                  { value: '__uncategorized__', label: 'Uncategorized' },
-                  ...filteredCategories.map((c) => ({
-                    value: c.id,
-                    label: c.name,
-                  })),
-                ]}
-                value={categoryId || '__uncategorized__'}
-                onValueChange={(val) => setCategoryId((!val || val === '__uncategorized__') ? '' : val)}
-              >
-                <SelectTrigger id="edit-category" className="w-full h-9 bg-card px-3 text-xs">
-                  <SelectValue placeholder="Uncategorized" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__uncategorized__" className="text-xs">Uncategorized</SelectItem>
-                  {filteredCategories.map((c) => (
-                    <SelectItem key={c.id} value={c.id} className="text-xs">
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="edit-category" className="text-xs font-medium text-muted-foreground">
+                Category
+              </Label>
+              <CategoryCombobox
+                id="edit-category"
+                value={categoryId}
+                onValueChange={(val) => setCategoryId(val)}
+                categories={categories}
+                filterType={transaction.type as 'expense' | 'income'}
+                includeUncategorized
+                placeholder="Uncategorized"
+              />
             </div>
           )}
 

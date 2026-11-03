@@ -14,6 +14,7 @@ import type { RDCompounding, RDFirstInstallmentOn } from '@src/lib/finance/domai
 import { rupeesToPaise } from '../shared/format';
 import { todayInTz, DEFAULT_TZ } from '@src/lib/finance/timezone';
 import type { AccountKind } from '@src/lib/finance/constants';
+import { ShieldCheckIcon } from 'lucide-react';
 
 export function AddAccountForm({ onSuccess, onCancel }: { onSuccess?: () => void; onCancel?: () => void }) {
     const { accounts, addAccount } = useFinanceStore();
@@ -130,9 +131,14 @@ export function AddAccountForm({ onSuccess, onCancel }: { onSuccess?: () => void
                 if (anchorRupees) {
                     metadata.openingBalancePaise = rupeesToPaise(parseFloat(anchorRupees));
                 }
-            } else if (kind === 'mutual_fund' || kind === 'stocks') {
+            } else if (kind === 'mutual_fund' || kind === 'stocks' || kind === 'nps') {
                 openingPaise = initialValueRupees ? rupeesToPaise(parseFloat(initialValueRupees)) : 0;
                 metadata.costBasis = openingPaise;
+            } else if (kind === 'ppf') {
+                openingPaise = openingBalanceRupees ? rupeesToPaise(parseFloat(openingBalanceRupees)) : 0;
+                metadata.openingDate = openingDate;
+            } else if (kind === 'epf' || kind === 'vpf') {
+                openingPaise = 0;
             } else if (kind === 'loan' || kind === 'other_liability') {
                 openingPaise = loanAmountRupees ? -Math.abs(rupeesToPaise(parseFloat(loanAmountRupees))) : 0;
                 metadata.interestRate = parseFloat(loanRate) || 0;
@@ -175,6 +181,10 @@ export function AddAccountForm({ onSuccess, onCancel }: { onSuccess?: () => void
                         { value: 'credit_card', label: 'Credit Card' },
                         { value: 'fixed_deposit', label: 'Fixed Deposit (FD)' },
                         { value: 'recurring_deposit', label: 'Recurring Deposit (RD)' },
+                        { value: 'epf', label: 'EPF (Employees’ Provident Fund)' },
+                        { value: 'vpf', label: 'VPF (Voluntary Provident Fund)' },
+                        { value: 'ppf', label: 'PPF (Public Provident Fund)' },
+                        { value: 'nps', label: 'NPS (National Pension Scheme)' },
                         { value: 'mutual_fund', label: 'Mutual Funds Portfolio' },
                         { value: 'stocks', label: 'Demat / Stocks' },
                         { value: 'loan', label: 'Loan (Home, Auto, Personal)' },
@@ -198,6 +208,10 @@ export function AddAccountForm({ onSuccess, onCancel }: { onSuccess?: () => void
                         <SelectItem value="credit_card">Credit Card</SelectItem>
                         <SelectItem value="fixed_deposit">Fixed Deposit (FD)</SelectItem>
                         <SelectItem value="recurring_deposit">Recurring Deposit (RD)</SelectItem>
+                        <SelectItem value="epf">EPF (Employees’ Provident Fund)</SelectItem>
+                        <SelectItem value="vpf">VPF (Voluntary Provident Fund)</SelectItem>
+                        <SelectItem value="ppf">PPF (Public Provident Fund)</SelectItem>
+                        <SelectItem value="nps">NPS (National Pension Scheme)</SelectItem>
                         <SelectItem value="mutual_fund">Mutual Funds Portfolio</SelectItem>
                         <SelectItem value="stocks">Demat / Stocks</SelectItem>
                         <SelectItem value="loan">Loan (Home, Auto, Personal)</SelectItem>
@@ -236,8 +250,8 @@ export function AddAccountForm({ onSuccess, onCancel }: { onSuccess?: () => void
             </div>
 
             {/* Dynamic Kind-Specific Fields */}
-            {/* Bank, Cash & Wallet Fields */}
-            {(kind === 'bank' || kind === 'cash' || kind === 'wallet' || kind === 'other_asset') && (
+            {/* Bank, Cash, Wallet & PPF Fields */}
+            {(kind === 'bank' || kind === 'cash' || kind === 'wallet' || kind === 'other_asset' || kind === 'ppf') && (
                 <div data-testid="kind-fields-bank" className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t">
                     <div className="space-y-1.5">
                         <Label htmlFor="opening-balance" className="text-xs font-medium text-muted-foreground">
@@ -263,6 +277,21 @@ export function AddAccountForm({ onSuccess, onCancel }: { onSuccess?: () => void
                             onChange={setOpeningDate}
                             placeholder="Select opening date"
                         />
+                    </div>
+                </div>
+            )}
+
+            {/* EPF & VPF Notice */}
+            {(kind === 'epf' || kind === 'vpf') && (
+                <div data-testid="kind-fields-epf" className="pt-2 border-t space-y-3">
+                    <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3.5 text-xs space-y-2">
+                        <div className="font-semibold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5">
+                            <ShieldCheckIcon className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            <span>EPFO Member Passbook Import</span>
+                        </div>
+                        <p className="text-muted-foreground leading-relaxed text-[11px]">
+                            Balances for {kind.toUpperCase()} are tracked via your official EPFO Member Passbook. Once created, open your account page to copy-paste portal text or upload your CSV passbook to import monthly contributions and calculate interest.
+                        </p>
                     </div>
                 </div>
             )}
@@ -450,8 +479,8 @@ export function AddAccountForm({ onSuccess, onCancel }: { onSuccess?: () => void
                 </div>
             )}
 
-            {/* Investment Fields (Mutual Funds & Stocks) */}
-            {(kind === 'mutual_fund' || kind === 'stocks') && (
+            {/* Investment Fields (Mutual Funds, Stocks & NPS) */}
+            {(kind === 'mutual_fund' || kind === 'stocks' || kind === 'nps') && (
                 <div data-testid="kind-fields-investment" className="space-y-3 pt-2 border-t">
                     <div className="space-y-1.5">
                         <Label htmlFor="investment-value" className="text-xs font-medium text-muted-foreground">

@@ -23,6 +23,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { paiseToRupees, rupeesToPaise } from '@src/components/finance/shared/format';
+import { CategoryCombobox } from '../shared/category-combobox';
 import type {
   AccountDTO,
   CategoryDTO,
@@ -63,13 +64,35 @@ interface FormInitialValues {
   note: string;
 }
 
+function getNextOccurrenceForDayOfMonth(dom: number, fromDateStr?: string): string {
+  const baseStr = fromDateStr || new Intl.DateTimeFormat('en-CA').format(new Date());
+  const [y, m, d] = baseStr.split('-').map(Number);
+
+  let targetYear = y;
+  let targetMonth = m; // 1-indexed
+
+  if (dom < d) {
+    // If the day in the current month has already elapsed, advance to next month
+    targetMonth += 1;
+    if (targetMonth > 12) {
+      targetMonth = 1;
+      targetYear += 1;
+    }
+  }
+
+  const maxDays = new Date(Date.UTC(targetYear, targetMonth, 0)).getUTCDate();
+  const clampedDay = Math.min(dom, maxDays);
+
+  return `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(clampedDay).padStart(2, '0')}`;
+}
+
 function computeInitialValues(
   ruleToEdit: RecurringRuleDTO | null | undefined,
   initialPresetId: 'rent' | 'sip' | 'emi' | 'subscription' | 'custom' | null | undefined,
   accounts: AccountDTO[],
   categories: CategoryDTO[]
 ): FormInitialValues {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat('en-CA').format(new Date());
   const todayDay = parseInt(today.split('-')[2], 10);
 
   if (ruleToEdit) {
@@ -99,17 +122,22 @@ function computeInitialValues(
     ? categories.find((c) => c.name.toLowerCase() === preset.defaultCategoryName.toLowerCase())
     : categories.find((c) => c.type === 'expense');
 
+  const defaultDom = preset?.defaultDayOfMonth || todayDay;
+  const initialStartDate = preset?.defaultDayOfMonth
+    ? getNextOccurrenceForDayOfMonth(preset.defaultDayOfMonth, today)
+    : today;
+
   return {
     type: (preset?.type as 'expense' | 'income' | 'transfer') || 'expense',
     payee: preset?.defaultPayee || '',
     amountRupees: '',
     frequency: preset?.defaultFrequency || 'monthly',
     interval: preset?.defaultInterval || 1,
-    dayOfMonth: preset?.defaultDayOfMonth || todayDay,
+    dayOfMonth: defaultDom,
     accountId: accounts[0]?.id || '',
     toAccountId: '',
     categoryId: matchingCat?.id || '',
-    startDate: today,
+    startDate: initialStartDate,
     endDate: '',
     note: preset?.defaultNote || '',
   };
@@ -159,6 +187,11 @@ function RecurringRuleForm({
     setInterval(preset.defaultInterval);
     setDayOfMonth(preset.defaultDayOfMonth);
 
+    if (!isEditing) {
+      const nextDate = getNextOccurrenceForDayOfMonth(preset.defaultDayOfMonth);
+      setStartDate(nextDate);
+    }
+
     const match = categories.find(
       (c) => c.name.toLowerCase() === preset.defaultCategoryName.toLowerCase()
     );
@@ -171,11 +204,9 @@ function RecurringRuleForm({
 
   const handleDayOfMonthChange = (newDom: number) => {
     setDayOfMonth(newDom);
-    if (!isEditing && startDate) {
-      const [y, m] = startDate.split('-');
-      const maxDays = new Date(Date.UTC(Number(y), Number(m), 0)).getUTCDate();
-      const clamped = Math.min(newDom, maxDays);
-      setStartDate(`${y}-${m}-${String(clamped).padStart(2, '0')}`);
+    if (!isEditing) {
+      const nextDate = getNextOccurrenceForDayOfMonth(newDom);
+      setStartDate(nextDate);
     }
   };
 
@@ -522,29 +553,16 @@ function RecurringRuleForm({
               <Label htmlFor="rule-category" className="text-xs font-medium">
                 Category
               </Label>
-              <Select
-                items={[
-                  { value: '__none__', label: 'None / Uncategorized' },
-                  ...filteredCategories.map((cat) => ({
-                    value: cat.id,
-                    label: cat.name,
-                  })),
-                ]}
-                value={categoryId || '__none__'}
-                onValueChange={(val) => setCategoryId((!val || val === '__none__') ? '' : val)}
-              >
-                <SelectTrigger id="rule-category" className="h-8 w-full text-xs">
-                  <SelectValue placeholder="None / Uncategorized" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__" className="text-xs">None / Uncategorized</SelectItem>
-                  {filteredCategories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id} className="text-xs">
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <CategoryCombobox
+                id="rule-category"
+                value={categoryId}
+                onValueChange={(val) => setCategoryId(val)}
+                categories={categories}
+                filterType={type as 'expense' | 'income'}
+                includeNone
+                placeholder="None / Uncategorized"
+                className="h-8"
+              />
             </div>
           )}
         </div>

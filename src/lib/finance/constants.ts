@@ -10,6 +10,10 @@ export const ACCOUNT_KINDS = [
   'loan',
   'other_asset',
   'other_liability',
+  'epf',
+  'vpf',
+  'ppf',
+  'nps',
 ] as const;
 
 export type AccountKind = (typeof ACCOUNT_KINDS)[number];
@@ -29,6 +33,10 @@ export const ACCOUNT_KIND_CLASS_MAP: Record<AccountKind, AccountClass> = {
   loan: 'liability',
   other_asset: 'asset',
   other_liability: 'liability',
+  epf: 'asset',
+  vpf: 'asset',
+  ppf: 'asset',
+  nps: 'asset',
 };
 
 export const TRANSACTION_TYPES = ['expense', 'income', 'transfer', 'adjustment'] as const;

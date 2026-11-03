@@ -40,8 +40,8 @@ export function UpdateValuationDialog({
   React.useEffect(() => {
     if (account) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setValueRupees(((account.currentValue || account.balance) / 100).toString());
-      setCostBasisRupees(((account.costBasis || account.balance) / 100).toString());
+      setValueRupees(((account.currentValue ?? account.balance) / 100).toString());
+      setCostBasisRupees(((account.costBasis ?? account.balance) / 100).toString());
       setDate(todayInTz(DEFAULT_TZ));
       setNote('');
       setError(null);

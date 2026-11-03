@@ -29,4 +29,5 @@ export interface AccountWithBalance extends AccountDTO {
   compoundingFrequency?: string; // for FD
   maturityDate?: string; // YYYY-MM-DD
   nextInstallmentDate?: string; // YYYY-MM-DD
+  pensionMemo?: number; // in paise (for EPF/VPF EPS pension)
 }

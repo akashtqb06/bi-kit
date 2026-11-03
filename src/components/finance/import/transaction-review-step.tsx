@@ -21,6 +21,7 @@ import {
   XCircleIcon,
 } from 'lucide-react';
 import { formatINR } from '@src/components/finance/shared/format';
+import { CategoryCombobox } from '../shared/category-combobox';
 import type { ParsedImportRow } from '@src/lib/finance/import/types';
 import type { CategoryDTO } from '@src/lib/finance/contract';
 
@@ -416,26 +417,15 @@ export function TransactionReviewStep({
                   {/* Category Inline Dropdown */}
                   <td className="p-3">
                     <div className="flex flex-col gap-1.5">
-                      <Select
-                        value={row.selectedCategoryId || '__uncategorized__'}
+                      <CategoryCombobox
+                        value={row.selectedCategoryId}
                         disabled={!row.isValid}
-                        onValueChange={(val) => handleCategoryChange(row.id, (!val || val === '__uncategorized__') ? '' : val)}
-                      >
-                        <SelectTrigger
-                          aria-label={`Category for ${row.description}`}
-                          className="w-full h-8 text-xs bg-background"
-                        >
-                          <SelectValue placeholder="-- Uncategorized --" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__uncategorized__" className="text-xs">-- Uncategorized --</SelectItem>
-                          {categories.map((c) => (
-                            <SelectItem key={c.id} value={c.id} className="text-xs">
-                              {c.name} ({c.type})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        onValueChange={(val) => handleCategoryChange(row.id, val)}
+                        categories={categories}
+                        includeUncategorized
+                        placeholder="-- Uncategorized --"
+                        className="h-8"
+                      />
 
                       {/* Rule Badge & Option to save rule */}
                       <div className="flex items-center gap-1.5 flex-wrap">

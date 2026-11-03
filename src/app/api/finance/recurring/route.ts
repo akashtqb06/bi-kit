@@ -5,12 +5,16 @@ import { jsonNoStore } from '../utils';
 import { createRecurringRuleSchema } from '@src/lib/finance/contract';
 import { getFinanceService } from '@src/lib/finance/service';
 import { checkFeatureGatedApi } from '@src/lib/finance/flags';
+import { catchUpRecurringRulesIfDue, generateDueRecurringTransactions } from '@src/lib/finance/recurring';
+import { todayInTz, DEFAULT_TZ } from '@src/lib/finance/timezone';
 
 export async function GET() {
   try {
     const user = await requireUserApi();
     const gated = checkFeatureGatedApi('recurring');
     if (gated) return gated;
+
+    await catchUpRecurringRulesIfDue(user.id);
 
     const service = getFinanceService();
     const rules = await service.listRecurringRules(user.id);
@@ -31,6 +35,13 @@ export async function POST(request: NextRequest) {
 
     const service = getFinanceService();
     const rule = await service.createRecurringRule(user.id, data);
+
+    const today = todayInTz(DEFAULT_TZ);
+    await generateDueRecurringTransactions({
+      userId: user.id,
+      asOfDate: today,
+    });
+
     return NextResponse.json({ rule }, { status: 201 });
   } catch (err) {
     return handleApiError(err);
