@@ -92,29 +92,25 @@ export function isTxAfterValuation(
   anchorDate: string,
   anchorCreatedAt: number | null
 ): boolean {
-  const txCreatedAt = tx.createdAt ? new Date(tx.createdAt).getTime() : null;
-
-  // 1. If transaction was created after the valuation anchor was recorded,
-  // it was chronologically impossible to have been in that valuation snapshot.
-  if (anchorCreatedAt != null && txCreatedAt != null && txCreatedAt >= anchorCreatedAt) {
-    return true;
-  }
-
-  // 2. Recurring transactions are generated dynamically and compound into holdings
-  if (tx.isRecurring && tx.date >= anchorDate) {
-    return true;
-  }
-
-  // 3. Transactions dated strictly after the valuation date
+  // 1. Transactions dated strictly after the valuation date always occurred after the anchor snapshot.
   if (tx.date > anchorDate) {
     return true;
   }
 
-  // 4. Same day transaction when timestamps are not provided
-  if (tx.date === anchorDate && (!anchorCreatedAt || !txCreatedAt)) {
-    return true;
+  // 2. Transactions dated strictly before the valuation date occurred before the anchor snapshot.
+  if (tx.date < anchorDate) {
+    return false;
   }
 
+  // 3. For transactions on the same date as the valuation anchor (tx.date === anchorDate):
+  // Compare timestamps if available.
+  const txCreatedAt = tx.createdAt ? new Date(tx.createdAt).getTime() : null;
+  if (anchorCreatedAt != null && txCreatedAt != null) {
+    return txCreatedAt > anchorCreatedAt;
+  }
+
+  // If timestamps are not available on the same date, assume the valuation was recorded
+  // as an end-of-day snapshot (occurring after same-day transactions).
   return false;
 }
 

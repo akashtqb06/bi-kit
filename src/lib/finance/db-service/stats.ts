@@ -135,10 +135,11 @@ export async function getOverviewStats(
           costBasis: finValuations.costBasis,
           note: finValuations.note,
           createdAt: finValuations.createdAt,
+          updatedAt: finValuations.updatedAt,
         })
         .from(finValuations)
         .where(and(inArray(finValuations.accountId, accountIds), lte(finValuations.date, today)))
-        .orderBy(desc(finValuations.date), desc(finValuations.createdAt))
+        .orderBy(desc(finValuations.date), desc(finValuations.updatedAt), desc(finValuations.createdAt))
     : [];
 
   // Map latest valuation per account
@@ -155,7 +156,7 @@ export async function getOverviewStats(
         value: Number(v.value),
         costBasis: v.costBasis !== null && v.costBasis !== undefined ? Number(v.costBasis) : null,
         note: v.note,
-        createdAt: v.createdAt,
+        createdAt: v.updatedAt || v.createdAt,
       });
     }
   }

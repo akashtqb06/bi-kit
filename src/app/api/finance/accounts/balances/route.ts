@@ -100,6 +100,7 @@ export async function GET() {
               date: finValuations.date,
               note: finValuations.note,
               createdAt: finValuations.createdAt,
+              updatedAt: finValuations.updatedAt,
             })
             .from(finValuations)
             .where(
@@ -108,7 +109,7 @@ export async function GET() {
                 lte(finValuations.date, today)
               )
             )
-            .orderBy(finValuations.accountId, desc(finValuations.date), desc(finValuations.createdAt))
+            .orderBy(finValuations.accountId, desc(finValuations.date), desc(finValuations.updatedAt), desc(finValuations.createdAt))
         : [];
 
     // Build maps
@@ -127,7 +128,7 @@ export async function GET() {
           costBasis: v.costBasis !== null && v.costBasis !== undefined ? Number(v.costBasis) : null,
           date: v.date,
           note: v.note,
-          createdAt: v.createdAt,
+          createdAt: v.updatedAt || v.createdAt,
         });
       }
       if (!manualAnchorMap.has(v.accountId) && v.note !== 'computed') {

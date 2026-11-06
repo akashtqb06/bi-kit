@@ -313,6 +313,7 @@ export async function getAccountHistory(
         costBasis: finValuations.costBasis,
         note: finValuations.note,
         createdAt: finValuations.createdAt,
+        updatedAt: finValuations.updatedAt,
       })
       .from(finValuations)
       .where(and(eq(finValuations.accountId, accountId), sql`${finValuations.date} <= ${endDate}`))
@@ -370,7 +371,7 @@ export async function getAccountHistory(
             value: Number(v.value),
             costBasis: v.costBasis !== null && v.costBasis !== undefined ? Number(v.costBasis) : null,
             note: v.note,
-            createdAt: v.createdAt,
+            createdAt: v.updatedAt || v.createdAt,
           };
         }
       }
