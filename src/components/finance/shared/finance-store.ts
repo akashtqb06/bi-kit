@@ -91,6 +91,7 @@ export interface FinanceState {
     accountId: string,
     options?: { from?: string; to?: string; preset?: string }
   ) => Promise<void>;
+  refreshValuations: (accountId: string) => Promise<void>;
   refreshCategories: () => Promise<void>;
   refreshBudgets: (filters?: BudgetFilters) => Promise<void>;
   openQuickAdd: (initialData?: Partial<CreateTransactionDTO>) => void;
@@ -358,6 +359,25 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
           [accountId]: 'error',
         },
       }));
+    }
+  },
+
+  refreshValuations: async (accountId: string) => {
+    try {
+      const res = await fetch(`/api/finance/valuations?accountId=${accountId}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+      });
+      if (!res.ok) throw new Error(`Valuations request failed: ${res.status}`);
+      const data = await res.json();
+      set((state) => ({
+        valuations: {
+          ...state.valuations,
+          [accountId]: Array.isArray(data.valuations) ? data.valuations : [],
+        },
+      }));
+    } catch (err) {
+      console.error(`Failed to load valuations for account ${accountId}:`, err);
     }
   },
 
@@ -958,6 +978,8 @@ export const useFinanceStore = create<FinanceState>((set, get, api) => {
       get().refreshAccounts(),
       get().refreshOverviewStats(),
       get().refreshNetWorthHistory(),
+      get().refreshValuations(data.accountId),
+      get().refreshAccountHistory(data.accountId),
     ]);
     return valuation;
   },

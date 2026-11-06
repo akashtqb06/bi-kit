@@ -43,6 +43,7 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
     accountHistory,
     refreshAccountHistory,
     refreshAccounts,
+    refreshValuations,
     valuations,
     deleteAccount,
     openQuickAdd,
@@ -78,6 +79,11 @@ export function AccountDetailView({ accountId }: { accountId: string }) {
   useEffect(() => {
     void refreshAccounts();
   }, [accountId, refreshAccounts]);
+
+  // Load valuations for investment accounts
+  useEffect(() => {
+    void refreshValuations(accountId);
+  }, [accountId, refreshValuations]);
 
   // Fetch account history from server
   useEffect(() => {
