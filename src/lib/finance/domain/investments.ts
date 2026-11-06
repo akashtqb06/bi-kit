@@ -161,14 +161,26 @@ export function calculateInvestmentHolding(params: {
     currentValue =
       latestValuation != null ? latestValuation.value + netTransfers : costBasis;
   } else {
-    // Manual valuation anchor recorded on latestValuation.date
+    // Manual valuation anchor recorded on latestValuation.date.
+    // Cost basis is ALWAYS derived from transactions — the stored costBasis on a
+    // non-opening valuation is intentionally ignored so that "Update Value" only
+    // records the current market price without overriding the transaction-based
+    // invested amount.
     const anchorDate = latestValuation.date;
     const anchorCreatedAt = latestValuation.createdAt
       ? new Date(latestValuation.createdAt).getTime()
       : null;
 
-    let netTransfersAfterAnchor = 0;
+    // All contributions up to (and including) the anchor valuation
+    const allTxsUpToAnchor = validTxs.filter(
+      (t) => !isTxAfterValuation(t, anchorDate, anchorCreatedAt)
+    );
+    const baseCost =
+      openingContribution +
+      calculateInvestmentContributions(allTxsUpToAnchor, accountId, anchorDate);
 
+    // Net new transfers added after the anchor (not yet captured in the valuation)
+    let netTransfersAfterAnchor = 0;
     for (const tx of validTxs) {
       if (tx.type === 'transfer' && isTxAfterValuation(tx, anchorDate, anchorCreatedAt)) {
         if (tx.toAccountId === accountId) {
@@ -179,16 +191,6 @@ export function calculateInvestmentHolding(params: {
         }
       }
     }
-
-    const baseCost =
-      latestValuation.costBasis != null
-        ? latestValuation.costBasis
-        : openingContribution +
-          calculateInvestmentContributions(
-            validTxs.filter((t) => !isTxAfterValuation(t, anchorDate, anchorCreatedAt)),
-            accountId,
-            anchorDate
-          );
 
     costBasis = baseCost + netTransfersAfterAnchor;
     currentValue = latestValuation.value + netTransfersAfterAnchor;

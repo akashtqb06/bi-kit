@@ -31,7 +31,6 @@ export function UpdateValuationDialog({
   const { addValuation } = useFinanceStore();
 
   const [valueRupees, setValueRupees] = useState('');
-  const [costBasisRupees, setCostBasisRupees] = useState('');
   const [date, setDate] = useState(() => todayInTz(DEFAULT_TZ));
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -41,7 +40,6 @@ export function UpdateValuationDialog({
     if (account) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setValueRupees(((account.currentValue ?? account.balance) / 100).toString());
-      setCostBasisRupees(((account.costBasis ?? account.balance) / 100).toString());
       setDate(todayInTz(DEFAULT_TZ));
       setNote('');
       setError(null);
@@ -73,13 +71,13 @@ export function UpdateValuationDialog({
     try {
       setIsSubmitting(true);
       const valPaise = rupeesToPaise(val);
-      const costBasisPaise = costBasisRupees ? rupeesToPaise(parseFloat(costBasisRupees)) : undefined;
 
       await addValuation({
         accountId: account.id,
         date,
         value: valPaise,
-        costBasis: costBasisPaise,
+        // Do NOT send costBasis — it is always derived from transactions.
+        // Storing it here would override the transaction-based invested amount.
         note: note.trim() || undefined,
       });
 
@@ -119,20 +117,6 @@ export function UpdateValuationDialog({
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="val-cost-basis" className="text-xs font-medium text-muted-foreground">
-              Total Invested / Cost Basis (₹)
-            </Label>
-            <Input
-              id="val-cost-basis"
-              type="number"
-              step="0.01"
-              className="h-9 text-xs"
-              value={costBasisRupees}
-              onChange={(e) => setCostBasisRupees(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-1">
             <Label htmlFor="val-date" className="text-xs font-medium text-muted-foreground">
               Valuation Date
             </Label>
@@ -159,6 +143,10 @@ export function UpdateValuationDialog({
               onChange={(e) => setNote(e.target.value)}
             />
           </div>
+
+          <p className="text-[11px] text-muted-foreground">
+            💡 Total Invested (cost basis) is always derived from your transactions — only the market value is recorded here.
+          </p>
 
           {error && <p className="text-xs text-destructive">{error}</p>}
 
